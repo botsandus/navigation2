@@ -195,8 +195,8 @@ geometry_msgs::msg::TwistStamped RegulatedPurePursuitController::computeVelocity
                                         last_point.x - previous_last_point.x);
     double distance_after_last = lookahead_dist - sqrt(carrot_dist2);
     geometry_msgs::msg::Point interpolated_carrot;
-    interpolated_carrot.x = cos(end_path_orientation) * distance_after_last;
-    interpolated_carrot.y = sin(end_path_orientation) * distance_after_last;
+    interpolated_carrot.x = last_point.x + cos(end_path_orientation) * distance_after_last;
+    interpolated_carrot.y = last_point.y + sin(end_path_orientation) * distance_after_last;
     double interpolated_carrot_dist2 =
         (interpolated_carrot.x * interpolated_carrot.x) +
         (interpolated_carrot.y * interpolated_carrot.y);
