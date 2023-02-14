@@ -187,12 +187,18 @@ geometry_msgs::msg::TwistStamped RegulatedPurePursuitController::computeVelocity
   // Handle special case of the carrot point being the last point of the path
   // We compute the curvature based on the interpolated position of the lookahead point
   if (params_->interpolate_curvature_at_goal
-      && carrot_pose.pose.position == transformed_plan.poses.back().pose.position
-      && transformed_plan.poses.size() > 1) {
+      && carrot_pose.pose.position == transformed_plan.poses.back().pose.position)
+  {
+    double end_path_orientation;
     geometry_msgs::msg::Point last_point = transformed_plan.poses.back().pose.position;
-    geometry_msgs::msg::Point previous_last_point = std::prev(transformed_plan.poses.end(),2)->pose.position;
-    double end_path_orientation = atan2(last_point.y - previous_last_point.y,
-                                        last_point.x - previous_last_point.x);
+    if (transformed_plan.poses.size() == 1) {
+      // Handling only one pose left on path
+      end_path_orientation = tf2::getYaw(transformed_plan.poses.back().pose.orientation);
+    } else {
+      geometry_msgs::msg::Point previous_last_point = std::prev(transformed_plan.poses.end(),2)->pose.position;
+      end_path_orientation = atan2(last_point.y - previous_last_point.y,
+                                   last_point.x - previous_last_point.x);
+    }
     double distance_after_last = lookahead_dist - sqrt(carrot_dist2);
     geometry_msgs::msg::Point interpolated_carrot;
     interpolated_carrot.x = last_point.x + cos(end_path_orientation) * distance_after_last;
@@ -203,7 +209,7 @@ geometry_msgs::msg::TwistStamped RegulatedPurePursuitController::computeVelocity
     curvature = 2.0 * interpolated_carrot.y / interpolated_carrot_dist2;
   }
 
-  carrot_pub_->publish(createCarrotMsg(carrot_pose));
+  //carrot_pub_->publish(createCarrotMsg(carrot_pose));
 
   double linear_vel, angular_vel;
 
