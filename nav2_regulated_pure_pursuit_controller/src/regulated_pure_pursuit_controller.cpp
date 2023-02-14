@@ -209,7 +209,7 @@ geometry_msgs::msg::TwistStamped RegulatedPurePursuitController::computeVelocity
     curvature = 2.0 * interpolated_carrot.y / interpolated_carrot_dist2;
   }
 
-  //carrot_pub_->publish(createCarrotMsg(carrot_pose));
+  carrot_pub_->publish(createCarrotMsg(carrot_pose));
 
   double linear_vel, angular_vel;
 
