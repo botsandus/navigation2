@@ -25,6 +25,7 @@
 #include "nav2_util/node_utils.hpp"
 #include "nav2_util/geometry_utils.hpp"
 #include "nav2_costmap_2d/costmap_filters/filter_values.hpp"
+#include <nav2_amcl/angleutils.hpp>
 
 using std::hypot;
 using std::min;
@@ -200,7 +201,7 @@ geometry_msgs::msg::TwistStamped RegulatedPurePursuitController::computeVelocity
   if (shouldRotateToGoalHeading(carrot_pose)) {
     double angle_to_goal = tf2::getYaw(transformed_plan.poses.back().pose.orientation);
     rotateToHeading(linear_vel, angular_vel, angle_to_goal, speed);
-  } else if (shouldRotateToPath(carrot_pose, angle_to_heading)) {
+  } else if (shouldRotateToPath(carrot_pose, angle_to_heading, sign)) {
     rotateToHeading(linear_vel, angular_vel, angle_to_heading, speed);
   } else {
     applyConstraints(
@@ -229,11 +230,16 @@ geometry_msgs::msg::TwistStamped RegulatedPurePursuitController::computeVelocity
 }
 
 bool RegulatedPurePursuitController::shouldRotateToPath(
-  const geometry_msgs::msg::PoseStamped & carrot_pose, double & angle_to_path)
+  const geometry_msgs::msg::PoseStamped & carrot_pose, double & angle_to_path, double sign)
 {
   // Whether we should rotate robot to rough path heading
-  angle_to_path = atan2(carrot_pose.pose.position.y, carrot_pose.pose.position.x);
-  return params_->use_rotate_to_heading &&
+  if (sign >=0) {
+    angle_to_path = atan2(carrot_pose.pose.position.y, carrot_pose.pose.position.x);
+  } else {
+    angle_to_path = nav2_amcl::angleutils::normalize(
+          atan2(carrot_pose.pose.position.y, carrot_pose.pose.position.x) + M_PI);
+  }
+  return params_->use_rotate_to_path &&
          fabs(angle_to_path) > params_->rotate_to_heading_min_angle;
 }
 

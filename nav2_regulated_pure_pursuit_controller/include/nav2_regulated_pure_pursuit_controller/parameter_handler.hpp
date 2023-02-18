@@ -50,6 +50,7 @@ struct Parameters
   double regulated_linear_scaling_min_radius;
   double regulated_linear_scaling_min_speed;
   bool use_rotate_to_heading;
+  bool use_rotate_to_path;
   double max_angular_accel;
   double rotate_to_heading_min_angle;
   bool allow_reversing;
