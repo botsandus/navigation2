@@ -92,6 +92,9 @@ ParameterHandler::ParameterHandler(
     node, plugin_name_ + ".use_interpolation",
     rclcpp::ParameterValue(true));
   declare_parameter_if_not_declared(
+    node, plugin_name_ + ".interpolate_curvature_at_goal",
+    rclcpp::ParameterValue(false));
+  declare_parameter_if_not_declared(
     node, plugin_name_ + ".use_collision_detection",
     rclcpp::ParameterValue(true));
 
@@ -151,6 +154,9 @@ ParameterHandler::ParameterHandler(
   node->get_parameter(
     plugin_name_ + ".use_interpolation",
     params_.use_interpolation);
+  node->get_parameter(
+    plugin_name_ + ".interpolate_curvature_at_goal",
+    params_.interpolate_curvature_at_goal);
   node->get_parameter(
     plugin_name_ + ".use_collision_detection",
     params_.use_collision_detection);

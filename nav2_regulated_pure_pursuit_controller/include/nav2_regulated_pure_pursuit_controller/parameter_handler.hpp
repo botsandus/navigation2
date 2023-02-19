@@ -56,6 +56,7 @@ struct Parameters
   bool allow_reversing;
   double max_robot_pose_search_dist;
   bool use_interpolation;
+  bool interpolate_curvature_at_goal;
   bool use_collision_detection;
   double transform_tolerance;
 };

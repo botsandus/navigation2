@@ -172,9 +172,6 @@ geometry_msgs::msg::TwistStamped RegulatedPurePursuitController::computeVelocity
 
   // Get the particular point on the path at the lookahead distance
   auto carrot_pose = getLookAheadPoint(lookahead_dist, transformed_plan);
-  carrot_pub_->publish(createCarrotMsg(carrot_pose));
-
-  double linear_vel, angular_vel;
 
   // Find distance^2 to look ahead point (carrot) in robot base frame
   // This is the chord length of the circle
@@ -187,6 +184,37 @@ geometry_msgs::msg::TwistStamped RegulatedPurePursuitController::computeVelocity
   if (carrot_dist2 > 0.001) {
     curvature = 2.0 * carrot_pose.pose.position.y / carrot_dist2;
   }
+
+  // Handle special case of the carrot point being the last point of the path
+  // We compute the curvature based on the interpolated position of the lookahead point
+  if (params_->interpolate_curvature_at_goal
+      && carrot_pose.pose.position == transformed_plan.poses.back().pose.position)
+  {
+    double end_path_orientation;
+    geometry_msgs::msg::Point last_point = transformed_plan.poses.back().pose.position;
+    if (transformed_plan.poses.size() == 1) {
+      // Handling only one pose left on path
+      end_path_orientation = tf2::getYaw(transformed_plan.poses.back().pose.orientation);
+    } else {
+      geometry_msgs::msg::Point previous_last_point = std::prev(transformed_plan.poses.end(),2)->pose.position;
+      end_path_orientation = atan2(last_point.y - previous_last_point.y,
+                                   last_point.x - previous_last_point.x);
+    }
+    double distance_after_last = lookahead_dist - sqrt(carrot_dist2);
+    geometry_msgs::msg::Point interpolated_carrot;
+    interpolated_carrot.x = last_point.x + cos(end_path_orientation) * distance_after_last;
+    interpolated_carrot.y = last_point.y + sin(end_path_orientation) * distance_after_last;
+    double interpolated_carrot_dist2 =
+        (interpolated_carrot.x * interpolated_carrot.x) +
+        (interpolated_carrot.y * interpolated_carrot.y);
+    curvature = 2.0 * interpolated_carrot.y / interpolated_carrot_dist2;
+  }
+
+  carrot_pub_->publish(createCarrotMsg(carrot_pose));
+
+  double linear_vel, angular_vel;
+
+
 
   // Setting the velocity direction
   double sign = 1.0;
