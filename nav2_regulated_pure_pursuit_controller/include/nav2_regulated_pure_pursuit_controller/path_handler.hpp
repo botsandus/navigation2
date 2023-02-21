@@ -79,7 +79,7 @@ public:
   void setPlan(const nav_msgs::msg::Path & path) {
     global_plan_ = path;
     if (path.poses.size() > 1) {
-      previous_last_pose_ = *std::prev(path.poses.end(),2);
+      previous_last_pose_ = *std::prev(path.poses.end(), 2);
     }
   }
 

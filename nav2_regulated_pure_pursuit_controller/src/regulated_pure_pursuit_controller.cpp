@@ -212,7 +212,7 @@ geometry_msgs::msg::TwistStamped RegulatedPurePursuitController::computeVelocity
             transformed_plan.poses.back().header.frame_id, before_last_pose, before_last_pose);
       before_last_point = before_last_pose.pose.position;
     } else {
-      before_last_point = std::prev(transformed_plan.poses.end(),2)->pose.position;
+      before_last_point = std::prev(transformed_plan.poses.end(), 2)->pose.position;
     }
 
     end_path_orientation = atan2(last_point.y - before_last_point.y,
