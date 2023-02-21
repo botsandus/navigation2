@@ -76,7 +76,8 @@ public:
     const geometry_msgs::msg::PoseStamped & in_pose,
     geometry_msgs::msg::PoseStamped & out_pose) const;
 
-  void setPlan(const nav_msgs::msg::Path & path) {
+  void setPlan(const nav_msgs::msg::Path & path)
+  {
     global_plan_ = path;
     if (path.poses.size() > 1) {
       previous_last_pose_ = *std::prev(path.poses.end(), 2);
