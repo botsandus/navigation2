@@ -25,6 +25,7 @@
 #include "nav2_util/node_utils.hpp"
 #include "nav2_util/geometry_utils.hpp"
 #include "nav2_costmap_2d/costmap_filters/filter_values.hpp"
+#include <nav2_amcl/angleutils.hpp>
 
 using std::hypot;
 using std::min;
@@ -73,6 +74,8 @@ void RegulatedPurePursuitController::configure(
 
   global_path_pub_ = node->create_publisher<nav_msgs::msg::Path>("received_global_plan", 1);
   carrot_pub_ = node->create_publisher<geometry_msgs::msg::PointStamped>("lookahead_point", 1);
+  interpolated_carrot_pub_ = node->create_publisher<geometry_msgs::msg::PointStamped>(
+    "interpolated_lookahead_point", 1);
 }
 
 void RegulatedPurePursuitController::cleanup()
@@ -84,6 +87,7 @@ void RegulatedPurePursuitController::cleanup()
     plugin_name_.c_str());
   global_path_pub_.reset();
   carrot_pub_.reset();
+  interpolated_carrot_pub_.reset();
 }
 
 void RegulatedPurePursuitController::activate()
@@ -95,6 +99,7 @@ void RegulatedPurePursuitController::activate()
     plugin_name_.c_str());
   global_path_pub_->on_activate();
   carrot_pub_->on_activate();
+  interpolated_carrot_pub_->on_activate();
 }
 
 void RegulatedPurePursuitController::deactivate()
@@ -106,6 +111,7 @@ void RegulatedPurePursuitController::deactivate()
     plugin_name_.c_str());
   global_path_pub_->on_deactivate();
   carrot_pub_->on_deactivate();
+  interpolated_carrot_pub_->on_deactivate();
 }
 
 std::unique_ptr<geometry_msgs::msg::PointStamped> RegulatedPurePursuitController::createCarrotMsg(
@@ -186,49 +192,66 @@ geometry_msgs::msg::TwistStamped RegulatedPurePursuitController::computeVelocity
 
   // Handle special case of the carrot point being the last point of the path
   // We compute the curvature based on the interpolated position of the lookahead point
-  if (params_->interpolate_curvature_at_goal
-      && carrot_pose.pose.position == transformed_plan.poses.back().pose.position)
+  // Interpolation is done based on the orientation of the vector connecting the last two poses
+  geometry_msgs::msg::PoseStamped interpolated_carrot = carrot_pose;
+  if (params_->interpolate_curvature_at_goal &&
+    carrot_pose.pose.position == transformed_plan.poses.back().pose.position)
   {
     double end_path_orientation;
+    double distance_after_last_pose = lookahead_dist - sqrt(carrot_dist2);
+
     geometry_msgs::msg::Point last_point = transformed_plan.poses.back().pose.position;
+    geometry_msgs::msg::Point before_last_point;
+
     if (transformed_plan.poses.size() == 1) {
-      // Handling only one pose left on path
-      end_path_orientation = tf2::getYaw(transformed_plan.poses.back().pose.orientation);
+      // Handle only one pose left on path
+      distance_after_last_pose = lookahead_dist;
+      geometry_msgs::msg::PoseStamped before_last_pose = path_handler_->getBeforeLastPose();
+      before_last_pose.header.stamp = rclcpp::Time(0);
+      path_handler_->transformPose(
+        transformed_plan.poses.back().header.frame_id, before_last_pose, before_last_pose);
+      before_last_point = before_last_pose.pose.position;
     } else {
-      geometry_msgs::msg::Point previous_last_point = std::prev(transformed_plan.poses.end(),2)->pose.position;
-      end_path_orientation = atan2(last_point.y - previous_last_point.y,
-                                   last_point.x - previous_last_point.x);
+      before_last_point = std::prev(transformed_plan.poses.end(), 2)->pose.position;
     }
-    double distance_after_last = lookahead_dist - sqrt(carrot_dist2);
-    geometry_msgs::msg::Point interpolated_carrot;
-    interpolated_carrot.x = last_point.x + cos(end_path_orientation) * distance_after_last;
-    interpolated_carrot.y = last_point.y + sin(end_path_orientation) * distance_after_last;
+
+    end_path_orientation = atan2(
+      last_point.y - before_last_point.y,
+      last_point.x - before_last_point.x);
+
+    interpolated_carrot.pose.position.x = last_point.x +
+      cos(end_path_orientation) * distance_after_last_pose;
+    interpolated_carrot.pose.position.y = last_point.y +
+      sin(end_path_orientation) * distance_after_last_pose;
+
     double interpolated_carrot_dist2 =
-        (interpolated_carrot.x * interpolated_carrot.x) +
-        (interpolated_carrot.y * interpolated_carrot.y);
-    curvature = 2.0 * interpolated_carrot.y / interpolated_carrot_dist2;
+      (interpolated_carrot.pose.position.x * interpolated_carrot.pose.position.x) +
+      (interpolated_carrot.pose.position.y * interpolated_carrot.pose.position.y);
+    curvature = 2.0 * interpolated_carrot.pose.position.y / interpolated_carrot_dist2;
+
+    interpolated_carrot_pub_->publish(createCarrotMsg(interpolated_carrot));
   }
 
   carrot_pub_->publish(createCarrotMsg(carrot_pose));
 
   double linear_vel, angular_vel;
 
-
-
   // Setting the velocity direction
-  double sign = 1.0;
+  double sign, interpolated_sign = 1.0;
   if (params_->allow_reversing) {
     sign = carrot_pose.pose.position.x >= 0.0 ? 1.0 : -1.0;
+    interpolated_sign = interpolated_carrot.pose.position.x >= 0.0 ? 1.0 : -1.0;
   }
 
   linear_vel = params_->desired_linear_vel;
 
   // Make sure we're in compliance with basic constraints
+  // Using interpolated carrot for rotate to Path (if interpolate_curvature_at_goal = true)
   double angle_to_heading;
   if (shouldRotateToGoalHeading(carrot_pose)) {
     double angle_to_goal = tf2::getYaw(transformed_plan.poses.back().pose.orientation);
     rotateToHeading(linear_vel, angular_vel, angle_to_goal, speed);
-  } else if (shouldRotateToPath(carrot_pose, angle_to_heading)) {
+  } else if (shouldRotateToPath(interpolated_carrot, angle_to_heading, interpolated_sign)) {
     rotateToHeading(linear_vel, angular_vel, angle_to_heading, speed);
   } else {
     applyConstraints(
@@ -257,11 +280,16 @@ geometry_msgs::msg::TwistStamped RegulatedPurePursuitController::computeVelocity
 }
 
 bool RegulatedPurePursuitController::shouldRotateToPath(
-  const geometry_msgs::msg::PoseStamped & carrot_pose, double & angle_to_path)
+  const geometry_msgs::msg::PoseStamped & carrot_pose, double & angle_to_path, double sign)
 {
   // Whether we should rotate robot to rough path heading
-  angle_to_path = atan2(carrot_pose.pose.position.y, carrot_pose.pose.position.x);
-  return params_->use_rotate_to_heading &&
+  if (sign >= 0) {
+    angle_to_path = atan2(carrot_pose.pose.position.y, carrot_pose.pose.position.x);
+  } else {
+    angle_to_path = nav2_amcl::angleutils::normalize(
+      atan2(carrot_pose.pose.position.y, carrot_pose.pose.position.x) + M_PI);
+  }
+  return params_->use_rotate_to_path &&
          fabs(angle_to_path) > params_->rotate_to_heading_min_angle;
 }
 

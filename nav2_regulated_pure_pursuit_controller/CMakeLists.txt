@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.5)
 project(nav2_regulated_pure_pursuit_controller)
 
 find_package(ament_cmake REQUIRED)
+find_package(nav2_amcl REQUIRED)
 find_package(nav2_common REQUIRED)
 find_package(nav2_core REQUIRED)
 find_package(nav2_costmap_2d REQUIRED)
@@ -30,6 +31,7 @@ set(dependencies
   nav2_core
   tf2
   tf2_geometry_msgs
+  nav2_amcl
 )
 
 set(library_name nav2_regulated_pure_pursuit_controller)

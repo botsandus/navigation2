@@ -77,7 +77,7 @@ public:
   bool shouldRotateToPathWrapper(
     const geometry_msgs::msg::PoseStamped & carrot_pose, double & angle_to_path)
   {
-    return shouldRotateToPath(carrot_pose, angle_to_path);
+    return shouldRotateToPath(carrot_pose, angle_to_path, 1.0);
   }
 
   bool shouldRotateToGoalHeadingWrapper(const geometry_msgs::msg::PoseStamped & carrot_pose)
