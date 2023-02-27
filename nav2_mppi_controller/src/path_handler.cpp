@@ -67,7 +67,7 @@ PathHandler::getGlobalPlanConsideringBoundsInCostmapFrame(
   // Transforming it to the costmap frame in the same loop
   for (auto global_plan_pose = closest_point; global_plan_pose != end; ++global_plan_pose) {
     // Distance relative to robot pose check
-    auto distance = euclidean_distance(global_pose, *global_plan_pose);
+    auto distance = nav2_util::geometry_utils::calculate_path_length(transformed_plan);
     if (distance >= prune_distance_) {
       return {transformed_plan, closest_point};
     }
