@@ -68,8 +68,9 @@ PathHandler::getGlobalPlanConsideringBoundsInCostmapFrame(
   // Find the furthest relevent pose on the path to consider within costmap
   // bounds
   // Transforming it to the costmap frame in the same loop
-  for (auto global_plan_pose = closest_point; global_plan_pose != pose_above_prune_distance; ++global_plan_pose) {
-
+  for (auto global_plan_pose = closest_point; global_plan_pose != pose_above_prune_distance;
+    ++global_plan_pose)
+  {
     // Transform from global plan frame to costmap frame
     geometry_msgs::msg::PoseStamped costmap_plan_pose;
     global_plan_pose->header.stamp = global_pose.header.stamp;
