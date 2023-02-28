@@ -119,6 +119,8 @@ nav_msgs::msg::Path PathHandler::transformPath(
 
   if (enforce_inversion_) {
     planUpToInversion(global_pose);
+  } else {
+    global_plan_end_ = global_plan_.poses.end();
   }
 
   auto [transformed_plan, lower_bound] = getGlobalPlanConsideringBoundsInCostmapFrame(global_pose);
@@ -163,6 +165,7 @@ double PathHandler::getMaxCostmapDist()
 void PathHandler::setPath(const nav_msgs::msg::Path & plan)
 {
   global_plan_ = plan;
+  std::cout << "setPath" << std::endl;
   global_plan_end_ = global_plan_.poses.end();
 }
 
