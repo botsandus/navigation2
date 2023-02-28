@@ -88,6 +88,8 @@ public:
    */
   nav_msgs::msg::Path transformPath(const geometry_msgs::msg::PoseStamped & robot_pose);
 
+  bool planUpToInversion(const geometry_msgs::msg::PoseStamped & robot_pose);
+
 protected:
   /**
     * @brief Transform a pose to another frame
@@ -135,11 +137,17 @@ protected:
   ParametersHandler * parameters_handler_;
 
   nav_msgs::msg::Path global_plan_;
+  PathIterator global_plan_end_;
   rclcpp::Logger logger_{rclcpp::get_logger("MPPIController")};
 
   double max_robot_pose_search_dist_{0};
   double prune_distance_{0};
   double transform_tolerance_{0};
+
+  bool enforce_inversion_{false};
+  double inversion_xy_tolerance_{0};
+  double inversion_yaw_tolerance{0};
+
 };
 }  // namespace mppi
 

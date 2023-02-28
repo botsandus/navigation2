@@ -29,6 +29,7 @@
 
 #include "angles/angles.h"
 
+#include "nav2_mppi_controller/tools/path_handler.hpp"
 #include "tf2/utils.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 
@@ -516,6 +517,34 @@ inline void savitskyGolayFilter(
     control_sequence.vx(offset),
     control_sequence.vy(offset),
     control_sequence.wz(offset)};
+}
+
+/**
+ * @brief Find the iterator of the first pose at which there is an inversion on the path,
+ * @path path to check for inversion
+ */
+inline PathIterator findFirstPathInversion(nav_msgs::msg::Path & path) {
+  // At least 3 poses for a possible inversion
+  if (path.poses.size() < 3) {
+    return path.poses.end();
+  }
+
+  for (PathIterator it = std::next(path.poses.begin()); it != std::prev(path.poses.end()); it++) {
+    std::prev(it);
+    double a_angle = atan2(
+      it->pose.position.y - std::prev(it)->pose.position.y,
+      it->pose.position.x - std::prev(it)->pose.position.x);
+    double b_angle = atan2(
+      std::next(it)->pose.position.y - it->pose.position.y,
+      std::next(it)->pose.position.x - it->pose.position.x);
+    double angle_increment = angles::shortest_angular_distance(a_angle, b_angle);
+
+    if (fabs(angle_increment) > M_PI_2) {
+      return std::next(it);
+    }
+  }
+
+  return path.poses.end();
 }
 
 }  // namespace mppi::utils

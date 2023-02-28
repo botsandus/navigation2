@@ -35,6 +35,11 @@ void PathHandler::initialize(
   getParam(max_robot_pose_search_dist_, "max_robot_pose_search_dist", getMaxCostmapDist());
   getParam(prune_distance_, "prune_distance", 1.5);
   getParam(transform_tolerance_, "transform_tolerance", 0.1);
+  getParam(enforce_inversion_, "enforce_inversion", false);
+  if (enforce_inversion_) {
+    getParam(inversion_xy_tolerance_, "inversion_xy_tolerance", 0.1);
+    getParam(inversion_yaw_tolerance, "inversion_yaw_tolerance", 0.1);
+  }
 }
 
 std::pair<nav_msgs::msg::Path, PathIterator>
@@ -62,15 +67,14 @@ PathHandler::getGlobalPlanConsideringBoundsInCostmapFrame(
 
   auto pose_above_prune_distance =
     nav2_util::geometry_utils::first_after_integrated_distance(
-    closest_point, global_plan_.poses.end(), prune_distance_);
+    closest_point, global_plan_end_, prune_distance_);
 
   unsigned int mx, my;
   // Find the furthest relevent pose on the path to consider within costmap
   // bounds
   // Transforming it to the costmap frame in the same loop
-  for (auto global_plan_pose = closest_point; global_plan_pose != pose_above_prune_distance;
-    ++global_plan_pose)
-  {
+  for (auto global_plan_pose = closest_point; global_plan_pose != pose_above_prune_distance; ++global_plan_pose) {
+
     // Transform from global plan frame to costmap frame
     geometry_msgs::msg::PoseStamped costmap_plan_pose;
     global_plan_pose->header.stamp = global_pose.header.stamp;
@@ -112,6 +116,11 @@ nav_msgs::msg::Path PathHandler::transformPath(
   // Find relevent bounds of path to use
   geometry_msgs::msg::PoseStamped global_pose =
     transformToGlobalPlanFrame(robot_pose);
+
+  if (enforce_inversion_) {
+    planUpToInversion(global_pose);
+  }
+
   auto [transformed_plan, lower_bound] = getGlobalPlanConsideringBoundsInCostmapFrame(global_pose);
 
   pruneGlobalPlan(lower_bound);
@@ -154,6 +163,7 @@ double PathHandler::getMaxCostmapDist()
 void PathHandler::setPath(const nav_msgs::msg::Path & plan)
 {
   global_plan_ = plan;
+  global_plan_end_ = global_plan_.poses.end();
 }
 
 nav_msgs::msg::Path & PathHandler::getPath() {return global_plan_;}
@@ -161,6 +171,31 @@ nav_msgs::msg::Path & PathHandler::getPath() {return global_plan_;}
 void PathHandler::pruneGlobalPlan(const PathIterator end)
 {
   global_plan_.poses.erase(global_plan_.poses.begin(), end);
+}
+
+bool PathHandler::planUpToInversion(const geometry_msgs::msg::PoseStamped & robot_pose) {
+  // Update plan end to use
+  global_plan_end_ = utils::findFirstPathInversion(global_plan_);
+
+  if (global_plan_end_ != global_plan_.poses.end()) {
+   // Keep full path if we are within tolerance of the inversion pose
+   double distance = std::hypot(robot_pose.pose.position.x-global_plan_end_->pose.position.x,
+                                robot_pose.pose.position.y-global_plan_end_->pose.position.y);
+
+   double angle_distance = angles::shortest_angular_distance(
+         tf2::getYaw(robot_pose.pose.orientation),
+         tf2::getYaw(robot_pose.pose.orientation));
+
+   if (distance < inversion_xy_tolerance_ && fabs(angle_distance) < inversion_yaw_tolerance) {
+     // Prune up to the current validated inversion (avoid oscillation)
+     pruneGlobalPlan(global_plan_end_);
+     // Refind plan end to use
+     global_plan_end_ = utils::findFirstPathInversion(global_plan_);
+   }
+   return true;
+  }
+
+  return false;
 }
 
 }  // namespace mppi
