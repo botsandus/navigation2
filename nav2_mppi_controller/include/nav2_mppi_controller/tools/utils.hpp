@@ -523,7 +523,8 @@ inline void savitskyGolayFilter(
  * @brief Find the iterator of the first pose at which there is an inversion on the path,
  * @path path to check for inversion
  */
-inline PathIterator findFirstPathInversion(nav_msgs::msg::Path & path) {
+inline PathIterator findFirstPathInversion(nav_msgs::msg::Path & path)
+{
   // At least 3 poses for a possible inversion
   if (path.poses.size() < 3) {
     return path.poses.end();

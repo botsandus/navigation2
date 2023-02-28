@@ -147,7 +147,6 @@ protected:
   bool enforce_inversion_{false};
   double inversion_xy_tolerance_{0};
   double inversion_yaw_tolerance{0};
-
 };
 }  // namespace mppi
 
