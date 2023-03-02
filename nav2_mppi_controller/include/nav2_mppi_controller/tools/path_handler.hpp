@@ -88,7 +88,7 @@ public:
    */
   nav_msgs::msg::Path transformPath(const geometry_msgs::msg::PoseStamped & robot_pose);
 
-  bool planUpToInversion(const geometry_msgs::msg::PoseStamped & robot_pose);
+  bool isWithinInversionTolerances(const geometry_msgs::msg::PoseStamped & robot_pose);
 
 protected:
   /**
@@ -129,15 +129,15 @@ protected:
     * @brief Prune global path to only interesting portions
     * @param end Final path iterator
     */
-  void pruneGlobalPlan(const PathIterator end);
+  void prunePlan(nav_msgs::msg::Path & plan, const PathIterator end);
 
   std::string name_;
   std::shared_ptr<nav2_costmap_2d::Costmap2DROS> costmap_;
   std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
   ParametersHandler * parameters_handler_;
 
+  nav_msgs::msg::Path global_plan_up_to_inversion_;
   nav_msgs::msg::Path global_plan_;
-  PathIterator global_plan_end_;
   rclcpp::Logger logger_{rclcpp::get_logger("MPPIController")};
 
   double max_robot_pose_search_dist_{0};
@@ -145,6 +145,7 @@ protected:
   double transform_tolerance_{0};
 
   bool enforce_inversion_{false};
+  bool inversion_remaining_{false};
   double inversion_xy_tolerance_{0};
   double inversion_yaw_tolerance{0};
 };
