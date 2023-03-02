@@ -48,7 +48,7 @@ PathHandler::getGlobalPlanConsideringBoundsInCostmapFrame(
   // Don't search further away than the prune distance
   auto closest_pose_upper_bound =
     nav2_util::geometry_utils::first_after_integrated_distance(
-    global_plan_.poses.begin(), global_plan_end_,
+    global_plan_.poses.begin(), global_plan_.poses.end(),
         std::min(max_robot_pose_search_dist_, prune_distance_));
 
   // Find closest point to the robot
