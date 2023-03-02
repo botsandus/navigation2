@@ -629,6 +629,20 @@ inline PathIterator findFirstPathInversion(nav_msgs::msg::Path & path)
   return path.poses.end();
 }
 
+inline bool removePosesAfterFirstInversion(nav_msgs::msg::Path & path)
+{
+  nav_msgs::msg::Path cropped_path = path;
+  PathIterator first_inversion = findFirstPathInversion(cropped_path);
+  cropped_path.poses.erase(first_inversion, cropped_path.poses.end());
+
+  if (path.poses.size() == cropped_path.poses.size()) {
+    return false;
+  } else {
+    path = cropped_path;
+    return true;
+  }
+}
+
 }  // namespace mppi::utils
 
 #endif  // NAV2_MPPI_CONTROLLER__TOOLS__UTILS_HPP_
