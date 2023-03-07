@@ -50,11 +50,10 @@ PathHandler::getGlobalPlanConsideringBoundsInCostmapFrame(
 
   auto begin = global_plan_up_to_inversion_.poses.begin();
 
-  // Don't search further away than the prune distance
+  // Limit the search for the closest pose up to max_robot_pose_search_dist on the path
   auto closest_pose_upper_bound =
     nav2_util::geometry_utils::first_after_integrated_distance(
-    global_plan_up_to_inversion_.poses.begin(), global_plan_up_to_inversion_.poses.end(),
-    std::min(max_robot_pose_search_dist_, prune_distance_));
+    global_plan_.poses.begin(), global_plan_.poses.end(), max_robot_pose_search_dist_);
 
   // Find closest point to the robot
   auto closest_point = nav2_util::geometry_utils::min_by(
@@ -67,7 +66,7 @@ PathHandler::getGlobalPlanConsideringBoundsInCostmapFrame(
   transformed_plan.header.frame_id = costmap_->getGlobalFrameID();
   transformed_plan.header.stamp = global_pose.header.stamp;
 
-  auto pose_above_prune_distance =
+  auto pruned_plan_end =
     nav2_util::geometry_utils::first_after_integrated_distance(
     closest_point, global_plan_up_to_inversion_.poses.end(), prune_distance_);
 
@@ -75,7 +74,7 @@ PathHandler::getGlobalPlanConsideringBoundsInCostmapFrame(
   // Find the furthest relevent pose on the path to consider within costmap
   // bounds
   // Transforming it to the costmap frame in the same loop
-  for (auto global_plan_pose = closest_point; global_plan_pose != pose_above_prune_distance;
+  for (auto global_plan_pose = closest_point; global_plan_pose != pruned_plan_end;
     ++global_plan_pose)
   {
     // Transform from global plan frame to costmap frame
