@@ -29,6 +29,7 @@
 
 #include "angles/angles.h"
 
+#include "nav2_mppi_controller/tools/path_handler.hpp"
 #include "tf2/utils.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 
@@ -418,13 +419,20 @@ inline void setPathCostsIfNotSet(
  * @param point_y Point to find angle relative to Y axis
  * @return Angle between two points
  */
-inline double posePointAngle(const geometry_msgs::msg::Pose & pose, double point_x, double point_y)
+inline double posePointAngle(
+  const geometry_msgs::msg::Pose & pose, double point_x, double point_y,
+  double point_yaw)
 {
   double pose_x = pose.position.x;
   double pose_y = pose.position.y;
   double pose_yaw = tf2::getYaw(pose.orientation);
 
   double yaw = atan2(point_y - pose_y, point_x - pose_x);
+
+  if (abs(angles::shortest_angular_distance(yaw, point_yaw)) > M_PI_2) {
+    yaw = angles::normalize_angle(yaw + M_PI);
+  }
+
   return abs(angles::shortest_angular_distance(yaw, pose_yaw));
 }
 
@@ -436,14 +444,14 @@ inline double posePointAngle(const geometry_msgs::msg::Pose & pose, double point
  */
 inline void savitskyGolayFilter(
   models::ControlSequence & control_sequence,
-  std::array<mppi::models::Control, 2> & control_history,
+  std::array<mppi::models::Control, 4> & control_history,
   const models::OptimizerSettings & settings)
 {
-  // Savitzky-Golay Quadratic, 5-point Coefficients
-  xt::xarray<float> filter = {-3.0, 12.0, 17.0, 12.0, -3.0};
-  filter /= 35.0;
+  // Savitzky-Golay Quadratic, 7-point Coefficients
+  xt::xarray<float> filter = {-21.0, 14.0, 39.0, 54.0, 59.0, 54.0, 39.0, 14.0, -21.0};
+  filter /= 231.0;
 
-  const unsigned int num_sequences = control_sequence.vx.shape(0);
+  const unsigned int num_sequences = control_sequence.vx.shape(0) - 1;
 
   // Too short to smooth meaningfully
   if (num_sequences < 10) {
@@ -455,67 +463,191 @@ inline void savitskyGolayFilter(
     };
 
   auto applyFilterOverAxis =
-    [&](xt::xtensor<float, 1> & sequence, const float hist_0, const float hist_1) -> void
+    [&](xt::xtensor<float, 1> & sequence,
+      const float hist_0, const float hist_1, const float hist_2, const float hist_3) -> void
     {
       unsigned int idx = 0;
       sequence(idx) = applyFilter(
       {
         hist_0,
         hist_1,
+        hist_2,
+        hist_3,
         sequence(idx),
         sequence(idx + 1),
-        sequence(idx + 2)});
+        sequence(idx + 2),
+        sequence(idx + 3),
+        sequence(idx + 4)});
 
       idx++;
       sequence(idx) = applyFilter(
       {
         hist_1,
+        hist_2,
+        hist_3,
         sequence(idx - 1),
         sequence(idx),
         sequence(idx + 1),
-        sequence(idx + 2)});
+        sequence(idx + 2),
+        sequence(idx + 3),
+        sequence(idx + 4)});
 
-      for (idx = 2; idx != num_sequences - 3; idx++) {
+      idx++;
+      sequence(idx) = applyFilter(
+      {
+        hist_2,
+        hist_3,
+        sequence(idx - 2),
+        sequence(idx - 1),
+        sequence(idx),
+        sequence(idx + 1),
+        sequence(idx + 2),
+        sequence(idx + 3),
+        sequence(idx + 4)});
+
+      idx++;
+      sequence(idx) = applyFilter(
+      {
+        hist_3,
+        sequence(idx - 3),
+        sequence(idx - 2),
+        sequence(idx - 1),
+        sequence(idx),
+        sequence(idx + 1),
+        sequence(idx + 2),
+        sequence(idx + 3),
+        sequence(idx + 4)});
+
+      for (idx = 4; idx != num_sequences - 4; idx++) {
         sequence(idx) = applyFilter(
         {
+          sequence(idx - 4),
+          sequence(idx - 3),
           sequence(idx - 2),
           sequence(idx - 1),
           sequence(idx),
           sequence(idx + 1),
-          sequence(idx + 2)});
+          sequence(idx + 2),
+          sequence(idx + 3),
+          sequence(idx + 4)});
       }
 
       idx++;
       sequence(idx) = applyFilter(
       {
+        sequence(idx - 4),
+        sequence(idx - 3),
         sequence(idx - 2),
         sequence(idx - 1),
         sequence(idx),
+        sequence(idx + 1),
+        sequence(idx + 2),
+        sequence(idx + 3),
+        sequence(idx + 3)});
+
+      idx++;
+      sequence(idx) = applyFilter(
+      {
+        sequence(idx - 4),
+        sequence(idx - 3),
+        sequence(idx - 2),
+        sequence(idx - 1),
+        sequence(idx),
+        sequence(idx + 1),
+        sequence(idx + 2),
+        sequence(idx + 2),
+        sequence(idx + 2)});
+
+      idx++;
+      sequence(idx) = applyFilter(
+      {
+        sequence(idx - 4),
+        sequence(idx - 3),
+        sequence(idx - 2),
+        sequence(idx - 1),
+        sequence(idx),
+        sequence(idx + 1),
+        sequence(idx + 1),
         sequence(idx + 1),
         sequence(idx + 1)});
 
       idx++;
       sequence(idx) = applyFilter(
       {
+        sequence(idx - 4),
+        sequence(idx - 3),
         sequence(idx - 2),
         sequence(idx - 1),
+        sequence(idx),
+        sequence(idx),
         sequence(idx),
         sequence(idx),
         sequence(idx)});
     };
 
   // Filter trajectories
-  applyFilterOverAxis(control_sequence.vx, control_history[0].vx, control_history[1].vx);
-  applyFilterOverAxis(control_sequence.vy, control_history[0].vy, control_history[1].vy);
-  applyFilterOverAxis(control_sequence.wz, control_history[0].wz, control_history[1].wz);
+  applyFilterOverAxis(
+    control_sequence.vx, control_history[0].vx,
+    control_history[1].vx, control_history[2].vx, control_history[3].vx);
+  applyFilterOverAxis(
+    control_sequence.vy, control_history[0].vy,
+    control_history[1].vy, control_history[2].vy, control_history[3].vy);
+  applyFilterOverAxis(
+    control_sequence.wz, control_history[0].wz,
+    control_history[1].wz, control_history[2].wz, control_history[3].wz);
 
   // Update control history
   unsigned int offset = settings.shift_control_sequence ? 1 : 0;
   control_history[0] = control_history[1];
-  control_history[1] = {
+  control_history[1] = control_history[2];
+  control_history[2] = control_history[3];
+  control_history[3] = {
     control_sequence.vx(offset),
     control_sequence.vy(offset),
     control_sequence.wz(offset)};
+}
+
+/**
+ * @brief Find the iterator of the first pose at which there is an inversion on the path,
+ * @path path to check for inversion
+ */
+inline PathIterator findFirstPathInversion(nav_msgs::msg::Path & path)
+{
+  // At least 3 poses for a possible inversion
+  if (path.poses.size() < 3) {
+    return path.poses.end();
+  }
+
+  for (PathIterator it = std::next(path.poses.begin()); it != std::prev(path.poses.end()); it++) {
+    std::prev(it);
+    double a_angle = atan2(
+      it->pose.position.y - std::prev(it)->pose.position.y,
+      it->pose.position.x - std::prev(it)->pose.position.x);
+    double b_angle = atan2(
+      std::next(it)->pose.position.y - it->pose.position.y,
+      std::next(it)->pose.position.x - it->pose.position.x);
+    double angle_increment = angles::shortest_angular_distance(a_angle, b_angle);
+
+    if (fabs(angle_increment) > M_PI_2) {
+      return std::next(it);
+    }
+  }
+
+  return path.poses.end();
+}
+
+inline bool removePosesAfterFirstInversion(nav_msgs::msg::Path & path)
+{
+  nav_msgs::msg::Path cropped_path = path;
+  PathIterator first_inversion = findFirstPathInversion(cropped_path);
+  cropped_path.poses.erase(first_inversion, cropped_path.poses.end());
+
+  if (path.poses.size() == cropped_path.poses.size()) {
+    return false;
+  } else {
+    path = cropped_path;
+    return true;
+  }
 }
 
 }  // namespace mppi::utils
