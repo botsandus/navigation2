@@ -38,9 +38,9 @@ public:
   PathHandlerWrapper()
   : PathHandler() {}
 
-  void pruneGlobalPlanWrapper(const PathIterator end)
+  void pruneGlobalPlanWrapper(nav_msgs::msg::Path & path, const PathIterator end)
   {
-    return pruneGlobalPlan(end);
+    return prunePlan(path, end);
   }
 
   double getMaxCostmapDistWrapper()
@@ -82,7 +82,7 @@ TEST(PathHandlerTests, GetAndPrunePath)
   EXPECT_EQ(path.poses.size(), rtn_path.poses.size());
 
   PathIterator it = rtn_path.poses.begin() + 5;
-  handler.pruneGlobalPlanWrapper(it);
+  handler.pruneGlobalPlanWrapper(path, it);
   auto rtn2_path = handler.getPath();
   EXPECT_EQ(rtn2_path.poses.size(), 6u);
 }
@@ -109,7 +109,6 @@ TEST(PathHandlerTests, TestBounds)
   std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_ =
     std::make_unique<tf2_ros::TransformBroadcaster>(node);
   geometry_msgs::msg::TransformStamped t;
-  //t.header.stamp = node->get_clock()->now();
   t.header.frame_id = "map";
   t.child_frame_id = "base_link";
   tf_broadcaster_->sendTransform(t);
@@ -134,7 +133,7 @@ TEST(PathHandlerTests, TestBounds)
     handler.getGlobalPlanConsideringBoundsInCostmapFrameWrapper(robot_pose);
   auto & path_in = handler.getPath();
   EXPECT_EQ(closest - path_in.poses.begin(), 25);
-  handler.pruneGlobalPlanWrapper(closest);
+  handler.pruneGlobalPlanWrapper(path, closest);
   auto & path_pruned = handler.getPath();
   EXPECT_EQ(path_pruned.poses.size(), 75u);
 }
@@ -157,7 +156,6 @@ TEST(PathHandlerTests, TestTransforms)
   std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_ =
     std::make_unique<tf2_ros::TransformBroadcaster>(node);
   geometry_msgs::msg::TransformStamped t;
-  //t.header.stamp = node->get_clock()->now();
   t.header.frame_id = "map";
   t.child_frame_id = "base_link";
   tf_broadcaster_->sendTransform(t);

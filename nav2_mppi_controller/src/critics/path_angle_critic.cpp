@@ -57,16 +57,30 @@ void PathAngleCritic::score(CriticData & data)
 
   const float goal_x = xt::view(data.path.x, offseted_idx);
   const float goal_y = xt::view(data.path.y, offseted_idx);
+  const float goal_yaw = xt::view(data.path.yaws, offseted_idx);
 
-  if (utils::posePointAngle(data.state.pose.pose, goal_x, goal_y) < max_angle_to_furthest_) {
+  if (utils::posePointAngle(
+      data.state.pose.pose, goal_x, goal_y,
+      goal_yaw) < max_angle_to_furthest_)
+  {
     return;
   }
 
   const auto yaws_between_points = xt::atan2(
     goal_y - data.trajectories.y,
     goal_x - data.trajectories.x);
+
+  const auto yaws_between_points_corrected = xt::eval(
+    xt::where(
+      xt::abs(utils::shortest_angular_distance(yaws_between_points, goal_yaw)) <= M_PI_2,
+      yaws_between_points,
+      utils::normalize_angles(yaws_between_points + M_PI)));
+
   const auto yaws =
-    xt::abs(utils::shortest_angular_distance(data.trajectories.yaws, yaws_between_points));
+    xt::abs(
+    utils::shortest_angular_distance(
+      data.trajectories.yaws,
+      yaws_between_points_corrected));
 
   data.costs += xt::pow(xt::mean(yaws, {1}, immediate) * weight_, power_);
 }
