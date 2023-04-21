@@ -12,27 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef NAV2_CONTROLLER__PLUGINS__ROTATION_PROGRESS_CHECKER_HPP_
-#define NAV2_CONTROLLER__PLUGINS__ROTATION_PROGRESS_CHECKER_HPP_
+#ifndef NAV2_CONTROLLER__PLUGINS__POSE_PROGRESS_CHECKER_HPP_
+#define NAV2_CONTROLLER__PLUGINS__POSE_PROGRESS_CHECKER_HPP_
 
 #include <string>
 #include <vector>
 #include "rclcpp/rclcpp.hpp"
 #include "nav2_controller/plugins/simple_progress_checker.hpp"
 #include "rclcpp_lifecycle/lifecycle_node.hpp"
-#include "nav2_core/progress_checker.hpp"
-#include "geometry_msgs/msg/pose_stamped.hpp"
-#include "geometry_msgs/msg/pose2_d.hpp"
 
 namespace nav2_controller
 {
 /**
-* @class RotationProgressChecker
+* @class PoseProgressChecker
 * @brief This plugin is used to check the position and the angle of the robot to make sure
 * that it is actually progressing or rotating towards a goal.
 */
 
-class RotationProgressChecker : public SimpleProgressChecker
+class PoseProgressChecker : public SimpleProgressChecker
 {
 public:
   void initialize(
@@ -46,9 +43,11 @@ protected:
    * @param pose Current pose of the robot
    * @return true, if movement is greater than radius_, or false
    */
-  bool is_robot_moved_enough(const geometry_msgs::msg::Pose2D & pose);
+  bool isRobotMovedEnough(const geometry_msgs::msg::Pose2D & pose);
 
-  static double pose_angle_distance(const geometry_msgs::msg::Pose2D &, const geometry_msgs::msg::Pose2D &);
+  static double poseAngleDistance(
+    const geometry_msgs::msg::Pose2D &,
+    const geometry_msgs::msg::Pose2D &);
 
   double required_movement_angle_;
 
@@ -65,4 +64,4 @@ protected:
 };
 }  // namespace nav2_controller
 
-#endif  // NAV2_CONTROLLER__PLUGINS__ROTATION_PROGRESS_CHECKER_HPP_
+#endif  // NAV2_CONTROLLER__PLUGINS__POSE_PROGRESS_CHECKER_HPP_
