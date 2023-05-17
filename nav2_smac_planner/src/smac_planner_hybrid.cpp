@@ -342,14 +342,14 @@ nav_msgs::msg::Path SmacPlannerHybrid::createPlan(
   NodeHybrid::CoordinateVector path;
   int num_iterations = 0;
   std::string error;
-  std::shared_ptr<std::vector<std::tuple<float, float>>> expansions = nullptr;
+  std::unique_ptr<std::vector<std::tuple<float, float>>> expansions = nullptr;
   try {
     if (_viz_expansions) {
-      expansions = std::make_shared<std::vector<std::tuple<float, float>>>();
+      expansions = std::make_unique<std::vector<std::tuple<float, float>>>();
     }
     if (!_a_star->createPath(
         path, num_iterations, _tolerance / static_cast<float>(costmap->getResolution()),
-        expansions))
+        expansions.get()))
     {
       if (num_iterations < _a_star->getMaxIterations()) {
         error = std::string("no valid path found");
