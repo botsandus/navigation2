@@ -134,6 +134,10 @@ void SmacPlannerHybrid::configure(
   node->get_parameter(name + ".lookup_table_size", _lookup_table_size);
 
   nav2_util::declare_parameter_if_not_declared(
+    node, name + ".viz_expansions", rclcpp::ParameterValue(false));
+  node->get_parameter(name + ".viz_expansions", _viz_expansions);
+
+  nav2_util::declare_parameter_if_not_declared(
     node, name + ".motion_model_for_search", rclcpp::ParameterValue(std::string("DUBIN")));
   node->get_parameter(name + ".motion_model_for_search", _motion_model_for_search);
   _motion_model = fromString(_motion_model_for_search);
@@ -215,6 +219,9 @@ void SmacPlannerHybrid::configure(
   }
 
   _raw_plan_publisher = node->create_publisher<nav_msgs::msg::Path>("unsmoothed_plan", 1);
+  if (_viz_expansions) {
+    _expansions_publisher = node->create_publisher<geometry_msgs::msg::PoseArray>("expansions", 1);
+  }
 
   RCLCPP_INFO(
     _logger, "Configured plugin %s of type SmacPlannerHybrid with "
@@ -231,6 +238,9 @@ void SmacPlannerHybrid::activate()
     _logger, "Activating plugin %s of type SmacPlannerHybrid",
     _name.c_str());
   _raw_plan_publisher->on_activate();
+  if (_viz_expansions) {
+    _expansions_publisher->on_activate();
+  }
   if (_costmap_downsampler) {
     _costmap_downsampler->on_activate();
   }
@@ -246,6 +256,9 @@ void SmacPlannerHybrid::deactivate()
     _logger, "Deactivating plugin %s of type SmacPlannerHybrid",
     _name.c_str());
   _raw_plan_publisher->on_deactivate();
+  if (_viz_expansions) {
+    _expansions_publisher->on_deactivate();
+  }
   if (_costmap_downsampler) {
     _costmap_downsampler->on_deactivate();
   }
@@ -264,6 +277,7 @@ void SmacPlannerHybrid::cleanup()
     _costmap_downsampler.reset();
   }
   _raw_plan_publisher.reset();
+  _expansions_publisher.reset();
 }
 
 nav_msgs::msg::Path SmacPlannerHybrid::createPlan(
@@ -328,9 +342,14 @@ nav_msgs::msg::Path SmacPlannerHybrid::createPlan(
   NodeHybrid::CoordinateVector path;
   int num_iterations = 0;
   std::string error;
+  std::unique_ptr<std::vector<std::tuple<float, float>>> expansions = nullptr;
   try {
+    if (_viz_expansions) {
+      expansions = std::make_unique<std::vector<std::tuple<float, float>>>();
+    }
     if (!_a_star->createPath(
-        path, num_iterations, _tolerance / static_cast<float>(costmap->getResolution())))
+        path, num_iterations, _tolerance / static_cast<float>(costmap->getResolution()),
+        expansions.get()))
     {
       if (num_iterations < _a_star->getMaxIterations()) {
         error = std::string("no valid path found");
@@ -341,6 +360,19 @@ nav_msgs::msg::Path SmacPlannerHybrid::createPlan(
   } catch (const std::runtime_error & e) {
     error = "invalid use: ";
     error += e.what();
+  }
+
+  if (_viz_expansions) {
+    geometry_msgs::msg::PoseArray msg;
+    geometry_msgs::msg::Pose msg_pose;
+    msg.header.stamp = _clock->now();
+    msg.header.frame_id = _global_frame;
+    for (auto & e : *expansions) {
+      msg_pose.position.x = std::get<0>(e);
+      msg_pose.position.y = std::get<1>(e);
+      msg.poses.push_back(msg_pose);
+    }
+    _expansions_publisher->publish(msg);
   }
 
   if (!error.empty()) {
