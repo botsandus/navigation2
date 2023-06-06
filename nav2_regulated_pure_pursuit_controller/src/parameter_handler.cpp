@@ -82,6 +82,8 @@ ParameterHandler::ParameterHandler(
   declare_parameter_if_not_declared(
     node, plugin_name_ + ".use_rotate_to_heading", rclcpp::ParameterValue(true));
   declare_parameter_if_not_declared(
+      node, plugin_name_ + ".use_rotate_to_path", rclcpp::ParameterValue(false));
+  declare_parameter_if_not_declared(
     node, plugin_name_ + ".rotate_to_heading_min_angle", rclcpp::ParameterValue(0.785));
   declare_parameter_if_not_declared(
     node, plugin_name_ + ".max_angular_accel", rclcpp::ParameterValue(3.2));
@@ -151,6 +153,7 @@ ParameterHandler::ParameterHandler(
     plugin_name_ + ".curvature_lookahead_dist",
     params_.curvature_lookahead_dist);
   node->get_parameter(plugin_name_ + ".use_rotate_to_heading", params_.use_rotate_to_heading);
+  node->get_parameter(plugin_name_ + ".use_rotate_to_path", params_.use_rotate_to_path);
   node->get_parameter(
     plugin_name_ + ".rotate_to_heading_min_angle", params_.rotate_to_heading_min_angle);
   node->get_parameter(plugin_name_ + ".max_angular_accel", params_.max_angular_accel);
@@ -261,21 +264,11 @@ ParameterHandler::dynamicParametersCallback(
         params_.use_cost_regulated_linear_velocity_scaling = parameter.as_bool();
       } else if (name == plugin_name_ + ".use_collision_detection") {
         params_.use_collision_detection = parameter.as_bool();
+      } else if (name == plugin_name_ + ".use_rotate_to_path") {
+        params_.use_rotate_to_path = parameter.as_bool();
       } else if (name == plugin_name_ + ".use_rotate_to_heading") {
-        if (parameter.as_bool() && params_.allow_reversing) {
-          RCLCPP_WARN(
-            logger_, "Both use_rotate_to_heading and allow_reversing "
-            "parameter cannot be set to true. Rejecting parameter update.");
-          continue;
-        }
         params_.use_rotate_to_heading = parameter.as_bool();
       } else if (name == plugin_name_ + ".allow_reversing") {
-        if (params_.use_rotate_to_heading && parameter.as_bool()) {
-          RCLCPP_WARN(
-            logger_, "Both use_rotate_to_heading and allow_reversing "
-            "parameter cannot be set to true. Rejecting parameter update.");
-          continue;
-        }
         params_.allow_reversing = parameter.as_bool();
       }
     }

@@ -14,6 +14,7 @@
 // limitations under the License.
 
 #include <algorithm>
+#include <angles/angles.h>
 #include <string>
 #include <limits>
 #include <memory>
@@ -251,19 +252,21 @@ geometry_msgs::msg::TwistStamped RegulatedPurePursuitController::computeVelocity
   double linear_vel, angular_vel;
 
   // Setting the velocity direction
-  double sign = 1.0;
+  double sign, interpolated_sign = 1.0;
   if (params_->allow_reversing) {
     sign = carrot_pose.pose.position.x >= 0.0 ? 1.0 : -1.0;
+    interpolated_sign = interpolated_carrot.pose.position.x >= 0.0 ? 1.0 : -1.0;
   }
 
   linear_vel = params_->desired_linear_vel;
 
   // Make sure we're in compliance with basic constraints
+  // Using interpolated carrot for rotate to Path (if interpolate_curvature_at_goal = true)
   double angle_to_heading;
   if (shouldRotateToGoalHeading(carrot_pose)) {
     double angle_to_goal = tf2::getYaw(transformed_plan.poses.back().pose.orientation);
     rotateToHeading(linear_vel, angular_vel, angle_to_goal, speed);
-  } else if (shouldRotateToPath(carrot_pose, angle_to_heading)) {
+  } else if (shouldRotateToPath(interpolated_carrot, angle_to_heading, interpolated_sign)) {
     rotateToHeading(linear_vel, angular_vel, angle_to_heading, speed);
   } else {
     applyConstraints(
@@ -292,10 +295,16 @@ geometry_msgs::msg::TwistStamped RegulatedPurePursuitController::computeVelocity
 }
 
 bool RegulatedPurePursuitController::shouldRotateToPath(
-  const geometry_msgs::msg::PoseStamped & carrot_pose, double & angle_to_path)
+    const geometry_msgs::msg::PoseStamped & carrot_pose, double & angle_to_path, double & sign)
 {
   // Whether we should rotate robot to rough path heading
-  angle_to_path = atan2(carrot_pose.pose.position.y, carrot_pose.pose.position.x);
+  if (sign >= 0) {
+    angle_to_path = atan2(carrot_pose.pose.position.y, carrot_pose.pose.position.x);
+  } else {
+    angle_to_path = angles::normalize_angle(
+      atan2(carrot_pose.pose.position.y, carrot_pose.pose.position.x) + M_PI);
+  }
+
   return params_->use_rotate_to_heading &&
          fabs(angle_to_path) > params_->rotate_to_heading_min_angle;
 }
