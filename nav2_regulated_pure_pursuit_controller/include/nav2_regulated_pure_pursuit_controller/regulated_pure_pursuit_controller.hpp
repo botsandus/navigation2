@@ -187,7 +187,9 @@ protected:
    * @param path Current global path
    * @return Lookahead point
    */
-  geometry_msgs::msg::PoseStamped getLookAheadPoint(const double &, const nav_msgs::msg::Path &);
+  geometry_msgs::msg::PoseStamped getLookAheadPoint(
+    const double &, const nav_msgs::msg::Path &,
+    bool interpolate_after_goal = false);
 
   /**
    * @brief checks for the cusp position
@@ -210,6 +212,8 @@ protected:
   std::shared_ptr<rclcpp_lifecycle::LifecyclePublisher<nav_msgs::msg::Path>> global_path_pub_;
   std::shared_ptr<rclcpp_lifecycle::LifecyclePublisher<geometry_msgs::msg::PointStamped>>
   carrot_pub_;
+  std::shared_ptr<rclcpp_lifecycle::LifecyclePublisher<geometry_msgs::msg::PointStamped>>
+  curvature_carrot_pub_;
   std::shared_ptr<rclcpp_lifecycle::LifecyclePublisher<nav_msgs::msg::Path>> carrot_arc_pub_;
   std::unique_ptr<nav2_regulated_pure_pursuit_controller::PathHandler> path_handler_;
   std::unique_ptr<nav2_regulated_pure_pursuit_controller::ParameterHandler> param_handler_;
