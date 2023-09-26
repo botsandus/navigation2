@@ -228,7 +228,6 @@ geometry_msgs::msg::TwistStamped RegulatedPurePursuitController::computeVelocity
     double angle_to_goal = tf2::getYaw(transformed_plan.poses.back().pose.orientation);
     rotateToHeading(linear_vel, angular_vel, angle_to_goal, speed);
   } else if (shouldRotateToPath(rotate_to_path_carrot_pose, angle_to_heading, x_vel_sign)) {
-    std::cout << "shouldRotateToPath" << std::endl;
     rotateToHeading(linear_vel, angular_vel, angle_to_heading, speed);
   } else {
     applyConstraints(
