@@ -20,6 +20,7 @@
 #include <vector>
 #include <utility>
 
+#include "nav2_amcl/angleutils.hpp"
 #include "nav2_regulated_pure_pursuit_controller/regulated_pure_pursuit_controller.hpp"
 #include "nav2_core/controller_exceptions.hpp"
 #include "nav2_util/node_utils.hpp"
@@ -195,6 +196,7 @@ geometry_msgs::msg::TwistStamped RegulatedPurePursuitController::computeVelocity
 
   // Get the particular point on the path at the lookahead distance
   auto carrot_pose = getLookAheadPoint(lookahead_dist, transformed_plan);
+  auto rotate_to_path_carrot_pose = carrot_pose;
   carrot_pub_->publish(createCarrotMsg(carrot_pose));
 
   double linear_vel, angular_vel;
@@ -206,33 +208,39 @@ geometry_msgs::msg::TwistStamped RegulatedPurePursuitController::computeVelocity
     auto curvature_lookahead_pose = getLookAheadPoint(
       params_->curvature_lookahead_dist,
       transformed_plan, params_->interpolate_curvature_after_goal);
+    rotate_to_path_carrot_pose = curvature_lookahead_pose;
     regulation_curvature = calculateCurvature(curvature_lookahead_pose.pose.position);
     curvature_carrot_pub_->publish(createCarrotMsg(curvature_lookahead_pose));
   }
 
   // Setting the velocity direction
-  double sign = 1.0;
+  double x_vel_sign = 1.0;
   if (params_->allow_reversing) {
-    sign = carrot_pose.pose.position.x >= 0.0 ? 1.0 : -1.0;
+    x_vel_sign = carrot_pose.pose.position.x >= 0.0 ? 1.0 : -1.0;
   }
 
   linear_vel = params_->desired_linear_vel;
 
   // Make sure we're in compliance with basic constraints
+  // For shouldRotateToPath, using x_vel_sign in order to support allow_reversing
+  // and rotate_to_path_carrot_pose for the direction carrot pose:
+  //        - equal to "normal" carrot_pose when curvature_lookahead_pose = false
+  //        - otherwise equal to curvature_lookahead_pose (which can be interpolated after goal)
   double angle_to_heading;
   if (shouldRotateToGoalHeading(carrot_pose)) {
     double angle_to_goal = tf2::getYaw(transformed_plan.poses.back().pose.orientation);
     rotateToHeading(linear_vel, angular_vel, angle_to_goal, speed);
-  } else if (shouldRotateToPath(carrot_pose, angle_to_heading)) {
+  } else if (shouldRotateToPath(rotate_to_path_carrot_pose, angle_to_heading, x_vel_sign)) {
+    std::cout << "shouldRotateToPath" << std::endl;
     rotateToHeading(linear_vel, angular_vel, angle_to_heading, speed);
   } else {
     applyConstraints(
       regulation_curvature, speed,
       collision_checker_->costAtPose(pose.pose.position.x, pose.pose.position.y), transformed_plan,
-      linear_vel, sign);
+      linear_vel, x_vel_sign);
 
     // Apply curvature to angular velocity after constraining linear velocity
-    angular_vel = linear_vel * regulation_curvature * -sign;
+    angular_vel = linear_vel * regulation_curvature;
   }
 
   // Collision checking on this velocity heading
@@ -252,10 +260,15 @@ geometry_msgs::msg::TwistStamped RegulatedPurePursuitController::computeVelocity
 }
 
 bool RegulatedPurePursuitController::shouldRotateToPath(
-  const geometry_msgs::msg::PoseStamped & carrot_pose, double & angle_to_path)
+  const geometry_msgs::msg::PoseStamped & carrot_pose, double & angle_to_path,
+  double & x_vel_sign)
 {
   // Whether we should rotate robot to rough path heading
   angle_to_path = atan2(carrot_pose.pose.position.y, carrot_pose.pose.position.x);
+  // In case we are reversing
+  if (x_vel_sign < 0) {
+    angle_to_path = nav2_amcl::angleutils::normalize(angle_to_path + M_PI);
+  }
   return params_->use_rotate_to_heading &&
          fabs(angle_to_path) > params_->rotate_to_heading_min_angle;
 }

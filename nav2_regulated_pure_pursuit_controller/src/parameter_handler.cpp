@@ -182,16 +182,6 @@ ParameterHandler::ParameterHandler(
     params_.use_cost_regulated_linear_velocity_scaling = false;
   }
 
-  /** Possible to drive in reverse direction if and only if
-   "use_rotate_to_heading" parameter is set to false **/
-
-  if (params_.use_rotate_to_heading && params_.allow_reversing) {
-    RCLCPP_WARN(
-      logger_, "Disabling reversing. Both use_rotate_to_heading and allow_reversing "
-      "parameter cannot be set to true. By default setting use_rotate_to_heading true");
-    params_.allow_reversing = false;
-  }
-
   dyn_params_handler_ = node->add_on_set_parameters_callback(
     std::bind(
       &ParameterHandler::dynamicParametersCallback,
@@ -262,12 +252,6 @@ ParameterHandler::dynamicParametersCallback(
       } else if (name == plugin_name_ + ".use_collision_detection") {
         params_.use_collision_detection = parameter.as_bool();
       } else if (name == plugin_name_ + ".use_rotate_to_heading") {
-        if (parameter.as_bool() && params_.allow_reversing) {
-          RCLCPP_WARN(
-            logger_, "Both use_rotate_to_heading and allow_reversing "
-            "parameter cannot be set to true. Rejecting parameter update.");
-          continue;
-        }
         params_.use_rotate_to_heading = parameter.as_bool();
       } else if (name == plugin_name_ + ".allow_reversing") {
         if (params_.use_rotate_to_heading && parameter.as_bool()) {
