@@ -171,6 +171,12 @@ ParameterHandler::ParameterHandler(
   node->get_parameter(
     plugin_name_ + ".interpolate_curvature_after_goal",
     params_.interpolate_curvature_after_goal);
+  if (!params_.use_fixed_curvature_lookahead && params_.interpolate_curvature_after_goal) {
+    RCLCPP_WARN(
+        logger_, "For interpolate_curvature_after_goal to be set to true, "
+        "use_fixed_curvature_lookahead should be true, it is currently set to false");
+    params_.interpolate_curvature_after_goal = false;
+  }
   node->get_parameter(
     plugin_name_ + ".use_collision_detection",
     params_.use_collision_detection);
