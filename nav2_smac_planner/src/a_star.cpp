@@ -26,8 +26,6 @@
 #include <vector>
 
 #include "nav2_smac_planner/a_star.hpp"
-#include <geometry_msgs/msg/pose_array.hpp>
-
 using namespace std::chrono;  // NOLINT
 
 namespace nav2_smac_planner
@@ -154,6 +152,30 @@ void AStarAlgorithm<NodeT>::setStart(
 }
 
 template<>
+void AStarAlgorithm<Node2D>::populateExpansionsLog(
+  const NodePtr & node,
+  std::vector<std::tuple<float, float, float>> * expansions_log)
+{
+  Node2D::Coordinates coords = node->getCoords(node->getIndex());
+  expansions_log->emplace_back(
+    _costmap->getOriginX() + ((coords.x + 0.5) * _costmap->getResolution()),
+    _costmap->getOriginY() + ((coords.y + 0.5) * _costmap->getResolution()),
+    0.0);
+}
+
+template<typename NodeT>
+void AStarAlgorithm<NodeT>::populateExpansionsLog(
+  const NodePtr & node,
+  std::vector<std::tuple<float, float, float>> * expansions_log)
+{
+  typename NodeT::Coordinates coords = node->pose;
+  expansions_log->emplace_back(
+    _costmap->getOriginX() + ((coords.x + 0.5) * _costmap->getResolution()),
+    _costmap->getOriginY() + ((coords.y + 0.5) * _costmap->getResolution()),
+    NodeT::motion_table.getAngleFromBin(coords.theta));
+}
+
+template<>
 void AStarAlgorithm<Node2D>::setGoal(
   const unsigned int & mx,
   const unsigned int & my,
@@ -209,12 +231,12 @@ bool AStarAlgorithm<NodeT>::areInputsValid()
   if (getToleranceHeuristic() < 0.001 &&
     !_goal->isNodeValid(_traverse_unknown, _collision_checker))
   {
-    throw std::runtime_error("Failed to compute path, goal is occupied with no tolerance.");
+    throw nav2_core::GoalOccupied("Goal was in lethal cost");
   }
 
   // Check if starting point is valid
   if (!_start->isNodeValid(_traverse_unknown, _collision_checker)) {
-    throw std::runtime_error("Starting point in lethal space! Cannot create feasible plan.");
+    throw nav2_core::StartOccupied("Start was in lethal cost");
   }
 
   return true;
@@ -224,7 +246,7 @@ template<typename NodeT>
 bool AStarAlgorithm<NodeT>::createPath(
   CoordinateVector & path, int & iterations,
   const float & tolerance,
-  std::vector<std::tuple<float, float>> * expansions_log)
+  std::vector<std::tuple<float, float, float>> * expansions_log)
 {
   steady_clock::time_point start_time = steady_clock::now();
   _tolerance = tolerance;
@@ -278,13 +300,7 @@ bool AStarAlgorithm<NodeT>::createPath(
 
     // Save current node coordinates for debug
     if (expansions_log) {
-      Coordinates coords = current_node->getCoords(
-        current_node->getIndex(), getSizeX(), getSizeDim3());
-      expansions_log->push_back(
-        std::make_tuple<float, float>(
-          _costmap->getOriginX() + (coords.x * _costmap->getResolution()),
-          _costmap->getOriginY() + (coords.y * _costmap->getResolution()))
-      );
+      populateExpansionsLog(current_node, expansions_log);
     }
 
     // We allow for nodes to be queued multiple times in case

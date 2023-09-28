@@ -1,4 +1,5 @@
 // Copyright (c) 2022 Samsung Research America, @artofnothingness Alexey Budyakov
+// Copyright (c) 2023 Open Navigation LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,7 +30,6 @@
 
 #include "angles/angles.h"
 
-#include "nav2_mppi_controller/tools/path_handler.hpp"
 #include "tf2/utils.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 
@@ -309,7 +309,7 @@ inline size_t findPathFurthestReachedPoint(const CriticData & data)
   const auto dists = dx * dx + dy * dy;
 
   size_t max_id_by_trajectories = 0;
-  double min_distance_by_path = std::numeric_limits<float>::max();
+  float min_distance_by_path = std::numeric_limits<float>::max();
 
   for (size_t i = 0; i < dists.shape(0); i++) {
     size_t min_id_by_path = 0;
@@ -337,7 +337,7 @@ inline size_t findPathTrajectoryInitialPoint(const CriticData & data)
   const auto dy = data.path.y - data.trajectories.y(0, 0);
   const auto dists = dx * dx + dy * dy;
 
-  double min_distance_by_path = std::numeric_limits<float>::max();
+  float min_distance_by_path = std::numeric_limits<float>::max();
   size_t min_id = 0;
   for (size_t j = 0; j < dists.shape(0); j++) {
     if (dists(j) < min_distance_by_path) {
@@ -417,23 +417,51 @@ inline void setPathCostsIfNotSet(
  * @param pose pose
  * @param point_x Point to find angle relative to X axis
  * @param point_y Point to find angle relative to Y axis
+ * @param forward_preference If reversing direction is valid
  * @return Angle between two points
  */
-inline double posePointAngle(
-  const geometry_msgs::msg::Pose & pose, double point_x, double point_y,
-  double point_yaw)
+inline float posePointAngle(
+  const geometry_msgs::msg::Pose & pose, double point_x, double point_y, bool forward_preference)
 {
-  double pose_x = pose.position.x;
-  double pose_y = pose.position.y;
-  double pose_yaw = tf2::getYaw(pose.orientation);
+  float pose_x = pose.position.x;
+  float pose_y = pose.position.y;
+  float pose_yaw = tf2::getYaw(pose.orientation);
 
-  double yaw = atan2(point_y - pose_y, point_x - pose_x);
+  float yaw = atan2f(point_y - pose_y, point_x - pose_x);
 
-  if (abs(angles::shortest_angular_distance(yaw, point_yaw)) > M_PI_2) {
+  // If no preference for forward, return smallest angle either in heading or 180 of heading
+  if (!forward_preference) {
+    return std::min(
+      fabs(angles::shortest_angular_distance(yaw, pose_yaw)),
+      fabs(angles::shortest_angular_distance(yaw, angles::normalize_angle(pose_yaw + M_PI))));
+  }
+
+  return fabs(angles::shortest_angular_distance(yaw, pose_yaw));
+}
+
+/**
+ * @brief evaluate angle from pose (have angle) to point (no angle)
+ * @param pose pose
+ * @param point_x Point to find angle relative to X axis
+ * @param point_y Point to find angle relative to Y axis
+ * @param point_yaw Yaw of the point to consider along Z axis
+ * @return Angle between two points
+ */
+inline float posePointAngle(
+  const geometry_msgs::msg::Pose & pose,
+  double point_x, double point_y, double point_yaw)
+{
+  float pose_x = pose.position.x;
+  float pose_y = pose.position.y;
+  float pose_yaw = tf2::getYaw(pose.orientation);
+
+  float yaw = atan2f(point_y - pose_y, point_x - pose_x);
+
+  if (fabs(angles::shortest_angular_distance(yaw, point_yaw)) > M_PI_2) {
     yaw = angles::normalize_angle(yaw + M_PI);
   }
 
-  return abs(angles::shortest_angular_distance(yaw, pose_yaw));
+  return fabs(angles::shortest_angular_distance(yaw, pose_yaw));
 }
 
 /**
@@ -447,14 +475,14 @@ inline void savitskyGolayFilter(
   std::array<mppi::models::Control, 4> & control_history,
   const models::OptimizerSettings & settings)
 {
-  // Savitzky-Golay Quadratic, 7-point Coefficients
+  // Savitzky-Golay Quadratic, 9-point Coefficients
   xt::xarray<float> filter = {-21.0, 14.0, 39.0, 54.0, 59.0, 54.0, 39.0, 14.0, -21.0};
   filter /= 231.0;
 
   const unsigned int num_sequences = control_sequence.vx.shape(0) - 1;
 
   // Too short to smooth meaningfully
-  if (num_sequences < 10) {
+  if (num_sequences < 20) {
     return;
   }
 
@@ -609,45 +637,55 @@ inline void savitskyGolayFilter(
 
 /**
  * @brief Find the iterator of the first pose at which there is an inversion on the path,
- * @path path to check for inversion
+ * @param path to check for inversion
+ * @return the first point after the inversion found in the path
  */
-inline PathIterator findFirstPathInversion(nav_msgs::msg::Path & path)
+inline unsigned int findFirstPathInversion(nav_msgs::msg::Path & path)
 {
   // At least 3 poses for a possible inversion
   if (path.poses.size() < 3) {
-    return path.poses.end();
+    return path.poses.size();
   }
 
-  for (PathIterator it = std::next(path.poses.begin()); it != std::prev(path.poses.end()); it++) {
-    std::prev(it);
-    double a_angle = atan2(
-      it->pose.position.y - std::prev(it)->pose.position.y,
-      it->pose.position.x - std::prev(it)->pose.position.x);
-    double b_angle = atan2(
-      std::next(it)->pose.position.y - it->pose.position.y,
-      std::next(it)->pose.position.x - it->pose.position.x);
-    double angle_increment = angles::shortest_angular_distance(a_angle, b_angle);
+  // Iterating through the path to determine the position of the path inversion
+  for (unsigned int idx = 1; idx < path.poses.size() - 1; ++idx) {
+    // We have two vectors for the dot product OA and AB. Determining the vectors.
+    float oa_x = path.poses[idx].pose.position.x -
+      path.poses[idx - 1].pose.position.x;
+    float oa_y = path.poses[idx].pose.position.y -
+      path.poses[idx - 1].pose.position.y;
+    float ab_x = path.poses[idx + 1].pose.position.x -
+      path.poses[idx].pose.position.x;
+    float ab_y = path.poses[idx + 1].pose.position.y -
+      path.poses[idx].pose.position.y;
 
-    if (fabs(angle_increment) > M_PI_2) {
-      return std::next(it);
+    // Checking for the existance of cusp, in the path, using the dot product.
+    float dot_product = (oa_x * ab_x) + (oa_y * ab_y);
+    if (dot_product < 0.0) {
+      return idx + 1;
     }
   }
 
-  return path.poses.end();
+  return path.poses.size();
 }
 
-inline bool removePosesAfterFirstInversion(nav_msgs::msg::Path & path)
+/**
+ * @brief Find and remove poses after the first inversion in the path
+ * @param path to check for inversion
+ * @return The location of the inversion, return 0 if none exist
+ */
+inline unsigned int removePosesAfterFirstInversion(nav_msgs::msg::Path & path)
 {
   nav_msgs::msg::Path cropped_path = path;
-  PathIterator first_inversion = findFirstPathInversion(cropped_path);
-  cropped_path.poses.erase(first_inversion, cropped_path.poses.end());
-
-  if (path.poses.size() == cropped_path.poses.size()) {
-    return false;
-  } else {
-    path = cropped_path;
-    return true;
+  const unsigned int first_after_inversion = findFirstPathInversion(cropped_path);
+  if (first_after_inversion == path.poses.size()) {
+    return 0u;
   }
+
+  cropped_path.poses.erase(
+    cropped_path.poses.begin() + first_after_inversion, cropped_path.poses.end());
+  path = cropped_path;
+  return first_after_inversion;
 }
 
 }  // namespace mppi::utils

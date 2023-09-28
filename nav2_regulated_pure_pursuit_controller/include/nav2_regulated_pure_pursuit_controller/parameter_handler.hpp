@@ -49,14 +49,15 @@ struct Parameters
   double inflation_cost_scaling_factor;
   double regulated_linear_scaling_min_radius;
   double regulated_linear_scaling_min_speed;
+  bool use_fixed_curvature_lookahead;
+  double curvature_lookahead_dist;
   bool use_rotate_to_heading;
-  bool use_rotate_to_path;
   double max_angular_accel;
   double rotate_to_heading_min_angle;
   bool allow_reversing;
   double max_robot_pose_search_dist;
   bool use_interpolation;
-  bool interpolate_curvature_at_goal;
+  bool interpolate_curvature_after_goal;
   bool use_collision_detection;
   double transform_tolerance;
 };

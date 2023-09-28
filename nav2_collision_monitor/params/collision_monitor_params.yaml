@@ -2,7 +2,7 @@ collision_monitor:
   ros__parameters:
     base_frame_id: "base_footprint"
     odom_frame_id: "odom"
-    cmd_vel_in_topic: "cmd_vel_raw"
+    cmd_vel_in_topic: "cmd_vel_smoothed"
     cmd_vel_out_topic: "cmd_vel"
     state_topic: "collision_monitor_state"
     transform_tolerance: 0.5
@@ -34,7 +34,7 @@ collision_monitor:
       type: "polygon"
       points: [0.5, 0.5, 0.5, -0.5, -0.5, -0.5, -0.5, 0.5]
       action_type: "limit"
-      max_points: 3
+      min_points: 4
       linear_limit: 0.4
       angular_limit: 0.5
       visualize: True
@@ -50,7 +50,7 @@ collision_monitor:
     observation_sources: ["scan"]
     scan:
       type: "scan"
-      topic: "/scan"
+      topic: "scan"
     pointcloud:
       type: "pointcloud"
       topic: "/intel_realsense_r200_depth/points"

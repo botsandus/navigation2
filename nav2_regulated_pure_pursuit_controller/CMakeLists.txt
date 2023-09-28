@@ -27,11 +27,11 @@ set(dependencies
   nav2_costmap_2d
   pluginlib
   nav_msgs
+  nav2_amcl
   nav2_util
   nav2_core
   tf2
   tf2_geometry_msgs
-  nav2_amcl
 )
 
 set(library_name nav2_regulated_pure_pursuit_controller)

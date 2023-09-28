@@ -1,4 +1,6 @@
 // Copyright (c) 2022 Samsung Research America, @artofnothingness Alexey Budyakov
+// Copyright (c) 2023 Dexory
+// Copyright (c) 2023 Open Navigation LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -35,10 +37,11 @@ void PathHandler::initialize(
   getParam(max_robot_pose_search_dist_, "max_robot_pose_search_dist", getMaxCostmapDist());
   getParam(prune_distance_, "prune_distance", 1.5);
   getParam(transform_tolerance_, "transform_tolerance", 0.1);
-  getParam(enforce_inversion_, "enforce_inversion", false);
-  if (enforce_inversion_) {
-    getParam(inversion_xy_tolerance_, "inversion_xy_tolerance", 0.1);
-    getParam(inversion_yaw_tolerance, "inversion_yaw_tolerance", 0.1);
+  getParam(enforce_path_inversion_, "enforce_path_inversion", false);
+  if (enforce_path_inversion_) {
+    getParam(inversion_xy_tolerance_, "inversion_xy_tolerance", 0.2);
+    getParam(inversion_yaw_tolerance, "inversion_yaw_tolerance", 0.4);
+    inversion_locale_ = 0u;
   }
 }
 
@@ -54,7 +57,7 @@ PathHandler::getGlobalPlanConsideringBoundsInCostmapFrame(
   auto closest_pose_upper_bound =
     nav2_util::geometry_utils::first_after_integrated_distance(
     global_plan_up_to_inversion_.poses.begin(), global_plan_up_to_inversion_.poses.end(),
-        max_robot_pose_search_dist_);
+    max_robot_pose_search_dist_);
 
   // Find closest point to the robot
   auto closest_point = nav2_util::geometry_utils::min_by(
@@ -120,17 +123,15 @@ nav_msgs::msg::Path PathHandler::transformPath(
   // Find relevent bounds of path to use
   geometry_msgs::msg::PoseStamped global_pose =
     transformToGlobalPlanFrame(robot_pose);
-
-
   auto [transformed_plan, lower_bound] = getGlobalPlanConsideringBoundsInCostmapFrame(global_pose);
 
   prunePlan(global_plan_up_to_inversion_, lower_bound);
 
-  if (enforce_inversion_ && inversion_remaining_) {
+  if (enforce_path_inversion_ && inversion_locale_ != 0u) {
     if (isWithinInversionTolerances(global_pose)) {
-      prunePlan(global_plan_, utils::findFirstPathInversion(global_plan_));
+      prunePlan(global_plan_, global_plan_.poses.begin() + inversion_locale_);
       global_plan_up_to_inversion_ = global_plan_;
-      inversion_remaining_ = utils::removePosesAfterFirstInversion(global_plan_up_to_inversion_);
+      inversion_locale_ = utils::removePosesAfterFirstInversion(global_plan_up_to_inversion_);
     }
   }
 
@@ -165,16 +166,16 @@ bool PathHandler::transformPose(
 double PathHandler::getMaxCostmapDist()
 {
   const auto & costmap = costmap_->getCostmap();
-  return std::max(costmap->getSizeInCellsX(), costmap->getSizeInCellsY()) *
-         costmap->getResolution() / 2.0;
+  return static_cast<double>(std::max(costmap->getSizeInCellsX(), costmap->getSizeInCellsY())) *
+         costmap->getResolution() * 0.50;
 }
 
 void PathHandler::setPath(const nav_msgs::msg::Path & plan)
 {
   global_plan_ = plan;
   global_plan_up_to_inversion_ = global_plan_;
-  if (enforce_inversion_) {
-    inversion_remaining_ = utils::removePosesAfterFirstInversion(global_plan_up_to_inversion_);
+  if (enforce_path_inversion_) {
+    inversion_locale_ = utils::removePosesAfterFirstInversion(global_plan_up_to_inversion_);
   }
 }
 
@@ -188,15 +189,16 @@ void PathHandler::prunePlan(nav_msgs::msg::Path & plan, const PathIterator end)
 bool PathHandler::isWithinInversionTolerances(const geometry_msgs::msg::PoseStamped & robot_pose)
 {
   // Keep full path if we are within tolerance of the inversion pose
-  double distance = std::hypot(
-    robot_pose.pose.position.x - global_plan_up_to_inversion_.poses.end()->pose.position.x,
-    robot_pose.pose.position.y - global_plan_up_to_inversion_.poses.end()->pose.position.y);
+  const auto last_pose = global_plan_up_to_inversion_.poses.back();
+  float distance = hypotf(
+    robot_pose.pose.position.x - last_pose.pose.position.x,
+    robot_pose.pose.position.y - last_pose.pose.position.y);
 
-  double angle_distance = angles::shortest_angular_distance(
+  float angle_distance = angles::shortest_angular_distance(
     tf2::getYaw(robot_pose.pose.orientation),
-    tf2::getYaw(global_plan_up_to_inversion_.poses.end()->pose.orientation));
+    tf2::getYaw(last_pose.pose.orientation));
 
-  return distance < inversion_xy_tolerance_ && fabs(angle_distance) < inversion_yaw_tolerance;
+  return distance <= inversion_xy_tolerance_ && fabs(angle_distance) <= inversion_yaw_tolerance;
 }
 
 }  // namespace mppi
