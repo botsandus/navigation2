@@ -195,7 +195,25 @@ TEST(UtilsTests, AnglesTests)
   pose.position.y = 0.0;
   pose.orientation.w = 1.0;
   double point_x = 1.0, point_y = 0.0;
-  EXPECT_NEAR(posePointAngle(pose, point_x, point_y), 0.0, 1e-6);
+  bool forward_preference = true;
+  EXPECT_NEAR(posePointAngle(pose, point_x, point_y, forward_preference), 0.0, 1e-6);
+  forward_preference = false;
+  EXPECT_NEAR(posePointAngle(pose, point_x, point_y, forward_preference), 0.0, 1e-6);
+  point_x = -1.0;
+  EXPECT_NEAR(posePointAngle(pose, point_x, point_y, forward_preference), 0.0, 1e-6);
+  forward_preference = true;
+  EXPECT_NEAR(posePointAngle(pose, point_x, point_y, forward_preference), M_PI, 1e-6);
+
+  // Test point-pose angle with goal yaws
+  point_x = 1.0;
+  double point_yaw = 0.0;
+  EXPECT_NEAR(posePointAngle(pose, point_x, point_y, point_yaw), 0.0, 1e-6);
+  point_yaw = M_PI;
+  EXPECT_NEAR(posePointAngle(pose, point_x, point_y, point_yaw), M_PI, 1e-6);
+  point_yaw = 0.1;
+  EXPECT_NEAR(posePointAngle(pose, point_x, point_y, point_yaw), 0.0, 1e-3);
+  point_yaw = 3.04159;
+  EXPECT_NEAR(posePointAngle(pose, point_x, point_y, point_yaw), M_PI, 1e-3);
 }
 
 TEST(UtilsTests, FurthestAndClosestReachedPoint)
@@ -318,7 +336,13 @@ TEST(UtilsTests, SmootherTest)
   noisey_sequence.wz += noises;
   sequence_init = noisey_sequence;
 
-  std::array<mppi::models::Control, 2> history, history_init;
+  std::array<mppi::models::Control, 4> history, history_init;
+  history[3].vx = 0.1;
+  history[3].vy = 0.0;
+  history[3].wz = 0.3;
+  history[2].vx = 0.1;
+  history[2].vy = 0.0;
+  history[2].wz = 0.3;
   history[1].vx = 0.1;
   history[1].vy = 0.0;
   history[1].wz = 0.3;
@@ -333,18 +357,18 @@ TEST(UtilsTests, SmootherTest)
   savitskyGolayFilter(noisey_sequence, history, settings);
 
   // Check history is propogated backward
-  EXPECT_NEAR(history_init[1].vx, history[0].vx, 0.02);
-  EXPECT_NEAR(history_init[1].vy, history[0].vy, 0.02);
-  EXPECT_NEAR(history_init[1].wz, history[0].wz, 0.02);
+  EXPECT_NEAR(history_init[3].vx, history[2].vx, 0.02);
+  EXPECT_NEAR(history_init[3].vy, history[2].vy, 0.02);
+  EXPECT_NEAR(history_init[3].wz, history[2].wz, 0.02);
 
   // Check history element is updated for first command
-  EXPECT_NEAR(history[1].vx, 0.2, 0.05);
-  EXPECT_NEAR(history[1].vy, 0.0, 0.02);
-  EXPECT_NEAR(history[1].wz, 0.23, 0.02);
+  EXPECT_NEAR(history[3].vx, 0.2, 0.05);
+  EXPECT_NEAR(history[3].vy, 0.0, 0.035);
+  EXPECT_NEAR(history[3].wz, 0.23, 0.02);
 
   // Check that path is smoother
   float smoothed_val, original_val;
-  for (unsigned int i = 0; i != noisey_sequence.vx.shape(0); i++) {
+  for (unsigned int i = 1; i != noisey_sequence.vx.shape(0) - 1; i++) {
     smoothed_val += fabs(noisey_sequence.vx(i) - 0.2);
     smoothed_val += fabs(noisey_sequence.vy(i) - 0.0);
     smoothed_val += fabs(noisey_sequence.wz(i) - 0.3);
@@ -355,4 +379,67 @@ TEST(UtilsTests, SmootherTest)
   }
 
   EXPECT_LT(smoothed_val, original_val);
+}
+
+TEST(UtilsTests, FindPathInversionTest)
+{
+  // Straight path, no inversions to be found
+  nav_msgs::msg::Path path;
+  for (unsigned int i = 0; i != 10; i++) {
+    geometry_msgs::msg::PoseStamped pose;
+    pose.pose.position.x = i;
+    path.poses.push_back(pose);
+  }
+  EXPECT_EQ(utils::findFirstPathInversion(path), 10u);
+
+  // To short to process
+  path.poses.erase(path.poses.begin(), path.poses.begin() + 7);
+  EXPECT_EQ(utils::findFirstPathInversion(path), 3u);
+
+  // Has inversion at index 10, so should return 11 for the first point afterwards
+  // 0 1 2 3 4 5 6 7 8 9 10 **9** 8 7 6 5 4 3 2 1
+  path.poses.clear();
+  for (unsigned int i = 0; i != 10; i++) {
+    geometry_msgs::msg::PoseStamped pose;
+    pose.pose.position.x = i;
+    path.poses.push_back(pose);
+  }
+  for (unsigned int i = 0; i != 10; i++) {
+    geometry_msgs::msg::PoseStamped pose;
+    pose.pose.position.x = 10 - i;
+    path.poses.push_back(pose);
+  }
+  EXPECT_EQ(utils::findFirstPathInversion(path), 11u);
+}
+
+TEST(UtilsTests, RemovePosesAfterPathInversionTest)
+{
+  nav_msgs::msg::Path path;
+  // straight path
+  for (unsigned int i = 0; i != 10; i++) {
+    geometry_msgs::msg::PoseStamped pose;
+    pose.pose.position.x = i;
+    path.poses.push_back(pose);
+  }
+  EXPECT_EQ(utils::removePosesAfterFirstInversion(path), 0u);
+
+  // try empty path
+  path.poses.clear();
+  EXPECT_EQ(utils::removePosesAfterFirstInversion(path), 0u);
+
+  // cusping path
+  for (unsigned int i = 0; i != 10; i++) {
+    geometry_msgs::msg::PoseStamped pose;
+    pose.pose.position.x = i;
+    path.poses.push_back(pose);
+  }
+  for (unsigned int i = 0; i != 10; i++) {
+    geometry_msgs::msg::PoseStamped pose;
+    pose.pose.position.x = 10 - i;
+    path.poses.push_back(pose);
+  }
+  EXPECT_EQ(utils::removePosesAfterFirstInversion(path), 11u);
+  // Check to see if removed
+  EXPECT_EQ(path.poses.size(), 11u);
+  EXPECT_EQ(path.poses.back().pose.position.x, 10);
 }

@@ -10,6 +10,7 @@ set(XTENSOR_USE_OPENMP 0)
 
 find_package(ament_cmake REQUIRED)
 find_package(xtensor REQUIRED)
+find_package(xsimd REQUIRED)
 
 set(dependencies_pkgs
   rclcpp
@@ -32,7 +33,22 @@ foreach(pkg IN LISTS dependencies_pkgs)
 endforeach()
 
 nav2_package()
-add_compile_options(-O3 -mavx2 -mfma -finline-limit=1000000 -ffp-contract=fast -ffast-math)
+
+include(CheckCXXCompilerFlag)
+
+check_cxx_compiler_flag("-mavx2" COMPILER_SUPPORTS_AVX2)
+check_cxx_compiler_flag("-mfma" COMPILER_SUPPORTS_FMA)
+
+if(COMPILER_SUPPORTS_AVX2)
+  add_compile_options(-mavx2)
+endif()
+
+if(COMPILER_SUPPORTS_FMA)
+  add_compile_options(-mfma)
+endif()
+
+# If building one the same hardware to be deployed on, try `-march=native`!
+add_compile_options(-O3 -finline-limit=10000000 -ffp-contract=fast -ffast-math -mtune=generic)
 
 add_library(mppi_controller SHARED
   src/controller.cpp
@@ -75,7 +91,14 @@ install(DIRECTORY include/
   DESTINATION include/
 )
 
-
+if(BUILD_TESTING)
+  find_package(ament_lint_auto REQUIRED)
+  find_package(ament_cmake_gtest REQUIRED)
+  set(ament_cmake_copyright_FOUND TRUE)
+  ament_lint_auto_find_test_dependencies()
+  add_subdirectory(test)
+  # add_subdirectory(benchmark)
+endif()
 
 ament_export_libraries(${libraries})
 ament_export_dependencies(${dependencies_pkgs})

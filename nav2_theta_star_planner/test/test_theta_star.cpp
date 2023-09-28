@@ -95,7 +95,6 @@ TEST(ThetaStarTest, test_theta_star) {
   planner_->setStartAndGoal(start, goal);
   EXPECT_TRUE(planner_->src_.x == s.x && planner_->src_.y == s.y);
   EXPECT_TRUE(planner_->dst_.x == g.x && planner_->dst_.y == g.y);
-
   /// Check if the initializePosn function works properly
   planner_->uinitializePosn(size_x * size_y);
   EXPECT_EQ(planner_->getSizeOfNodePosition(), (size_x * size_y));
@@ -121,7 +120,7 @@ TEST(ThetaStarTest, test_theta_star) {
   EXPECT_FALSE(planner_->isSafe(10, 10));      // cost at this point is 253 (>LETHAL_COST)
 
   /// Check if the functions addIndex & getIndex work properly
-  coordsM c = {20, 30};
+  coordsM c = {18, 18};
   planner_->uaddToNodesData(0);
   planner_->uaddIndex(c.x, c.y);
   tree_node * c_node = planner_->ugetIndex(c.x, c.y);
@@ -174,8 +173,8 @@ TEST(ThetaStarPlanner, test_theta_star_planner) {
   }
   goal.pose.position.x = 1.0;
   goal.pose.position.y = 1.0;
-  path = planner_2d->createPlan(start, goal);
-  EXPECT_EQ(static_cast<int>(path.poses.size()), 0);
+
+  EXPECT_THROW(planner_2d->createPlan(start, goal), nav2_core::GoalOccupied);
 
   planner_2d->deactivate();
   planner_2d->cleanup();

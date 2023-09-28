@@ -17,19 +17,21 @@
 #include <memory>
 #include <string>
 #include <utility>
-#include <set>
-#include <limits>
 #include <vector>
 
 #include "nav2_util/geometry_utils.hpp"
+#include "nav2_util/node_utils.hpp"
 #include "nav2_util/robot_utils.hpp"
-#include "nav2_behavior_tree/bt_conversions.hpp"
+#include "nav2_behavior_tree/bt_utils.hpp"
+
+using nav2_util::declare_parameter_if_not_declared;
 
 namespace nav2_bt_navigator
 {
 
-BtNavigator::BtNavigator(const rclcpp::NodeOptions & options)
-: nav2_util::LifecycleNode("bt_navigator", "", options),
+BtNavigator::BtNavigator(rclcpp::NodeOptions options)
+: nav2_util::LifecycleNode("bt_navigator", "",
+    options.automatically_declare_parameters_from_overrides(true)),
   class_loader_("nav2_core", "nav2_core::NavigatorBase")
 {
   RCLCPP_INFO(get_logger(), "Creating");
@@ -51,6 +53,10 @@ BtNavigator::BtNavigator(const rclcpp::NodeOptions & options)
     "nav2_goal_updated_condition_bt_node",
     "nav2_globally_updated_goal_condition_bt_node",
     "nav2_is_path_valid_condition_bt_node",
+    "nav2_are_error_codes_active_condition_bt_node",
+    "nav2_would_a_controller_recovery_help_condition_bt_node",
+    "nav2_would_a_planner_recovery_help_condition_bt_node",
+    "nav2_would_a_smoother_recovery_help_condition_bt_node",
     "nav2_reinitialize_global_localization_service_bt_node",
     "nav2_rate_controller_bt_node",
     "nav2_distance_controller_bt_node",
@@ -80,14 +86,20 @@ BtNavigator::BtNavigator(const rclcpp::NodeOptions & options)
     "nav2_spin_cancel_bt_node",
     "nav2_assisted_teleop_cancel_bt_node",
     "nav2_back_up_cancel_bt_node",
-    "nav2_drive_on_heading_cancel_bt_node"
+    "nav2_drive_on_heading_cancel_bt_node",
+    "nav2_is_battery_charging_condition_bt_node"
   };
 
-  declare_parameter("plugin_lib_names", plugin_libs);
-  declare_parameter("transform_tolerance", rclcpp::ParameterValue(0.1));
-  declare_parameter("global_frame", std::string("map"));
-  declare_parameter("robot_base_frame", std::string("base_link"));
-  declare_parameter("odom_topic", std::string("odom"));
+  declare_parameter_if_not_declared(
+    this, "plugin_lib_names", rclcpp::ParameterValue(plugin_libs));
+  declare_parameter_if_not_declared(
+    this, "transform_tolerance", rclcpp::ParameterValue(0.1));
+  declare_parameter_if_not_declared(
+    this, "global_frame", rclcpp::ParameterValue(std::string("map")));
+  declare_parameter_if_not_declared(
+    this, "robot_base_frame", rclcpp::ParameterValue(std::string("base_link")));
+  declare_parameter_if_not_declared(
+    this, "odom_topic", rclcpp::ParameterValue(std::string("odom")));
 }
 
 BtNavigator::~BtNavigator()
@@ -135,11 +147,15 @@ BtNavigator::on_configure(const rclcpp_lifecycle::State & /*state*/)
   };
 
   std::vector<std::string> navigator_ids;
-  declare_parameter("navigators", default_navigator_ids);
+  declare_parameter_if_not_declared(
+    node, "navigators",
+    rclcpp::ParameterValue(default_navigator_ids));
   get_parameter("navigators", navigator_ids);
   if (navigator_ids == default_navigator_ids) {
     for (size_t i = 0; i < default_navigator_ids.size(); ++i) {
-      declare_parameter(default_navigator_ids[i] + ".plugin", default_navigator_types[i]);
+      declare_parameter_if_not_declared(
+        node, default_navigator_ids[i] + ".plugin",
+        rclcpp::ParameterValue(default_navigator_types[i]));
     }
   }
 

@@ -73,12 +73,22 @@ nav_msgs::msg::Path PathHandler::transformGlobalPlan(
       return euclidean_distance(robot_pose, ps);
     });
 
+  // Make sure we always have at least 2 points on the transformed plan and than we don't prune
+  // the global plan below 2 points in order to have always enough point to interpolate the
+  // end of path direction
+  if (global_plan_.poses.begin() != closest_pose_upper_bound &&
+    transformation_begin == std::prev(closest_pose_upper_bound))
+  {
+    RCLCPP_WARN_STREAM(logger_, "transformation_begin == closest_pose_upper_bound ");
+    transformation_begin = std::prev(std::prev(closest_pose_upper_bound));
+  }
+
   // We'll discard points on the plan that are outside the local costmap
   const double max_costmap_extent = getCostmapMaxExtent();
   auto transformation_end = std::find_if(
     transformation_begin, global_plan_.poses.end(),
-    [&](const auto & pose) {
-      return euclidean_distance(pose, robot_pose) > max_costmap_extent;
+    [&](const auto & global_plan_pose) {
+      return euclidean_distance(global_plan_pose, robot_pose) > max_costmap_extent;
     });
 
   // Lambda to transform a PoseStamped from global frame to local

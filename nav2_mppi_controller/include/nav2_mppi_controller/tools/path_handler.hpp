@@ -1,4 +1,6 @@
 // Copyright (c) 2022 Samsung Research America, @artofnothingness Alexey Budyakov
+// Copyright (c) 2023 Dexory
+// Copyright (c) 2023 Open Navigation LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -88,8 +90,6 @@ public:
    */
   nav_msgs::msg::Path transformPath(const geometry_msgs::msg::PoseStamped & robot_pose);
 
-  bool isWithinInversionTolerances(const geometry_msgs::msg::PoseStamped & robot_pose);
-
 protected:
   /**
     * @brief Transform a pose to another frame
@@ -126,28 +126,35 @@ protected:
     const geometry_msgs::msg::PoseStamped & global_pose);
 
   /**
-    * @brief Prune global path to only interesting portions
+    * @brief Prune a path to only interesting portions
+    * @param plan Plan to prune
     * @param end Final path iterator
     */
   void prunePlan(nav_msgs::msg::Path & plan, const PathIterator end);
+
+  /**
+    * @brief Check if the robot pose is within the set inversion tolerances
+    * @param robot_pose Robot's current pose to check
+    * @return bool If the robot pose is within the set inversion tolerances
+    */
+  bool isWithinInversionTolerances(const geometry_msgs::msg::PoseStamped & robot_pose);
 
   std::string name_;
   std::shared_ptr<nav2_costmap_2d::Costmap2DROS> costmap_;
   std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
   ParametersHandler * parameters_handler_;
 
-  nav_msgs::msg::Path global_plan_up_to_inversion_;
   nav_msgs::msg::Path global_plan_;
+  nav_msgs::msg::Path global_plan_up_to_inversion_;
   rclcpp::Logger logger_{rclcpp::get_logger("MPPIController")};
 
   double max_robot_pose_search_dist_{0};
   double prune_distance_{0};
   double transform_tolerance_{0};
-
-  bool enforce_inversion_{false};
-  bool inversion_remaining_{false};
-  double inversion_xy_tolerance_{0};
-  double inversion_yaw_tolerance{0};
+  float inversion_xy_tolerance_{0.2};
+  float inversion_yaw_tolerance{0.4};
+  bool enforce_path_inversion_{false};
+  unsigned int inversion_locale_{0u};
 };
 }  // namespace mppi
 

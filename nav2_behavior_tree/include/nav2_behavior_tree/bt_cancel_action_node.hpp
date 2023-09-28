@@ -22,7 +22,7 @@
 #include "behaviortree_cpp_v3/action_node.h"
 #include "nav2_util/node_utils.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
-#include "nav2_behavior_tree/bt_conversions.hpp"
+#include "nav2_behavior_tree/bt_utils.hpp"
 
 namespace nav2_behavior_tree
 {
@@ -93,7 +93,9 @@ public:
       RCLCPP_ERROR(
         node_->get_logger(), "\"%s\" action server not available after waiting for 1 s",
         action_name.c_str());
-      throw std::runtime_error(std::string("Action server %s not available", action_name.c_str()));
+      throw std::runtime_error(
+              std::string("Action server ") + action_name +
+              std::string(" not available"));
     }
   }
 
