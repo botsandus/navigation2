@@ -15,6 +15,7 @@
 #include "nav2_collision_monitor/pointcloud.hpp"
 
 #include <functional>
+#include <optional>
 
 #include "sensor_msgs/point_cloud2_iterator.hpp"
 
@@ -30,12 +31,12 @@ PointCloud::PointCloud(
   const std::shared_ptr<tf2_ros::Buffer> tf_buffer,
   const std::string & base_frame_id,
   const std::string & global_frame_id,
-  const tf2::Duration & transform_tolerance,
+  const tf2::Duration & transform_timeout,
   const rclcpp::Duration & source_timeout,
   const bool base_shift_correction)
 : Source(
     node, source_name, tf_buffer, base_frame_id, global_frame_id,
-    transform_tolerance, source_timeout, base_shift_correction),
+    transform_timeout, source_timeout, base_shift_correction),
   data_(nullptr)
 {
   RCLCPP_INFO(logger_, "[%s]: Creating PointCloud", source_name_.c_str());
@@ -78,30 +79,25 @@ bool PointCloud::getData(
     return false;
   }
 
-  tf2::Transform tf_transform;
-  if (base_shift_correction_) {
-    // Obtaining the transform to get data from source frame and time where it was received
-    // to the base frame and current time
-    if (
-      !nav2_util::getTransform(
-        data_->header.frame_id, data_->header.stamp,
-        base_frame_id_, curr_time, global_frame_id_,
-        transform_tolerance_, tf_buffer_, tf_transform))
-    {
-      return false;
-    }
-  } else {
-    // Obtaining the transform to get data from source frame to base frame without time shift
-    // considered. Less accurate but much more faster option not dependent on state estimation
-    // frames.
-    if (
-      !nav2_util::getTransform(
-        data_->header.frame_id, base_frame_id_,
-        transform_tolerance_, tf_buffer_, tf_transform))
-    {
-      return false;
-    }
-  }
+  const auto tf_transform = [&]() -> std::optional<tf2::Transform> {
+      // Obtaining the transform to get data from source frame and time where it was received to the
+      // base frame and current time
+      if (base_shift_correction_) {
+        return nav2_util::getTransform(
+          base_frame_id_, curr_time, data_->header.frame_id,
+          data_->header.stamp, global_frame_id_, transform_timeout_,
+          tf_buffer_);
+      }
+
+      // Obtaining the transform to get data from source frame to base frame without time shift
+      // considered. Less accurate but much more faster option not dependent on state estimation
+      // frames.
+      return nav2_util::getTransform(
+        base_frame_id_, data_->header.frame_id, transform_timeout_,
+        tf_buffer_);
+    }();
+
+  if (!tf_transform.has_value()) {return false;}
 
   sensor_msgs::PointCloud2ConstIterator<float> iter_x(*data_, "x");
   sensor_msgs::PointCloud2ConstIterator<float> iter_y(*data_, "y");
@@ -111,7 +107,7 @@ bool PointCloud::getData(
   for (; iter_x != iter_x.end(); ++iter_x, ++iter_y, ++iter_z) {
     // Transform point coordinates from source frame -> to base frame
     tf2::Vector3 p_v3_s(*iter_x, *iter_y, *iter_z);
-    tf2::Vector3 p_v3_b = tf_transform * p_v3_s;
+    tf2::Vector3 p_v3_b = tf_transform.value() * p_v3_s;
 
     // Refill data array
     if (p_v3_b.z() >= min_height_ && p_v3_b.z() <= max_height_) {
