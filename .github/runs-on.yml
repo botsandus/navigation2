@@ -1,0 +1,4 @@
+# NOTE: RunsOn only reads the configuration file from the repository default branch.
+# Thus new settings will not be applied until the changes are merged into the default branch.
+
+_extends: auto-sandbox
