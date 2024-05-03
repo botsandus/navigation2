@@ -50,7 +50,7 @@ public:
    * @param cost_in The costmap cost at this node
    * @param index The index of this node for self-reference
    */
-  explicit NodeBasic(const unsigned int index)
+  explicit NodeBasic(const uint64_t index)
   : index(index),
     graph_node_ptr(nullptr)
   {
@@ -74,7 +74,8 @@ public:
   typename NodeT::Coordinates pose;  // Used by NodeHybrid and NodeLattice
   NodeT * graph_node_ptr;
   MotionPrimitive * prim_ptr;  // Used by NodeLattice
-  unsigned int index, motion_index;
+  uint64_t index;
+  unsigned int motion_index;
   bool backward;
   TurnDirection turn_dir;
 };
