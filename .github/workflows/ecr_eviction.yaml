@@ -1,0 +1,12 @@
+name: ECR Retention Policy
+
+on:
+  pull_request:
+    types:
+      - closed
+  workflow_dispatch:
+
+jobs:
+  clean-ghac:
+    uses: botsandus/auto-sandbox/.github/workflows/ecr_retention.yaml@main
+    secrets: inherit
