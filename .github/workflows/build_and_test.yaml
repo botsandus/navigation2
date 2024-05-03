@@ -4,6 +4,7 @@ name: Call Build and Test Feature Repo
 on:
   push:
     branches:
+      - bau
       - main
       - master
   pull_request:
