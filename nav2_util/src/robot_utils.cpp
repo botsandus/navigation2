@@ -169,6 +169,7 @@ bool getTransform(
     tf2::fromMsg(transform.transform, tf2_transform);
     return true;
   }
+
   return false;
 }
 
@@ -199,6 +200,11 @@ bool validateTwist(const geometry_msgs::msg::Twist & msg)
   }
 
   return true;
+}
+
+bool validateTwist(const geometry_msgs::msg::TwistStamped & msg)
+{
+  return validateTwist(msg.twist);
 }
 
 }  // end namespace nav2_util
