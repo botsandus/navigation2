@@ -47,10 +47,15 @@ double PathHandler::getCostmapMaxExtent() const
 
 nav_msgs::msg::Path PathHandler::transformGlobalPlan(
   const geometry_msgs::msg::PoseStamped & pose,
-  double max_robot_pose_search_dist)
+  double max_robot_pose_search_dist,
+  bool reject_unit_path)
 {
   if (global_plan_.poses.empty()) {
     throw nav2_core::InvalidPath("Received plan with zero length");
+  }
+
+  if (reject_unit_path && global_plan_.poses.size() == 1) {
+    throw nav2_core::InvalidPath("Received plan with length of one");
   }
 
   // let's get the pose of the robot in the frame of the plan
@@ -73,13 +78,12 @@ nav_msgs::msg::Path PathHandler::transformGlobalPlan(
       return euclidean_distance(robot_pose, ps);
     });
 
-  // Make sure we always have at least 2 points on the transformed plan and than we don't prune
+  // Make sure we always have at least 2 points on the transformed plan and that we don't prune
   // the global plan below 2 points in order to have always enough point to interpolate the
   // end of path direction
-  if (global_plan_.poses.begin() != closest_pose_upper_bound &&
+  if (global_plan_.poses.begin() != closest_pose_upper_bound && global_plan_.poses.size() > 1 &&
     transformation_begin == std::prev(closest_pose_upper_bound))
   {
-    RCLCPP_WARN_STREAM(logger_, "transformation_begin == closest_pose_upper_bound ");
     transformation_begin = std::prev(std::prev(closest_pose_upper_bound));
   }
 

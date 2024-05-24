@@ -32,8 +32,8 @@
 
 #include "sensor_msgs/msg/image.hpp"
 #include "nav2_core/waypoint_task_executor.hpp"
-#include "opencv4/opencv2/core.hpp"
-#include "opencv4/opencv2/opencv.hpp"
+#include "opencv2/core.hpp"
+#include "opencv2/opencv.hpp"
 #include "cv_bridge/cv_bridge.hpp"
 #include "image_transport/image_transport.hpp"
 
@@ -108,7 +108,7 @@ protected:
   sensor_msgs::msg::Image::SharedPtr curr_frame_msg_;
   // global logger
   rclcpp::Logger logger_{rclcpp::get_logger("nav2_waypoint_follower")};
-  // ros susbcriber to get camera image
+  // ros subscriber to get camera image
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr camera_image_subscriber_;
 };
 }  // namespace nav2_waypoint_follower

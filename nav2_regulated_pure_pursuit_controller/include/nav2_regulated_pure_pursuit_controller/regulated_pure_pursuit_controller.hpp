@@ -96,6 +96,8 @@ public:
     const geometry_msgs::msg::Twist & velocity,
     nav2_core::GoalChecker * /*goal_checker*/) override;
 
+  bool cancel() override;
+
   /**
    * @brief nav2_core setPlan - Sets the global plan
    * @param path The global plan
@@ -110,6 +112,8 @@ public:
    * or in absolute values in false case.
    */
   void setSpeedLimit(const double & speed_limit, const bool & percentage) override;
+
+  void reset() override;
 
 protected:
   /**
@@ -131,6 +135,7 @@ protected:
    * @brief Whether robot should rotate to rough path heading
    * @param carrot_pose current lookahead point
    * @param angle_to_path Angle of robot output relatie to carrot marker
+   * @param x_vel_sign Velocoty sign (forward or backward)
    * @return Whether should rotate to path heading
    */
   bool shouldRotateToPath(
@@ -186,6 +191,8 @@ protected:
    * @brief Get lookahead point
    * @param lookahead_dist Optimal lookahead distance
    * @param path Current global path
+   * @param interpolate_after_goal If true, interpolate the lookahead point after the goal based
+   * on the orientation given by the position of the last two pose of the path
    * @return Lookahead point
    */
   geometry_msgs::msg::PoseStamped getLookAheadPoint(
@@ -209,6 +216,8 @@ protected:
   Parameters * params_;
   double goal_dist_tol_;
   double control_duration_;
+  bool cancelling_ = false;
+  bool finished_cancelling_ = false;
 
   std::shared_ptr<rclcpp_lifecycle::LifecyclePublisher<nav_msgs::msg::Path>> global_path_pub_;
   std::shared_ptr<rclcpp_lifecycle::LifecyclePublisher<geometry_msgs::msg::PointStamped>>

@@ -86,13 +86,12 @@ ParameterHandler::ParameterHandler(
   declare_parameter_if_not_declared(
     node, plugin_name_ + ".max_angular_accel", rclcpp::ParameterValue(3.2));
   declare_parameter_if_not_declared(
+    node, plugin_name_ + ".cancel_deceleration", rclcpp::ParameterValue(3.2));
+  declare_parameter_if_not_declared(
     node, plugin_name_ + ".allow_reversing", rclcpp::ParameterValue(false));
   declare_parameter_if_not_declared(
     node, plugin_name_ + ".max_robot_pose_search_dist",
     rclcpp::ParameterValue(costmap_size_x / 2.0));
-  declare_parameter_if_not_declared(
-    node, plugin_name_ + ".use_interpolation",
-    rclcpp::ParameterValue(true));
   declare_parameter_if_not_declared(
     node, plugin_name_ + ".interpolate_curvature_after_goal",
     rclcpp::ParameterValue(false));
@@ -154,6 +153,7 @@ ParameterHandler::ParameterHandler(
   node->get_parameter(
     plugin_name_ + ".rotate_to_heading_min_angle", params_.rotate_to_heading_min_angle);
   node->get_parameter(plugin_name_ + ".max_angular_accel", params_.max_angular_accel);
+  node->get_parameter(plugin_name_ + ".cancel_deceleration", params_.cancel_deceleration);
   node->get_parameter(plugin_name_ + ".allow_reversing", params_.allow_reversing);
   node->get_parameter(
     plugin_name_ + ".max_robot_pose_search_dist",
@@ -166,15 +166,12 @@ ParameterHandler::ParameterHandler(
   }
 
   node->get_parameter(
-    plugin_name_ + ".use_interpolation",
-    params_.use_interpolation);
-  node->get_parameter(
     plugin_name_ + ".interpolate_curvature_after_goal",
     params_.interpolate_curvature_after_goal);
   if (!params_.use_fixed_curvature_lookahead && params_.interpolate_curvature_after_goal) {
     RCLCPP_WARN(
-        logger_, "For interpolate_curvature_after_goal to be set to true, "
-        "use_fixed_curvature_lookahead should be true, it is currently set to false");
+      logger_, "For interpolate_curvature_after_goal to be set to true, "
+      "use_fixed_curvature_lookahead should be true, it is currently set to false. Disabling.");
     params_.interpolate_curvature_after_goal = false;
   }
   node->get_parameter(
@@ -243,6 +240,8 @@ ParameterHandler::dynamicParametersCallback(
         params_.regulated_linear_scaling_min_speed = parameter.as_double();
       } else if (name == plugin_name_ + ".max_angular_accel") {
         params_.max_angular_accel = parameter.as_double();
+      } else if (name == plugin_name_ + ".cancel_deceleration") {
+        params_.cancel_deceleration = parameter.as_double();
       } else if (name == plugin_name_ + ".rotate_to_heading_min_angle") {
         params_.rotate_to_heading_min_angle = parameter.as_double();
       }

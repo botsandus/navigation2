@@ -20,17 +20,23 @@
 #include <vector>
 
 #include "rclcpp/rclcpp.hpp"
-#include "behaviortree_cpp_v3/utils/shared_library.h"
+#include "behaviortree_cpp/utils/shared_library.h"
 
 namespace nav2_behavior_tree
 {
 
-BehaviorTreeEngine::BehaviorTreeEngine(const std::vector<std::string> & plugin_libraries)
+BehaviorTreeEngine::BehaviorTreeEngine(
+  const std::vector<std::string> & plugin_libraries)
 {
   BT::SharedLibrary loader;
   for (const auto & p : plugin_libraries) {
     factory_.registerFromPlugin(loader.getOSName(p));
   }
+
+  // FIXME: the next two line are needed for back-compatibility with BT.CPP 3.8.x
+  // Note that the can be removed, once we migrate from BT.CPP 4.5.x to 4.6+
+  BT::ReactiveSequence::EnableException(false);
+  BT::ReactiveFallback::EnableException(false);
 }
 
 BtStatus
@@ -47,15 +53,20 @@ BehaviorTreeEngine::run(
   try {
     while (rclcpp::ok() && result == BT::NodeStatus::RUNNING) {
       if (cancelRequested()) {
-        tree->rootNode()->halt();
+        tree->haltTree();
         return BtStatus::CANCELED;
       }
 
-      result = tree->tickRoot();
+      result = tree->tickOnce();
 
       onLoop();
 
-      loopRate.sleep();
+      if (!loopRate.sleep()) {
+        RCLCPP_WARN(
+          rclcpp::get_logger("BehaviorTreeEngine"),
+          "Behavior Tree tick rate %0.2f was exceeded!",
+          1.0 / (loopRate.period().count() * 1.0e-9));
+      }
     }
   } catch (const std::exception & ex) {
     RCLCPP_ERROR(

@@ -21,12 +21,18 @@
 #include <mutex>
 #include <condition_variable>
 
+// xtensor creates warnings that needs to be ignored as we are building with -Werror
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"
+#pragma GCC diagnostic ignored "-Wstringop-overflow"
 #include <xtensor/xtensor.hpp>
 #include <xtensor/xview.hpp>
+#pragma GCC diagnostic pop
 
 #include "nav2_mppi_controller/models/optimizer_settings.hpp"
-#include <nav2_mppi_controller/models/control_sequence.hpp>
-#include <nav2_mppi_controller/models/state.hpp>
+#include "nav2_mppi_controller/tools/parameters_handler.hpp"
+#include "nav2_mppi_controller/models/control_sequence.hpp"
+#include "nav2_mppi_controller/models/state.hpp"
 
 namespace mppi
 {
@@ -47,8 +53,12 @@ public:
    * @brief Initialize noise generator with settings and model types
    * @param settings Settings of controller
    * @param is_holonomic If base is holonomic
+   * @param name Namespace for configs
+   * @param param_handler Get parameters util
    */
-  void initialize(mppi::models::OptimizerSettings & settings, bool is_holonomic);
+  void initialize(
+    mppi::models::OptimizerSettings & settings,
+    bool is_holonomic, const std::string & name, ParametersHandler * param_handler);
 
   /**
    * @brief Shutdown noise generator thread
@@ -99,7 +109,7 @@ protected:
   std::thread noise_thread_;
   std::condition_variable noise_cond_;
   std::mutex noise_lock_;
-  bool active_{false}, ready_{false};
+  bool active_{false}, ready_{false}, regenerate_noises_{false};
 };
 
 }  // namespace mppi
