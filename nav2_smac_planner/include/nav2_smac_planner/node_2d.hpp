@@ -87,7 +87,7 @@ public:
    * @brief Gets the accumulated cost at this node
    * @return accumulated cost
    */
-  inline float & getAccumulatedCost()
+  inline float getAccumulatedCost()
   {
     return _accumulated_cost;
   }
@@ -105,7 +105,7 @@ public:
    * @brief Gets the costmap cost at this node
    * @return costmap cost
    */
-  inline float & getCost()
+  inline float getCost()
   {
     return _cell_cost;
   }
@@ -123,7 +123,7 @@ public:
    * @brief Gets if cell has been visited in search
    * @param If cell was visited
    */
-  inline bool & wasVisited()
+  inline bool wasVisited()
   {
     return _was_visited;
   }
@@ -224,13 +224,11 @@ public:
    * @brief Get cost of heuristic of node
    * @param node Node index current
    * @param node Node index of new
-   * @param costmap Costmap ptr to use
    * @return Heuristic cost between the nodes
    */
   static float getHeuristicCost(
     const Coordinates & node_coords,
-    const Coordinates & goal_coordinates,
-    const nav2_costmap_2d::Costmap2D * costmap);
+    const Coordinates & goal_coordinates);
 
   /**
    * @brief Initialize the neighborhood to be used in A*

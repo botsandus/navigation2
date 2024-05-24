@@ -62,6 +62,9 @@ public:
 
   void setCostmap(nav2_util::Costmap * costmap)
   {
+    std::unique_lock<nav2_costmap_2d::Costmap2D::mutex_t> lock(
+      *(costmap_ros_->getCostmap()->getMutex()));
+
     nav2_msgs::msg::CostmapMetaData prop;
     nav2_msgs::msg::Costmap cm = costmap->get_costmap(prop);
     prop = cm.metadata;
@@ -84,7 +87,8 @@ public:
       return false;
     }
     try {
-      path = planners_["GridBased"]->createPlan(start, goal);
+      auto dummy_cancel_checker = []() {return false;};
+      path = planners_["GridBased"]->createPlan(start, goal, dummy_cancel_checker);
       // The situation when createPlan() did not throw any exception
       // does not guarantee that plan was created correctly.
       // So it should be checked additionally that path is correct.

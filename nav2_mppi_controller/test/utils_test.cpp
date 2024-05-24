@@ -257,7 +257,6 @@ TEST(UtilsTests, FurthestAndClosestReachedPoint)
   {state, generated_trajectories, path, costs, model_dt, false, nullptr, nullptr,
     std::nullopt, std::nullopt};  /// Caution, keep references
   EXPECT_EQ(findPathFurthestReachedPoint(data3), 5u);
-  EXPECT_EQ(findPathTrajectoryInitialPoint(data3), 5u);
 }
 
 TEST(UtilsTests, findPathCosts)
@@ -329,7 +328,7 @@ TEST(UtilsTests, SmootherTest)
   noisey_sequence.vy = 0.0 * xt::ones<float>({30});
   noisey_sequence.wz = 0.3 * xt::ones<float>({30});
 
-  // Make the sequence noisey
+  // Make the sequence noisy
   auto noises = xt::random::randn<float>({30}, 0.0, 0.2);
   noisey_sequence.vx += noises;
   noisey_sequence.vy += noises;
