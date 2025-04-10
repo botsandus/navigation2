@@ -117,7 +117,9 @@ void enqueue(
   CachedDistanceMap * cdm,
   unsigned char * marked)
 {
-  if (marked[MAP_INDEX(map, i, j)]) {
+  const int map_index = MAP_INDEX(map, i, j);
+
+  if (marked[map_index]) {
     return;
   }
 
@@ -128,8 +130,6 @@ void enqueue(
   if (distance > cdm->cell_radius_) {
     return;
   }
-
-  const int map_index = MAP_INDEX(map, i, j);
 
   map->cells[map_index].occ_dist = distance * map->scale;
 
