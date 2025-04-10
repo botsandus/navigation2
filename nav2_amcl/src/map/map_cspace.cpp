@@ -33,6 +33,7 @@ struct CellData
   map_t * map_;
   unsigned int i_, j_;
   unsigned int src_i_, src_j_;
+  float occ_dist;
 };
 
 /*
@@ -81,9 +82,7 @@ public:
  */
 bool operator<(const CellData & a, const CellData & b)
 {
-  return a.map_->cells[MAP_INDEX(
-             a.map_, a.i_,
-             a.j_)].occ_dist > a.map_->cells[MAP_INDEX(b.map_, b.i_, b.j_)].occ_dist;
+  return a.occ_dist > b.occ_dist;
 }
 
 /*
@@ -134,7 +133,8 @@ void enqueue(
   map->cells[map_index].occ_dist = distance * map->scale;
 
   Q.emplace(CellData{map, static_cast<unsigned int>(i), static_cast<unsigned int>(j),
-      static_cast<unsigned int>(src_i), static_cast<unsigned int>(src_j)});
+      static_cast<unsigned int>(src_i), static_cast<unsigned int>(src_j),
+      map->cells[map_index].occ_dist});
 
   marked[map_index] = 1;
 }
