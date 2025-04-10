@@ -20,7 +20,10 @@
  */
 
 #include <cassert>
+#include <chrono>
 #include <cmath>
+#include <iostream>
+#include <ostream>
 
 #include "nav2_amcl/sensors/laser/laser.hpp"
 
@@ -35,7 +38,13 @@ LikelihoodFieldModel::LikelihoodFieldModel(
   z_hit_ = z_hit;
   z_rand_ = z_rand;
   sigma_hit_ = sigma_hit;
+  // Measure time with chrono
+  std::cout << "Updating map" << std::endl;
+  auto start = std::chrono::high_resolution_clock::now();
   map_update_cspace(map, max_occ_dist);
+  auto end = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double> elapsed = end - start;
+  std::cout << "Map update took: " << elapsed.count() << " seconds" << std::endl;
 }
 
 double

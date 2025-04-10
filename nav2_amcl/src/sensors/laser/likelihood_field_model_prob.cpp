@@ -20,7 +20,10 @@
  */
 
 #include <cassert>
+#include <chrono>
 #include <cmath>
+#include <iostream>
+#include <ostream>
 
 #include "nav2_amcl/sensors/laser/laser.hpp"
 
@@ -43,7 +46,13 @@ LikelihoodFieldModelProb::LikelihoodFieldModelProb(
   beam_skip_distance_ = beam_skip_distance;
   beam_skip_threshold_ = beam_skip_threshold;
   beam_skip_error_threshold_ = beam_skip_error_threshold;
+  // Measure time with chrono
+  std::cout << "Updating map" << std::endl;
+  auto start = std::chrono::high_resolution_clock::now();
   map_update_cspace(map, max_occ_dist);
+  auto end = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double> elapsed = end - start;
+  std::cout << "Map update took: " << elapsed.count() << " seconds" << std::endl;
 }
 
 // Determine the probability for the given pose
