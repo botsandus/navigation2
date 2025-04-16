@@ -80,7 +80,7 @@ protected:
    * @brief Lifecycle node manager callback function
    * @param request_header Header of the service request
    * @param request Service request
-   * @param reponse Service response
+   * @param response Service response
    */
   void managerCallback(
     const std::shared_ptr<rmw_request_id_t> request_header,
@@ -91,7 +91,7 @@ protected:
    * state.
    * @param request_header Header of the request
    * @param request Service request
-   * @param reponse Service response
+   * @param response Service response
    */
   void isActiveCallback(
     const std::shared_ptr<rmw_request_id_t> request_header,
@@ -233,6 +233,7 @@ protected:
   rclcpp::TimerBase::SharedPtr bond_respawn_timer_;
   std::chrono::milliseconds bond_timeout_;
   std::chrono::milliseconds service_timeout_;
+  bool non_default_timeout;
 
   // A map of all nodes to check bond connection
   std::map<std::string, std::shared_ptr<bond::Bond>> bond_map_;
