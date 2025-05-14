@@ -159,10 +159,11 @@ void map_update_cspace(map_t * map, double max_occ_dist)
   // Enqueue all the obstacle cells
   CellData cell;
   cell.map_ = map;
+  int loop_map_index;
   for (int i = 0; i < map->size_x; i++) {
     cell.src_i_ = cell.i_ = i;
     for (int j = 0; j < map->size_y; j++) {
-      const int loop_map_index = MAP_INDEX(map, i, j);
+      loop_map_index = MAP_INDEX(map, i, j);
       if (map->cells[loop_map_index].occ_state == +1) {
         map->cells[loop_map_index].occ_dist = 0.0;
         cell.src_j_ = cell.j_ = j;
@@ -178,27 +179,27 @@ void map_update_cspace(map_t * map, double max_occ_dist)
     CellData current_cell = Q.top();
     if (current_cell.i_ > 0) {
       enqueue(
-        map, current_cell.i_ - 1, current_cell.j_,
-        current_cell.src_i_, current_cell.src_j_,
-        Q, cdm, marked);
+          map, current_cell.i_ - 1, current_cell.j_,
+          current_cell.src_i_, current_cell.src_j_,
+          Q, cdm, marked);
     }
     if (current_cell.j_ > 0) {
       enqueue(
-        map, current_cell.i_, current_cell.j_ - 1,
-        current_cell.src_i_, current_cell.src_j_,
-        Q, cdm, marked);
+          map, current_cell.i_, current_cell.j_ - 1,
+          current_cell.src_i_, current_cell.src_j_,
+          Q, cdm, marked);
     }
     if (static_cast<int>(current_cell.i_) < map->size_x - 1) {
       enqueue(
-        map, current_cell.i_ + 1, current_cell.j_,
-        current_cell.src_i_, current_cell.src_j_,
-        Q, cdm, marked);
+          map, current_cell.i_ + 1, current_cell.j_,
+          current_cell.src_i_, current_cell.src_j_,
+          Q, cdm, marked);
     }
     if (static_cast<int>(current_cell.j_) < map->size_y - 1) {
       enqueue(
-        map, current_cell.i_, current_cell.j_ + 1,
-        current_cell.src_i_, current_cell.src_j_,
-        Q, cdm, marked);
+          map, current_cell.i_, current_cell.j_ + 1,
+          current_cell.src_i_, current_cell.src_j_,
+          Q, cdm, marked);
     }
 
     Q.pop();

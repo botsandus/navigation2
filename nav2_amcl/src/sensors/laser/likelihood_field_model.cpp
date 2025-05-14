@@ -20,10 +20,7 @@
  */
 
 #include <cassert>
-#include <chrono>
 #include <cmath>
-#include <iostream>
-#include <ostream>
 
 #include "nav2_amcl/sensors/laser/laser.hpp"
 
@@ -39,11 +36,12 @@ LikelihoodFieldModel::LikelihoodFieldModel(
   z_rand_ = z_rand;
   sigma_hit_ = sigma_hit;
 
-  // recompute cpace only when nescessary, i.e. if:
+  // recompute cspace only when necessary, i.e. if:
   // - max_occ_dist changed
   // OR
-  // - cspace was not computed yet, i.e. when map->max_occ_dist == 0.0
-  if (map->max_occ_dist != max_occ_dist || map->max_occ_dist == 0.0) {
+  // - cspace was not computed yet, i.e. when map->max_occ_dist == 0.0 (and hence different from
+  // max_occ_dist)
+  if (map->max_occ_dist != max_occ_dist) {
     map_update_cspace(map, max_occ_dist);
   }
 }
