@@ -1491,6 +1491,9 @@ AmclNode::convertMap(const nav_msgs::msg::OccupancyGrid & map_msg)
     } else {
       map->cells[i].occ_state = 0;
     }
+  
+  map->max_occ_dist = 0.0;
+
   }
 
   return map;
