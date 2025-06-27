@@ -68,6 +68,14 @@ std::shared_ptr<Costmap2D> CostmapSubscriber::getCostmap()
   return costmap_;
 }
 
+rclcpp::Time CostmapSubscriber::getLatestCostmapMsgTimeStamp()
+{
+  if (!isCostmapReceived()) {
+    throw std::runtime_error("Costmap is not available");
+  }
+  return latest_costmap_msg_timestamp_;
+}
+
 void CostmapSubscriber::costmapCallback(const nav2_msgs::msg::Costmap::SharedPtr msg)
 {
   {
@@ -82,6 +90,7 @@ void CostmapSubscriber::costmapCallback(const nav2_msgs::msg::Costmap::SharedPtr
 
     processCurrentCostmapMsg();
   }
+  latest_costmap_msg_timestamp_ = msg->header.stamp;
 }
 
 void CostmapSubscriber::costmapUpdateCallback(
