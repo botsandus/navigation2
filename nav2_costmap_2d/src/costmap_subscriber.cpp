@@ -76,6 +76,14 @@ rclcpp::Time CostmapSubscriber::getLatestCostmapMsgTimeStamp()
   return latest_costmap_msg_timestamp_;
 }
 
+rclcpp::Time CostmapSubscriber::getLatestCostmapRecievedTime()
+{
+  if (!isCostmapReceived()) {
+    throw std::runtime_error("Costmap is not available");
+  }
+  return latest_costmap_received_timestamp_;
+}
+
 void CostmapSubscriber::costmapCallback(const nav2_msgs::msg::Costmap::SharedPtr msg)
 {
   {
@@ -91,6 +99,7 @@ void CostmapSubscriber::costmapCallback(const nav2_msgs::msg::Costmap::SharedPtr
     processCurrentCostmapMsg();
   }
   latest_costmap_msg_timestamp_ = msg->header.stamp;
+  latest_costmap_received_timestamp_ = rclcpp::Clock().now();
 }
 
 void CostmapSubscriber::costmapUpdateCallback(

@@ -62,6 +62,11 @@ public:
    */
   rclcpp::Time getLatestCostmapMsgTimeStamp();
   /**
+   * @brief Get latest costmap received timestamp
+   * @return Timestamp of the latest costmap received
+   */
+  rclcpp::Time getLatestCostmapRecievedTime();
+  /**
    * @brief Callback for the costmap topic
    */
   void costmapCallback(const nav2_msgs::msg::Costmap::SharedPtr msg);
@@ -82,6 +87,7 @@ protected:
   rclcpp::Subscription<nav2_msgs::msg::Costmap>::SharedPtr costmap_sub_;
   rclcpp::Subscription<nav2_msgs::msg::CostmapUpdate>::SharedPtr costmap_update_sub_;
   rclcpp::Time latest_costmap_msg_timestamp_;
+  rclcpp::Time latest_costmap_received_timestamp_;
 
   std::shared_ptr<Costmap2D> costmap_;
   nav2_msgs::msg::Costmap::SharedPtr costmap_msg_;
