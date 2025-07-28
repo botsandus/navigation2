@@ -183,6 +183,11 @@ void
 StaticLayer::processMap(const nav_msgs::msg::OccupancyGrid & new_map)
 {
   RCLCPP_DEBUG(logger_, "StaticLayer: Process map");
+  double res = std::round(new_map.info.resolution * 1000.0) / 1000.0;
+  double origin_x = std::round(
+    new_map.info.origin.position.x * 1000.0) / 1000.0;
+  double origin_y = std::round(
+    new_map.info.origin.position.y * 1000.0) / 1000.0;
 
   unsigned int size_x = new_map.info.width;
   unsigned int size_y = new_map.info.height;
@@ -196,34 +201,34 @@ StaticLayer::processMap(const nav_msgs::msg::OccupancyGrid & new_map)
   Costmap2D * master = layered_costmap_->getCostmap();
   if (!layered_costmap_->isRolling() && (master->getSizeInCellsX() != size_x ||
     master->getSizeInCellsY() != size_y ||
-    master->getResolution() != new_map.info.resolution ||
-    master->getOriginX() != new_map.info.origin.position.x ||
-    master->getOriginY() != new_map.info.origin.position.y ||
+    master->getResolution() != res ||
+    master->getOriginX() != origin_x ||
+    master->getOriginY() != origin_y ||
     !layered_costmap_->isSizeLocked()))
   {
     // Update the size of the layered costmap (and all layers, including this one)
     RCLCPP_INFO(
       logger_,
       "StaticLayer: Resizing costmap to %d X %d at %f m/pix", size_x, size_y,
-      new_map.info.resolution);
+      res);
     layered_costmap_->resizeMap(
-      size_x, size_y, new_map.info.resolution,
-      new_map.info.origin.position.x,
-      new_map.info.origin.position.y,
+      size_x, size_y, res,
+      origin_x,
+      origin_y,
       true);
   } else if (size_x_ != size_x || size_y_ != size_y ||  // NOLINT
-    resolution_ != new_map.info.resolution ||
-    origin_x_ != new_map.info.origin.position.x ||
-    origin_y_ != new_map.info.origin.position.y)
+    resolution_ != res ||
+    origin_x_ != origin_x ||
+    origin_y_ != origin_y)
   {
     // only update the size of the costmap stored locally in this layer
     RCLCPP_INFO(
       logger_,
       "StaticLayer: Resizing static layer to %d X %d at %f m/pix", size_x, size_y,
-      new_map.info.resolution);
+      res);
     resizeMap(
-      size_x, size_y, new_map.info.resolution,
-      new_map.info.origin.position.x, new_map.info.origin.position.y);
+      size_x, size_y, res,
+      origin_x, origin_y);
   }
 
   unsigned int index = 0;
