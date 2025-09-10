@@ -62,7 +62,7 @@ if(ROS2_MAJOR_VERSION GREATER_EQUAL 29)
     target_link_libraries(${library_name} PUBLIC robot_localization::rl_lib)
 else()
     message(STATUS "ROS2_MAJOR_VERSION (${ROS2_MAJOR_VERSION}) is NOT greater than 29 (Jazzy and older).")
-    ament_target_dependencies(${library_name} PUBLIC robot_localization)
+    target_link_libraries(${library_name} PUBLIC robot_localization)
 endif()
 
 add_executable(${executable_name}
