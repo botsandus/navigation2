@@ -107,11 +107,17 @@ DifferentialMotionModel::odometryUpdate(
           alpha1_ * delta_rot2_noise * delta_rot2_noise +
           alpha2_ * delta_trans * delta_trans)));
 
+    double strafe_hat_stddev = sqrt(alpha5_ * (delta_trans * delta_trans));
+
+    double delta_strafe_hat = 0 + pf_ran_gaussian(strafe_hat_stddev);
+
     // Apply sampled update to particle pose
     sample->pose.v[0] += delta_trans_hat *
-      cos(sample->pose.v[2] + delta_rot1_hat);
+      cos(sample->pose.v[2] + delta_rot1_hat)
+      + delta_strafe_hat * sin(sample->pose.v[2] + delta_rot1_hat);
     sample->pose.v[1] += delta_trans_hat *
-      sin(sample->pose.v[2] + delta_rot1_hat);
+      sin(sample->pose.v[2] + delta_rot1_hat) +
+      + delta_strafe_hat * cos(sample->pose.v[2] + delta_rot1_hat);
     sample->pose.v[2] += delta_rot1_hat + delta_rot2_hat;
   }
 }
