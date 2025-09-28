@@ -47,6 +47,7 @@
 #include "nav2_costmap_2d/footprint.hpp"
 #include "pluginlib/class_list_macros.hpp"
 #include "rclcpp/parameter_events_filter.hpp"
+#include "nav2_util/execution_timer.hpp"
 
 PLUGINLIB_EXPORT_CLASS(nav2_costmap_2d::InflationLayer, nav2_costmap_2d::Layer)
 
@@ -196,6 +197,10 @@ InflationLayer::updateCosts(
   int max_i,
   int max_j)
 {
+  // Measure time elapsed
+  auto timer = std::make_unique<nav2_util::ExecutionTimer>();
+  timer->start();
+
   std::lock_guard<Costmap2D::mutex_t> guard(*getMutex());
   if (!enabled_ || (cell_inflation_radius_ == 0)) {
     return;
@@ -318,6 +323,10 @@ InflationLayer::updateCosts(
   }
 
   current_ = true;
+
+  timer->end();
+  RCLCPP_WARN(rclcpp::get_logger("InflationLayer::updateCosts"), "InflationLayer::updateCosts time: %.9f", timer->elapsed_time_in_seconds());
+
 }
 
 /**
