@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.5)
 project(nav2_costmap_2d)
 
+add_compile_options(-g)
+
 find_package(ament_cmake REQUIRED)
 find_package(angles REQUIRED)
 find_package(backward_ros REQUIRED)
