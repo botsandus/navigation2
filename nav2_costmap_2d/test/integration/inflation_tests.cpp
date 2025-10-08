@@ -293,6 +293,8 @@ void TestNode::initNode(double inflation_radius)
 
 TEST_F(TestNode, testInflationAroundUnknown)
 {
+  int x_size = 10000;
+  int y_size = x_size;
   auto inflation_radius = 4.1;
   std::vector<rclcpp::Parameter> parameters;
   // Set cost_scaling_factor parameter to 1.0 for inflation layer
@@ -306,7 +308,7 @@ TEST_F(TestNode, testInflationAroundUnknown)
 
   tf2_ros::Buffer tf(node_->get_clock());
   nav2_costmap_2d::LayeredCostmap layers("frame", false, false);
-  layers.resizeMap(10000, 10000, 1, 0, 0);
+  layers.resizeMap(x_size, y_size, 1, 0, 0);
 
   // Footprint with inscribed radius = 2.1
   // circumscribed radius = 3.1
@@ -317,12 +319,15 @@ TEST_F(TestNode, testInflationAroundUnknown)
   layers.setFootprint(polygon);
   layers.updateMap(0, 0, 0);
 
+  int c = 0;
   for (unsigned int i = 0; i < layers.getCostmap()->getSizeInCellsX(); i+=10) {
     for (unsigned int j = 0; j < layers.getCostmap()->getSizeInCellsY(); j+=10) {
       layers.getCostmap()->setCost(i, j, nav2_costmap_2d::LETHAL_OBSTACLE);
+      c++;
     }
   }
-  ilayer->updateCosts(*layers.getCostmap(), 0, 0, 10000, 10000);
+  std::cout << "number of lethal cells " << c << std::endl;
+  ilayer->updateCosts(*layers.getCostmap(), 0, 0, layers.getCostmap()->getSizeInCellsX(), layers.getCostmap()->getSizeInCellsY());
 
   //validatePointInflation(4, 4, layers.getCostmap(), ilayer, inflation_radius);
 }

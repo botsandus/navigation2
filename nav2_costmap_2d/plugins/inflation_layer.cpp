@@ -263,6 +263,7 @@ InflationLayer::updateCosts(
   // Process cells by increasing distance; new cells are appended to the
   // corresponding distance bin, so they
   // can overtake previously inserted but farther away cells
+  int c=0;
   for (auto & dist_bin : inflation_cells_) {
     dist_bin.reserve(200);
     for (std::size_t i = 0; i < dist_bin.size(); ++i) {
@@ -317,6 +318,8 @@ InflationLayer::updateCosts(
         enqueue(index + size_x, mx, my + 1, sx, sy);
       }
     }
+    RCLCPP_WARN_STREAM(logger_, "inflation_cells_[" << c << "] / dist_bin SIZE " << dist_bin.size());
+    c++;
     // This level of inflation_cells_ is not needed anymore. We can free the memory
     // Note that dist_bin.clear() is not enough, because it won't free the memory
     dist_bin = std::vector<CellData>();
@@ -359,6 +362,7 @@ InflationLayer::enqueue(
     // push the cell data onto the inflation list and mark
     const auto dist = distance_matrix_[mx - src_x + r][my - src_y + r];
     inflation_cells_[dist].emplace_back(mx, my, src_x, src_y);
+
   }
 }
 
@@ -402,6 +406,7 @@ InflationLayer::generateIntegerDistances()
 {
   const int r = cell_inflation_radius_ + 2;
   const int size = r * 2 + 1;
+  RCLCPP_WARN_STREAM(logger_, "cell_inflation_radius_ " << cell_inflation_radius_ << " r " << r << " size " << size);
 
   std::vector<std::pair<int, int>> points;
 
