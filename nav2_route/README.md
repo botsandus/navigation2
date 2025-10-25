@@ -62,7 +62,7 @@ Architectures (1) and (2) are implemented and tested in `nav2_bt_navigator/behav
   - This architecturally puts the route planning in the higher-level application-autonomy logic rather than with in the main navigation-planning task logic, which could be useful separation of concerns for some applications.
 * 4. Create a behavior tree to NavigateToPose to the first node in the graph, then select (1) or (2) to track the route, finally NavigateToPose to get to the final goal pose off of the graph
   - This is useful when the start and/or goal poses are not on the navigation graph, and thus the robot needs to navigate to its starting node or final goal pose in a 'first-mile' and 'last-mile' style task
-* 5. Route Server's `ComputeAndTrackRoute` instead of `ComputeRoute` and send the dense path in (1) or sparse route in (2) or (3)
+* 5. Route Server's `ComputeAndTrackRoute` instead of `ComputeRoute` and send the dense path in (1) or sparse route in (2) or (1)
   - This is useful to track the progress of the route in the Route Server while following the route as an application sees fit. This process allows for the triggering of spatial, graph, or contextual behaviors while executing the task like adjusting speeds, turning on lights, rerouting due to multi-robot coordination resource constraints, opening doors, etc. This has a wide ranging set of applications.
 * 6. Teleoping a robot -> having a script which automatically stores new nodes and/or operator manually triggers a node capture -> saving this to file -> annotating file with operation plugin to do at each waypoint (if any) -> later using the graph to navigate the robot and perform tasks
   - This is one possible way to setup a Teach-and-Repeat behavior using the route server with custom behaviors at each node. There are likely many.
@@ -83,7 +83,7 @@ Each have their own complete unit testing files named similarly in the `test/` d
 
 ### Plugin Interfaces
 
-Several plugin interfaces are provided to enable customizable behavior in the route search, route operation, and route graph file formatting. This allows for a great deal of customization for any number of applications which might want to (1) prioritize time, distance, or other application-specific criteria in routing; (2) perform custom operations or rerouting mechanics at run-time while progressing along the route such as adjusting speed or opening doors; (3) be able to integrate your own custom file format or another format of your interest.
+Several plugin interfaces are provided to enable customizable behavior in the route search, route operation, and route graph file formatting. This allows for a great deal of customization for any number of applications which might want to (1) prioritize time, distance, or other application-specific criteria in routing; (2) perform custom operations or rerouting mechanics at run-time while progressing along the route such as adjusting speed or opening doors; (1) be able to integrate your own custom file format or another format of your interest.
 
 The interface definitions can be found in the `include/nav2_route/interfaces` directory and are mostly self explanatory via their method names and provided doxygen documentation.
 
@@ -290,7 +290,7 @@ This route operation will trigger an external service when a graph node or edge 
 
 The graphs may be stored in one of the formats the parser plugins can understand or implement your own parser for a particular format of your interest!
 A parser is provided for GeoJSON formats.
-The only three required features of the navigation graph is (1) for the nodes and edges to have identifiers from each other to be unique for referencing and (2) for edges to have the IDs of the nodes belonging to the start and end of the edge and (3) nodes contain coordinates.
+The only three required features of the navigation graph is (1) for the nodes and edges to have identifiers from each other to be unique for referencing and (2) for edges to have the IDs of the nodes belonging to the start and end of the edge and (1) nodes contain coordinates.
 This is strictly required for the Route Server to operate properly in all of its features.
 
 Besides this, we establish some conventions for route graph files to standardize this information to offer consistent and documented behavior with our provided plugins.
