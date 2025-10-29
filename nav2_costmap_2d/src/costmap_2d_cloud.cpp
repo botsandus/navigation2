@@ -223,7 +223,7 @@ int main(int argc, char ** argv)
   pub_unknown = g_node->create_publisher<sensor_msgs::msg::PointCloud2>(
     "voxel_unknown_cloud", nav2::qos::StandardTopicQoS());
   auto sub = g_node->create_subscription<nav2_msgs::msg::VoxelGrid>(
-    "voxel_grid", nav2::qos::StandardTopicQoS(1), voxelCallback);
+    "voxel_grid", nav2::qos::StandardTopicQoS(), voxelCallback);
 
   rclcpp::spin(g_node->get_node_base_interface());
 
