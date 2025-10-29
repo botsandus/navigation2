@@ -157,7 +157,7 @@ int main(int argc, char ** argv)
     "visualization_marker", nav2::qos::StandardTopicQoS());
 
   auto sub = g_node->create_subscription<nav2_msgs::msg::VoxelGrid>(
-    "voxel_grid", nav2::qos::StandardTopicQoS(1), voxelCallback);
+    "voxel_grid", nav2::qos::StandardTopicQoS(), voxelCallback);
 
   rclcpp::spin(g_node->get_node_base_interface());
 }
