@@ -604,6 +604,12 @@ void ControllerServer::setPlannerPath(const nav_msgs::msg::Path & path)
   end_pose_ = path.poses.back();
   end_pose_.header.frame_id = path.header.frame_id;
   goal_checkers_[current_goal_checker_]->reset();
+  // Save the pose before the end pose for use in goal checking, but only if we have more than
+  // one pose in the path
+  before_end_pose_.reset();
+  if (path.poses.size() > 1) {
+    before_end_pose_ = path.poses[path.poses.size() - 2];
+  }
 
   RCLCPP_DEBUG(
     get_logger(), "Path end point is (%.2f, %.2f)",
@@ -797,13 +803,21 @@ bool ControllerServer::isGoalReached()
   geometry_msgs::msg::Twist velocity = nav_2d_utils::twist2Dto3D(twist);
 
   geometry_msgs::msg::PoseStamped transformed_end_pose;
+  std::optional<geometry_msgs::msg::Pose> transformed_before_end_pose;
   rclcpp::Duration tolerance(rclcpp::Duration::from_seconds(costmap_ros_->getTransformTolerance()));
   nav_2d_utils::transformPose(
     costmap_ros_->getTfBuffer(), costmap_ros_->getGlobalFrameID(),
     end_pose_, transformed_end_pose, tolerance);
+  if (before_end_pose_.has_value()) {
+    geometry_msgs::msg::PoseStamped transformed_before_end_pose_stamped;
+    nav_2d_utils::transformPose(
+      costmap_ros_->getTfBuffer(), costmap_ros_->getGlobalFrameID(),
+      before_end_pose_.value(), transformed_before_end_pose_stamped, tolerance);
+    transformed_before_end_pose = transformed_before_end_pose_stamped.pose;
+  }
 
   return goal_checkers_[current_goal_checker_]->isGoalReached(
-    pose.pose, transformed_end_pose.pose,
+    pose.pose, transformed_end_pose.pose, transformed_before_end_pose,
     velocity);
 }
 
