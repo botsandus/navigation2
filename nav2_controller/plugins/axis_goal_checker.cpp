@@ -87,6 +87,12 @@ bool AxisGoalChecker::isGoalReached(
       goal_pose.position.y - query_pose.position.y) *
       cos(projection_angle);
 
+    // print projected_distance_to_goal, end_of_path_yaw, robot_to_goal_yaw, projection_angle
+    RCLCPP_INFO(
+      rclcpp::get_logger("AxisGoalChecker"),
+      "Projected distance to goal: %.4f, End of path yaw: %.4f, Robot to goal yaw: %.4f, Projection angle: %.4f",
+      projected_distance_to_goal, end_of_path_yaw, robot_to_goal_yaw, projection_angle);
+
     if (is_overshoot_valid_) {
       return projected_distance_to_goal < goal_tolerance_;
     } else {

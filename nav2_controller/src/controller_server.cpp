@@ -849,6 +849,22 @@ bool ControllerServer::isGoalReached()
       throw nav2_core::ControllerTFError("Failed to transform before end pose to global frame");
     }
   }
+
+  // prin transformed_before_end_pose and transformed_end_pose_ for debugging
+  RCLCPP_INFO(
+    get_logger(),
+    "Transformed end pose: (%.2f, %.2f)",
+    transformed_end_pose_.pose.position.x,
+    transformed_end_pose_.pose.position.y);
+  if (transformed_before_end_pose.has_value()) {
+    RCLCPP_INFO(
+      get_logger(),
+      "Transformed before end pose: (%.2f, %.2f)",
+      transformed_before_end_pose->position.x,
+      transformed_before_end_pose->position.y);
+  } else {
+    RCLCPP_INFO(get_logger(), "No transformed before end pose available.");
+  }
   return goal_checkers_[current_goal_checker_]->isGoalReached(
     pose.pose, transformed_end_pose_.pose, transformed_before_end_pose,
     velocity);
