@@ -33,7 +33,8 @@ namespace nav2_controller
 {
 
 AxisGoalChecker::AxisGoalChecker()
-: goal_tolerance_(0.25)
+: axis_progress_goal_tolerance_(0.25), axis_offset_goal_tolerance_(0.25),
+  is_overshoot_valid_(false)
 {
 }
 
@@ -47,8 +48,13 @@ void AxisGoalChecker::initialize(
 
   nav2::declare_parameter_if_not_declared(
     node,
-    plugin_name + ".goal_tolerance", rclcpp::ParameterValue(0.25));
-  node->get_parameter(plugin_name + ".goal_tolerance", goal_tolerance_);
+    plugin_name + ".axis_progress_goal_tolerance", rclcpp::ParameterValue(0.25));
+  node->get_parameter(plugin_name + ".axis_progress_goal_tolerance", axis_progress_goal_tolerance_);
+
+  nav2::declare_parameter_if_not_declared(
+    node,
+    plugin_name + ".axis_offset_goal_tolerance", rclcpp::ParameterValue(0.25));
+  node->get_parameter(plugin_name + ".axis_offset_goal_tolerance", axis_offset_goal_tolerance_);
 
   nav2::declare_parameter_if_not_declared(
     node,
@@ -87,17 +93,25 @@ bool AxisGoalChecker::isGoalReached(
       goal_pose.position.y - query_pose.position.y) *
       cos(projection_angle);
 
+    double ortho_projected_distance_to_goal = std::hypot(
+      goal_pose.position.x - query_pose.position.x,
+      goal_pose.position.y - query_pose.position.y) *
+      sin(projection_angle);
+
     if (is_overshoot_valid_) {
-      return projected_distance_to_goal < goal_tolerance_;
+      return projected_distance_to_goal < axis_progress_goal_tolerance_ &&
+             fabs(ortho_projected_distance_to_goal) < axis_offset_goal_tolerance_;
     } else {
-      return fabs(projected_distance_to_goal) < goal_tolerance_;
+      return fabs(projected_distance_to_goal) < axis_progress_goal_tolerance_&&
+          fabs(ortho_projected_distance_to_goal) < axis_offset_goal_tolerance_;
     }
   } else {
-    // handle path with only 1 point, in that case reverting to single distance check
+    // handle path with only 1 point, in that case reverting to simple distance check
     double distance_to_goal = std::hypot(
       goal_pose.position.x - query_pose.position.x,
       goal_pose.position.y - query_pose.position.y);
-    return fabs(distance_to_goal) < goal_tolerance_;
+    return fabs(distance_to_goal) < axis_progress_goal_tolerance_ &&
+           fabs(distance_to_goal) < axis_offset_goal_tolerance_;
   }
 }
 
@@ -107,8 +121,8 @@ bool AxisGoalChecker::getTolerances(
 {
   double invalid_field = std::numeric_limits<double>::lowest();
 
-  pose_tolerance.position.x = goal_tolerance_;
-  pose_tolerance.position.y = goal_tolerance_;
+  pose_tolerance.position.x = std::min(axis_progress_goal_tolerance_, axis_offset_goal_tolerance_);
+  pose_tolerance.position.y = std::min(axis_progress_goal_tolerance_, axis_offset_goal_tolerance_);
   pose_tolerance.position.z = invalid_field;
   pose_tolerance.orientation =
     nav2_util::geometry_utils::orientationAroundZAxis(M_PI_2);
@@ -133,8 +147,11 @@ AxisGoalChecker::dynamicParametersCallback(std::vector<rclcpp::Parameter> parame
     const auto & name = parameter.get_name();
 
     if (type == ParameterType::PARAMETER_DOUBLE) {
-      if (name == plugin_name_ + ".segment_axis_goal_tolerance") {
-        goal_tolerance_ = parameter.as_double();
+      if (name == plugin_name_ + ".axis_progress_goal_tolerance") {
+        axis_progress_goal_tolerance_ = parameter.as_double();
+      }
+      if (name == plugin_name_ + ".axis_offset_goal_tolerance") {
+        axis_offset_goal_tolerance_ = parameter.as_double();
       }
     } else if (type == ParameterType::PARAMETER_BOOL) {
       if (name == plugin_name_ + ".is_overshoot_valid") {
