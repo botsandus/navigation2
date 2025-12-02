@@ -57,6 +57,7 @@ bool AxisGoalChecker::isGoalReached(
   const std::optional<geometry_msgs::msg::Pose> & before_goal_pose,
   const geometry_msgs::msg::Twist &)
 {
+  bool to_return = false;
   if (before_goal_pose.has_value()) {
     // end of path direction
     double end_of_path_yaw = atan2(
@@ -76,17 +77,28 @@ bool AxisGoalChecker::isGoalReached(
       cos(projection_angle);
 
     if (is_overshoot_valid_) {
-      return projected_distance_to_goal < segment_axis_goal_tolerance_;
+      to_return = projected_distance_to_goal < segment_axis_goal_tolerance_;
     } else {
-      return fabs(projected_distance_to_goal) < segment_axis_goal_tolerance_;
+      to_return = fabs(projected_distance_to_goal) < segment_axis_goal_tolerance_;
     }
   } else {
     // handle path with only 1 point, in that case reverting to single distance check
     double distance_to_goal = std::hypot(
       goal_pose.position.x - query_pose.position.x,
       goal_pose.position.y - query_pose.position.y);
-    return fabs(distance_to_goal) < segment_axis_goal_tolerance_;
+    to_return = fabs(distance_to_goal) < segment_axis_goal_tolerance_;
   }
+  // log all input poses for debugging
+  RCLCPP_INFO(
+    rclcpp::get_logger("AxisGoalChecker"),
+    "Query Pose: [%.2f, %.2f], Goal Pose: [%.2f, %.2f], Before Goal Pose: [%s], GoalReached: %s",
+    query_pose.position.x, query_pose.position.y,
+    goal_pose.position.x, goal_pose.position.y,
+    before_goal_pose.has_value() ?
+    std::to_string(before_goal_pose->position.x).append(", ").append(
+      std::to_string(before_goal_pose->position.y)).c_str() : "N/A",
+    to_return ? "true" : "false");
+  return to_return;
 }
 
 bool AxisGoalChecker::getTolerances(
