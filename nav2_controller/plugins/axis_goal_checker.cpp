@@ -88,6 +88,12 @@ bool AxisGoalChecker::isGoalReached(
       goal_pose.position.y - query_pose.position.y) *
       cos(projection_angle);
 
+    // log all values for debugging
+    RCLCPP_INFO(
+      rclcpp::get_logger("AxisGoalChecker"),
+      "is_overshoot_valid_: %s End of Path Yaw: %.5f, Robot to Goal Yaw: %.5f, Projection Angle: %.5f, Projected Distance to Goal: %.5f",
+      is_overshoot_valid_ ? "true" : "false", end_of_path_yaw, robot_to_goal_yaw, projection_angle, projected_distance_to_goal);
+
     if (is_overshoot_valid_) {
       to_return = projected_distance_to_goal < goal_tolerance_;
     } else {
@@ -98,12 +104,16 @@ bool AxisGoalChecker::isGoalReached(
     double distance_to_goal = std::hypot(
       goal_pose.position.x - query_pose.position.x,
       goal_pose.position.y - query_pose.position.y);
+    // log distance for debugging
+    RCLCPP_INFO(
+      rclcpp::get_logger("AxisGoalChecker"),
+      "Path with 1 point. Distance to Goal: %.5f", distance_to_goal);
     to_return = fabs(distance_to_goal) < goal_tolerance_;
   }
   // log all input poses for debugging
   RCLCPP_INFO(
     rclcpp::get_logger("AxisGoalChecker"),
-    "Query Pose: [%.2f, %.2f], Goal Pose: [%.2f, %.2f], Before Goal Pose: [%s], GoalReached: %s",
+    "Query Pose: [%.5f, %.5f], Goal Pose: [%.5f, %.5f], Before Goal Pose: [%s], GoalReached: %s",
     query_pose.position.x, query_pose.position.y,
     goal_pose.position.x, goal_pose.position.y,
     before_goal_pose.has_value() ?
