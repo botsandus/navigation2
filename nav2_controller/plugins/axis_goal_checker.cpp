@@ -98,12 +98,6 @@ bool AxisGoalChecker::isGoalReached(
       goal_pose.position.y - query_pose.position.y) *
       sin(projection_angle);
 
-    // print projected_distance_to_goal and ortho_projected_distance_to_goal for debugging
-    RCLCPP_INFO(
-      rclcpp::get_logger("AxisGoalChecker"),
-      "Projected distance to goal: %f, Ortho projected distance to goal: %f",
-      projected_distance_to_goal, ortho_projected_distance_to_goal);
-
     if (is_overshoot_valid_) {
       return projected_distance_to_goal < axis_progress_goal_tolerance_ &&
              fabs(ortho_projected_distance_to_goal) < axis_offset_goal_tolerance_;
