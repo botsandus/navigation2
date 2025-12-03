@@ -102,8 +102,8 @@ bool AxisGoalChecker::isGoalReached(
       return projected_distance_to_goal < axis_progress_goal_tolerance_ &&
              fabs(ortho_projected_distance_to_goal) < axis_offset_goal_tolerance_;
     } else {
-      return fabs(projected_distance_to_goal) < axis_progress_goal_tolerance_&&
-          fabs(ortho_projected_distance_to_goal) < axis_offset_goal_tolerance_;
+      return fabs(projected_distance_to_goal) < axis_progress_goal_tolerance_ &&
+             fabs(ortho_projected_distance_to_goal) < axis_offset_goal_tolerance_;
     }
   } else {
     // handle path with only 1 point, in that case reverting to simple distance check
