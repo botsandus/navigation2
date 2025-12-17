@@ -54,6 +54,7 @@ public:
 
 protected:
   double goal_tolerance_;
+  double path_length_tolerance_;
   bool is_overshoot_valid_;
   // Dynamic parameters handler
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr dyn_params_handler_;

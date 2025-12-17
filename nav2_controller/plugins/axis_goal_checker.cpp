@@ -31,7 +31,8 @@ namespace nav2_controller
 {
 
 AxisGoalChecker::AxisGoalChecker()
-: goal_tolerance_(0.25)
+: goal_tolerance_(0.25),
+  path_length_tolerance_(1.0)
 {
 }
 
@@ -47,6 +48,11 @@ void AxisGoalChecker::initialize(
     node,
     plugin_name + ".goal_tolerance", rclcpp::ParameterValue(0.25));
   node->get_parameter(plugin_name + ".goal_tolerance", goal_tolerance_);
+
+  nav2::declare_parameter_if_not_declared(
+    node,
+    plugin_name + ".path_length_tolerance", rclcpp::ParameterValue(1.0));
+  node->get_parameter(plugin_name + ".path_length_tolerance", path_length_tolerance_);
 
   nav2::declare_parameter_if_not_declared(
     node,
@@ -67,6 +73,13 @@ bool AxisGoalChecker::isGoalReached(
   const geometry_msgs::msg::Twist &,
   const nav_msgs::msg::Path & transformed_global_plan)
 {
+  // If the local plan length is longer than the tolerance, we skip the check
+  if (nav2_util::geometry_utils::calculate_path_length(transformed_global_plan) >
+    path_length_tolerance_)
+  {
+    return false;
+  }
+
   // Extract before_goal_pose from the path (second to last pose)
   std::optional<geometry_msgs::msg::Pose> before_goal_pose;
   if (transformed_global_plan.poses.size() >= 2) {
@@ -139,6 +152,8 @@ AxisGoalChecker::dynamicParametersCallback(std::vector<rclcpp::Parameter> parame
     if (type == ParameterType::PARAMETER_DOUBLE) {
       if (name == plugin_name_ + ".segment_axis_goal_tolerance") {
         goal_tolerance_ = parameter.as_double();
+      } else if (name == plugin_name_ + ".path_length_tolerance") {
+        path_length_tolerance_ = parameter.as_double();
       }
     } else if (type == ParameterType::PARAMETER_BOOL) {
       if (name == plugin_name_ + ".is_overshoot_valid") {
