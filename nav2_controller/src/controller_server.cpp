@@ -437,7 +437,7 @@ bool ControllerServer::findPathHandlerId(
 
 void ControllerServer::computeControl()
 {
-  std::lock_guard<std::mutex> lock_reinit(param_handler_->getMutex());
+  // std::lock_guard<std::mutex> lock_reinit(param_handler_->getMutex());
 
   RCLCPP_INFO(get_logger(), "Received a goal, begin computing control effort.");
 
