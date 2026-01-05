@@ -190,7 +190,6 @@ target_link_libraries(axis_goal_checker PRIVATE
   pluginlib::pluginlib
 )
 
-
 add_library(feasible_path_handler SHARED plugins/feasible_path_handler.cpp)
 target_include_directories(feasible_path_handler
   PUBLIC
