@@ -23,7 +23,6 @@
 #include "nav2_ros_common/node_utils.hpp"
 #include "nav2_util/geometry_utils.hpp"
 
-
 using rcl_interfaces::msg::ParameterType;
 using std::placeholders::_1;
 
@@ -31,8 +30,8 @@ namespace nav2_controller
 {
 
 AxisGoalChecker::AxisGoalChecker()
-: goal_tolerance_(0.25),
-  path_length_tolerance_(1.0)
+: along_path_tolerance_(0.25), cross_track_tolerance_(0.25),
+  path_length_tolerance_(1.0), is_overshoot_valid_(false)
 {
 }
 
@@ -43,21 +42,16 @@ void AxisGoalChecker::initialize(
 {
   plugin_name_ = plugin_name;
   auto node = parent.lock();
+  logger_ = node->get_logger();
 
-  nav2::declare_parameter_if_not_declared(
-    node,
-    plugin_name + ".goal_tolerance", rclcpp::ParameterValue(0.25));
-  node->get_parameter(plugin_name + ".goal_tolerance", goal_tolerance_);
-
-  nav2::declare_parameter_if_not_declared(
-    node,
-    plugin_name + ".path_length_tolerance", rclcpp::ParameterValue(1.0));
-  node->get_parameter(plugin_name + ".path_length_tolerance", path_length_tolerance_);
-
-  nav2::declare_parameter_if_not_declared(
-    node,
-    plugin_name + ".is_overshoot_valid", rclcpp::ParameterValue(false));
-  node->get_parameter(plugin_name + ".is_overshoot_valid", is_overshoot_valid_);
+  along_path_tolerance_ = node->declare_or_get_parameter(
+    plugin_name + ".along_path_tolerance", 0.25);
+  cross_track_tolerance_ = node->declare_or_get_parameter(
+    plugin_name + ".cross_track_tolerance", 0.25);
+  path_length_tolerance_ = node->declare_or_get_parameter(
+    plugin_name + ".path_length_tolerance", 1.0);
+  is_overshoot_valid_ = node->declare_or_get_parameter(
+    plugin_name + ".is_overshoot_valid", false);
 
   // Add callback for dynamic parameters
   dyn_params_handler_ = node->add_on_set_parameters_callback(
@@ -80,41 +74,67 @@ bool AxisGoalChecker::isGoalReached(
     return false;
   }
 
-  // Extract before_goal_pose from the path (second to last pose)
-  std::optional<geometry_msgs::msg::Pose> before_goal_pose;
+  // Check if we have at least 2 poses to determine path direction
   if (transformed_global_plan.poses.size() >= 2) {
-    before_goal_pose = transformed_global_plan.poses[transformed_global_plan.poses.size() - 2].pose;
-  }
+    // Use axis-aligned goal checking with path direction
+    const auto & before_goal_pose =
+      transformed_global_plan.poses[transformed_global_plan.poses.size() - 2].pose;
 
-  if (before_goal_pose.has_value()) {
+    // Check if the last two poses are identical (would cause atan2(0,0))
+    double dx = goal_pose.position.x - before_goal_pose.position.x;
+    double dy = goal_pose.position.y - before_goal_pose.position.y;
+    double pose_distance = std::hypot(dx, dy);
+
+    // If poses are identical, fall back to simple distance check
+    if (pose_distance < 1e-6) {
+      RCLCPP_WARN(
+        logger_,
+        "Last two poses in path are identical, falling back to simple distance check");
+      double distance_to_goal = std::hypot(
+        goal_pose.position.x - query_pose.position.x,
+        goal_pose.position.y - query_pose.position.y);
+      double tolerance = std::min(along_path_tolerance_, cross_track_tolerance_);
+      return distance_to_goal < tolerance;
+    }
+
     // end of path direction
-    double end_of_path_yaw = atan2(
-      goal_pose.position.y - before_goal_pose->position.y,
-      goal_pose.position.x - before_goal_pose->position.x);
+    double end_of_path_yaw = atan2(dy, dx);
 
-    double robot_to_goal_yaw = atan2(
-      goal_pose.position.y - query_pose.position.y,
-      goal_pose.position.x - query_pose.position.x);
+    // Check if robot is already at goal (would cause atan2(0,0))
+    double robot_to_goal_dx = goal_pose.position.x - query_pose.position.x;
+    double robot_to_goal_dy = goal_pose.position.y - query_pose.position.y;
+    double distance_to_goal = std::hypot(robot_to_goal_dx, robot_to_goal_dy);
+
+    if (distance_to_goal < 1e-6) {
+      return true;  // Robot is at goal
+    }
+
+    double robot_to_goal_yaw = atan2(robot_to_goal_dy, robot_to_goal_dx);
 
     double projection_angle = angles::shortest_angular_distance(
       robot_to_goal_yaw, end_of_path_yaw);
 
-    double projected_distance_to_goal = std::hypot(
-      goal_pose.position.x - query_pose.position.x,
-      goal_pose.position.y - query_pose.position.y) *
-      cos(projection_angle);
+    double along_path_distance = distance_to_goal * cos(projection_angle);
+
+    double cross_track_distance = distance_to_goal * sin(projection_angle);
 
     if (is_overshoot_valid_) {
-      return projected_distance_to_goal < goal_tolerance_;
+      return along_path_distance < along_path_tolerance_ &&
+             fabs(cross_track_distance) < cross_track_tolerance_;
     } else {
-      return fabs(projected_distance_to_goal) < goal_tolerance_;
+      return fabs(along_path_distance) < along_path_tolerance_ &&
+             fabs(cross_track_distance) < cross_track_tolerance_;
     }
   } else {
-    // handle path with only 1 point, in that case reverting to single distance check
+    // Fallback: path has only 1 point, use simple distance check
+    RCLCPP_WARN(
+      logger_,
+      "Path has fewer than 2 poses, falling back to simple distance check");
     double distance_to_goal = std::hypot(
       goal_pose.position.x - query_pose.position.x,
       goal_pose.position.y - query_pose.position.y);
-    return fabs(distance_to_goal) < goal_tolerance_;
+    double tolerance = std::min(along_path_tolerance_, cross_track_tolerance_);
+    return distance_to_goal < tolerance;
   }
 }
 
@@ -124,8 +144,8 @@ bool AxisGoalChecker::getTolerances(
 {
   double invalid_field = std::numeric_limits<double>::lowest();
 
-  pose_tolerance.position.x = goal_tolerance_;
-  pose_tolerance.position.y = goal_tolerance_;
+  pose_tolerance.position.x = std::min(along_path_tolerance_, cross_track_tolerance_);
+  pose_tolerance.position.y = std::min(along_path_tolerance_, cross_track_tolerance_);
   pose_tolerance.position.z = invalid_field;
   pose_tolerance.orientation =
     nav2_util::geometry_utils::orientationAroundZAxis(M_PI_2);
@@ -148,10 +168,14 @@ AxisGoalChecker::dynamicParametersCallback(std::vector<rclcpp::Parameter> parame
   for (auto & parameter : parameters) {
     const auto & type = parameter.get_type();
     const auto & name = parameter.get_name();
-
+    if (name.find(plugin_name_ + ".") != 0) {
+      continue;
+    }
     if (type == ParameterType::PARAMETER_DOUBLE) {
-      if (name == plugin_name_ + ".segment_axis_goal_tolerance") {
-        goal_tolerance_ = parameter.as_double();
+      if (name == plugin_name_ + ".along_path_tolerance") {
+        along_path_tolerance_ = parameter.as_double();
+      } else if (name == plugin_name_ + ".cross_track_tolerance") {
+        cross_track_tolerance_ = parameter.as_double();
       } else if (name == plugin_name_ + ".path_length_tolerance") {
         path_length_tolerance_ = parameter.as_double();
       }

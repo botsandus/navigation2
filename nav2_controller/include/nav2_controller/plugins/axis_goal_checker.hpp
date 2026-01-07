@@ -27,12 +27,13 @@
 namespace nav2_controller
 {
 
-/**  * @class AxisGoalChecker
-  * @brief Goal Checker plugin that checks progress along the axis defined by the
-  * 2 last poses of the pathalong the axis defined by the last segment of the path to the goal.
+/**
+  * @class AxisGoalChecker
+  * @brief Goal Checker plugin that checks progress along the axis defined by the last segment
+  * of the path to the goal.
   *
   * This class can be configured to allow overshoot past the goal if the is_overshoot_valid
-  *  parameter is set to true (which it is false by default).
+  *  parameter is set to true (which is false by default).
   */
 class AxisGoalChecker : public nav2_core::GoalChecker
 {
@@ -53,12 +54,14 @@ public:
     geometry_msgs::msg::Twist & vel_tolerance) override;
 
 protected:
-  double goal_tolerance_;
+  double along_path_tolerance_;
+  double cross_track_tolerance_;
   double path_length_tolerance_;
   bool is_overshoot_valid_;
   // Dynamic parameters handler
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr dyn_params_handler_;
   std::string plugin_name_;
+  rclcpp::Logger logger_{rclcpp::get_logger("AxisGoalChecker")};
 
   /**
    * @brief Callback executed when a parameter change is detected
