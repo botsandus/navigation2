@@ -398,10 +398,9 @@ TaskStatus PlannerTester::createPlan(
   return TaskStatus::FAILED;
 }
 
-std::shared_ptr<nav2_msgs::srv::IsPathValid::Response> PlannerTester::isPathValid(
+bool PlannerTester::isPathValid(
   nav_msgs::msg::Path & path, unsigned int max_cost,
-  bool consider_unknown_as_obstacle, const std::string & layer_name,
-  const std::string & footprint, bool check_full_path)
+  bool consider_unknown_as_obstacle)
 {
   planner_tester_->setCostmap(costmap_.get());
   // create a fake service request
@@ -409,9 +408,6 @@ std::shared_ptr<nav2_msgs::srv::IsPathValid::Response> PlannerTester::isPathVali
   request->path = path;
   request->max_cost = max_cost;
   request->consider_unknown_as_obstacle = consider_unknown_as_obstacle;
-  request->layer_name = layer_name;
-  request->footprint = footprint;
-  request->check_full_path = check_full_path;
   auto result = path_valid_client_->async_call(request);
 
   RCLCPP_INFO(this->get_logger(), "Waiting for service complete");
@@ -420,10 +416,10 @@ std::shared_ptr<nav2_msgs::srv::IsPathValid::Response> PlannerTester::isPathVali
       std::chrono::milliseconds(100)) ==
     rclcpp::FutureReturnCode::SUCCESS)
   {
-    return result.get();
+    return result.get()->is_valid;
   } else {
     RCLCPP_INFO(get_logger(), "Failed to call is_path_valid service");
-    return nullptr;
+    return false;
   }
 }
 

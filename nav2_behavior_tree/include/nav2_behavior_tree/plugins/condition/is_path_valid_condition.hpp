@@ -17,7 +17,6 @@
 
 #include <string>
 #include <memory>
-#include <vector>
 
 #include "nav2_ros_common/lifecycle_node.hpp"
 #include "behaviortree_cpp/condition_node.h"
@@ -70,7 +69,6 @@ public:
     // Register JSON definitions for the types used in the ports
     BT::RegisterJsonDefinition<nav_msgs::msg::Path>();
     BT::RegisterJsonDefinition<std::chrono::milliseconds>();
-    BT::RegisterJsonDefinition<std::vector<geometry_msgs::msg::PoseStamped>>();
 
     return {
       BT::InputPort<nav_msgs::msg::Path>("path", "Path to Check"),
@@ -78,20 +76,7 @@ public:
       BT::InputPort<unsigned int>("max_cost", 254, "Maximum cost of the path"),
       BT::InputPort<bool>(
         "consider_unknown_as_obstacle", false,
-        "Whether to consider unknown cost as obstacle"),
-      BT::InputPort<std::string>(
-        "layer_name", "",
-        "Name of the costmap layer to check against (empty = full costmap)"),
-      BT::InputPort<std::string>(
-        "footprint", "",
-        "Custom footprint specification as bracketed array of arrays, e.g., "
-        "[[x1,y1],[x2,y2],...] (empty = use robot footprint)"),
-      BT::InputPort<bool>(
-        "check_full_path", false,
-        "Whether to check all poses (true) or stop at first invalid pose (false)"),
-      BT::OutputPort<std::vector<geometry_msgs::msg::PoseStamped>>(
-        "collision_poses",
-        "Poses in the path that are in collision")
+        "Whether to consider unknown cost as obstacle")
     };
   }
 
@@ -103,9 +88,6 @@ private:
   std::chrono::milliseconds server_timeout_;
   unsigned int max_cost_;
   bool consider_unknown_as_obstacle_;
-  std::string layer_name_;
-  std::string footprint_;
-  bool check_full_path_;
 };
 
 }  // namespace nav2_behavior_tree

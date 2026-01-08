@@ -158,10 +158,9 @@ public:
     const unsigned int number_tests,
     const float acceptable_fail_ratio);
 
-  std::shared_ptr<nav2_msgs::srv::IsPathValid::Response> isPathValid(
+  bool isPathValid(
     nav_msgs::msg::Path & path, unsigned int max_cost,
-    bool consider_unknown_as_obstacle, const std::string & layer_name = "",
-    const std::string & footprint = "", bool check_full_path = false);
+    bool consider_unknown_as_obstacle);
 
 private:
   void setCostmap();
