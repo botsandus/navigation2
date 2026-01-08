@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.8)
 project(nav2_collision_monitor)
 
 find_package(ament_cmake REQUIRED)
@@ -17,6 +17,7 @@ find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(nav2_ros_common REQUIRED)
+find_package(point_cloud_transport REQUIRED)
 
 nav2_package()
 
@@ -36,7 +37,9 @@ add_library(${monitor_library_name} SHARED
   src/polygon_source.cpp
   src/range.cpp
   src/kinematics.cpp
+  src/costmap.cpp
 )
+
 target_include_directories(${monitor_library_name}
   PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
@@ -54,6 +57,7 @@ target_link_libraries(${monitor_library_name} PUBLIC
   tf2::tf2
   tf2_ros::tf2_ros
   ${visualization_msgs_TARGETS}
+  point_cloud_transport::point_cloud_transport
 )
 target_link_libraries(${monitor_library_name} PRIVATE
   rclcpp_components::component
@@ -68,6 +72,7 @@ add_library(${detector_library_name} SHARED
   src/scan.cpp
   src/pointcloud.cpp
   src/polygon_source.cpp
+  src/costmap.cpp
   src/range.cpp
   src/kinematics.cpp
 )
@@ -88,6 +93,7 @@ target_link_libraries(${detector_library_name} PUBLIC
   tf2_ros::tf2_ros
   tf2::tf2
   ${visualization_msgs_TARGETS}
+  point_cloud_transport::point_cloud_transport
 )
 target_link_libraries(${detector_library_name} PRIVATE
   rclcpp_components::component
@@ -143,6 +149,8 @@ install(DIRECTORY params DESTINATION share/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
+  find_package(launch_testing_ament_cmake REQUIRED)
+  find_package(rosgraph_msgs REQUIRED)
   # the following line skips the linter which checks for copyrights
   set(ament_cmake_copyright_FOUND TRUE)
   set(ament_cmake_cpplint_FOUND TRUE)
@@ -162,6 +170,7 @@ ament_export_dependencies(
   nav2_costmap_2d
   nav2_msgs
   nav2_util
+  rosgraph_msgs
   rclcpp
   rclcpp_lifecycle
   sensor_msgs
@@ -169,6 +178,7 @@ ament_export_dependencies(
   tf2_ros
   nav2_ros_common
   visualization_msgs
+  point_cloud_transport
 )
 ament_export_targets(export_${PROJECT_NAME})
 

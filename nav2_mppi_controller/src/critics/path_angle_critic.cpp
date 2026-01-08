@@ -23,7 +23,6 @@ namespace mppi::critics
 void PathAngleCritic::initialize()
 {
   auto getParentParam = parameters_handler_->getParamGetter(parent_name_);
-  getParentParam(enforce_path_inversion_, "enforce_path_inversion", false);
   float vx_min;
   getParentParam(vx_min, "vx_min", -0.35);
   if (fabs(vx_min) < 1e-6f) {  // zero
@@ -62,22 +61,14 @@ void PathAngleCritic::initialize()
 
 void PathAngleCritic::score(CriticData & data)
 {
-  if (!enabled_) {
-    return;
-  }
-
-  geometry_msgs::msg::Pose goal = utils::getCriticGoal(data, enforce_path_inversion_);
-
-  if (utils::withinPositionGoalTolerance(
-      threshold_to_consider_, data.state.pose.pose, goal))
-  {
+  if (!enabled_ || data.state.local_path_length < threshold_to_consider_) {
     return;
   }
 
   utils::setPathFurthestPointIfNotSet(data);
   auto offsetted_idx = std::min(
     *data.furthest_reached_path_point + offset_from_furthest_,
-      static_cast<size_t>(data.path.x.size()) - 1);
+    static_cast<size_t>(data.path.x.size()) - 1);
 
   const float goal_x = data.path.x(offsetted_idx);
   const float goal_y = data.path.y(offsetted_idx);
@@ -108,7 +99,7 @@ void PathAngleCritic::score(CriticData & data)
   auto diff_y = goal_y - data.trajectories.y.col(last_idx);
   auto diff_x = goal_x - data.trajectories.x.col(last_idx);
   auto yaws_between_points = diff_y.binaryExpr(
-    diff_x, [&](const float & y, const float & x){return atan2f(y, x);}).eval();
+    diff_x, [&](const float & y, const float & x) {return atan2f(y, x);}).eval();
 
   switch (mode_) {
     case PathAngleMode::FORWARD_PREFERENCE:
@@ -126,7 +117,8 @@ void PathAngleCritic::score(CriticData & data)
     case PathAngleMode::NO_DIRECTIONAL_PREFERENCE:
       {
         auto last_yaws = data.trajectories.yaws.col(last_idx);
-        auto yaws_between_points_corrected = utils::normalize_yaws_between_points(last_yaws,
+        auto yaws_between_points_corrected = utils::normalize_yaws_between_points(
+          last_yaws,
           yaws_between_points);
         auto corrected_yaws = utils::shortest_angular_distance(
           last_yaws, yaws_between_points_corrected).abs();
@@ -140,7 +132,8 @@ void PathAngleCritic::score(CriticData & data)
     case PathAngleMode::CONSIDER_FEASIBLE_PATH_ORIENTATIONS:
       {
         auto last_yaws = data.trajectories.yaws.col(last_idx);
-        auto yaws_between_points_corrected = utils::normalize_yaws_between_points(goal_yaw,
+        auto yaws_between_points_corrected = utils::normalize_yaws_between_points(
+          goal_yaw,
           yaws_between_points);
         auto corrected_yaws = utils::shortest_angular_distance(
           last_yaws, yaws_between_points_corrected).abs();

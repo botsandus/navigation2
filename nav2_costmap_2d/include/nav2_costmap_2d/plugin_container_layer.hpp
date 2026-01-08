@@ -15,7 +15,6 @@
 #ifndef NAV2_COSTMAP_2D__PLUGIN_CONTAINER_LAYER_HPP_
 #define NAV2_COSTMAP_2D__PLUGIN_CONTAINER_LAYER_HPP_
 
-#include <Eigen/Dense>
 #include <cmath>
 #include <memory>
 #include <string>
@@ -27,7 +26,7 @@
 #include "nav2_costmap_2d/costmap_layer.hpp"
 #include "nav2_costmap_2d/observation_buffer.hpp"
 #include "nav2_costmap_2d/inflation_layer.hpp"
-#include "tf2_ros/message_filter.h"
+#include "tf2_ros/message_filter.hpp"
 #include "pluginlib/class_loader.hpp"
 
 using nav2_costmap_2d::LETHAL_OBSTACLE;

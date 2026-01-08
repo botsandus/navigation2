@@ -20,12 +20,9 @@ namespace mppi::critics
 void PathAlignCritic::initialize()
 {
   auto getParentParam = parameters_handler_->getParamGetter(parent_name_);
-  getParentParam(enforce_path_inversion_, "enforce_path_inversion", false);
-
   auto getParam = parameters_handler_->getParamGetter(name_);
   getParam(power_, "cost_power", 1);
   getParam(weight_, "cost_weight", 10.0f);
-
   getParam(max_path_occupancy_ratio_, "max_path_occupancy_ratio", 0.07f);
   getParam(offset_from_furthest_, "offset_from_furthest", 20);
   getParam(trajectory_point_step_, "trajectory_point_step", 4);
@@ -42,16 +39,7 @@ void PathAlignCritic::initialize()
 
 void PathAlignCritic::score(CriticData & data)
 {
-  if (!enabled_) {
-    return;
-  }
-
-  geometry_msgs::msg::Pose goal = utils::getCriticGoal(data, enforce_path_inversion_);
-
-  // Don't apply close to goal, let the goal critics take over
-  if (utils::withinPositionGoalTolerance(
-      threshold_to_consider_, data.state.pose.pose, goal))
-  {
+  if (!enabled_ || data.state.local_path_length < threshold_to_consider_) {
     return;
   }
 
@@ -110,14 +98,17 @@ void PathAlignCritic::score(CriticData & data)
   int outer_stride = strided_traj_rows * trajectory_point_step_;
   // Get strided trajectory information
   const auto T_x = Eigen::Map<const Eigen::ArrayXXf, 0,
-      Eigen::Stride<-1, -1>>(data.trajectories.x.data(),
-      strided_traj_rows, strided_traj_cols, Eigen::Stride<-1, -1>(outer_stride, 1));
+      Eigen::Stride<-1, -1>>(
+    data.trajectories.x.data(),
+    strided_traj_rows, strided_traj_cols, Eigen::Stride<-1, -1>(outer_stride, 1));
   const auto T_y = Eigen::Map<const Eigen::ArrayXXf, 0,
-      Eigen::Stride<-1, -1>>(data.trajectories.y.data(),
-      strided_traj_rows, strided_traj_cols, Eigen::Stride<-1, -1>(outer_stride, 1));
+      Eigen::Stride<-1, -1>>(
+    data.trajectories.y.data(),
+    strided_traj_rows, strided_traj_cols, Eigen::Stride<-1, -1>(outer_stride, 1));
   const auto T_yaw = Eigen::Map<const Eigen::ArrayXXf, 0,
-      Eigen::Stride<-1, -1>>(data.trajectories.yaws.data(), strided_traj_rows, strided_traj_cols,
-      Eigen::Stride<-1, -1>(outer_stride, 1));
+      Eigen::Stride<-1, -1>>(
+    data.trajectories.yaws.data(), strided_traj_rows, strided_traj_cols,
+    Eigen::Stride<-1, -1>(outer_stride, 1));
   const auto traj_sampled_size = T_x.cols();
 
   for (size_t t = 0; t < batch_size; ++t) {

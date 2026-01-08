@@ -41,7 +41,7 @@
 #include "gtest/gtest.h"
 #include "rclcpp/rclcpp.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
-#include "tf2_ros/transform_listener.h"
+#include "tf2_ros/transform_listener.hpp"
 #include "nav2_costmap_2d/footprint.hpp"
 
 class FootprintTestNode
@@ -195,7 +195,7 @@ TEST_F(TestNode, footprint_from_same_level_param)
   EXPECT_EQ(0.0f, footprint[2].z);
 }
 
-int main(int argc, char **argv)
+int main(int argc, char ** argv)
 {
   ::testing::InitGoogleTest(&argc, argv);
 

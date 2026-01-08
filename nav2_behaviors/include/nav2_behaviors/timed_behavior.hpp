@@ -26,8 +26,8 @@
 #include <utility>
 
 #include "rclcpp/rclcpp.hpp"
-#include "tf2_ros/transform_listener.h"
-#include "tf2_ros/create_timer_ros.h"
+#include "tf2_ros/transform_listener.hpp"
+#include "tf2_ros/create_timer_ros.hpp"
 #include "geometry_msgs/msg/twist.hpp"
 #include "nav2_util/robot_utils.hpp"
 #include "nav2_util/twist_publisher.hpp"
@@ -218,7 +218,8 @@ protected:
     if (on_run_result.status != Status::SUCCEEDED) {
       result->error_code = on_run_result.error_code;
       result->error_msg = on_run_result.error_msg;
-      RCLCPP_INFO(logger_, "Initial checks failed for %s - %s", behavior_name_.c_str(),
+      RCLCPP_INFO(
+        logger_, "Initial checks failed for %s - %s", behavior_name_.c_str(),
         on_run_result.error_msg.c_str());
       action_server_->terminate_current(result);
       return;

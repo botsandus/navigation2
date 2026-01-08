@@ -17,7 +17,6 @@
   <depend>nav2_costmap_2d</depend>
   <depend>nav2_msgs</depend>
   <depend>nav2_util</depend>
-  <depend>nav_2d_utils</depend>
   <depend>pluginlib</depend>
   <depend>rclcpp</depend>
   <depend>rclcpp_components</depend>
@@ -25,12 +24,14 @@
   <depend>tf2</depend>
   <depend>tf2_ros</depend>
   <depend>nav2_ros_common</depend>
+  <depend>eigen</depend>
 
   <test_depend>ament_cmake_gtest</test_depend>
   <test_depend>ament_index_cpp</test_depend>
   <test_depend>ament_lint_common</test_depend>
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>rclcpp_action</test_depend>
+  <test_depend>ament_cmake_ros</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

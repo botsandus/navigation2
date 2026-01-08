@@ -41,6 +41,7 @@ public:
   virtual bool isGoalReached(
     const geometry_msgs::msg::Pose & /*query_pose*/,
     const geometry_msgs::msg::Pose & /*goal_pose*/,
+    const std::optional<geometry_msgs::msg::Pose> & /*before_goal_pose*/,
     const geometry_msgs::msg::Twist & /*velocity*/) {return false;}
 
   virtual bool getTolerances(
@@ -114,56 +115,6 @@ TEST(UtilsTests, ConversionTests)
   EXPECT_EQ(path_t.x(2), 5);
   EXPECT_EQ(path_t.y(2), 50);
   EXPECT_NEAR(path_t.yaws(2), 0.0, 1e-6);
-}
-
-TEST(UtilsTests, WithTolTests)
-{
-  geometry_msgs::msg::Pose pose;
-  pose.position.x = 10.0;
-  pose.position.y = 1.0;
-
-  nav2_core::GoalChecker * goal_checker = new TestGoalChecker;
-
-  nav_msgs::msg::Path path;
-  path.poses.resize(2);
-  geometry_msgs::msg::Pose & goal = path.poses.back().pose;
-
-  // Create CriticData with state and goal initialized
-  models::State state;
-  state.pose.pose = pose;
-  models::Trajectories generated_trajectories;
-  models::Path path_critic;
-  Eigen::ArrayXf costs;
-  float model_dt;
-  CriticData data = {
-    state, generated_trajectories, path_critic, goal,
-    costs, model_dt, false, nullptr, nullptr, std::nullopt, std::nullopt};
-
-  // Test not in tolerance
-  goal.position.x = 0.0;
-  goal.position.y = 0.0;
-  EXPECT_FALSE(withinPositionGoalTolerance(goal_checker, pose, goal));
-  EXPECT_FALSE(withinPositionGoalTolerance(0.25, pose, goal));
-
-  // Test in tolerance
-  goal.position.x = 9.8;
-  goal.position.y = 0.95;
-  EXPECT_TRUE(withinPositionGoalTolerance(goal_checker, pose, goal));
-  EXPECT_TRUE(withinPositionGoalTolerance(0.25, pose, goal));
-
-  goal.position.x = 10.0;
-  goal.position.y = 0.76;
-  EXPECT_TRUE(withinPositionGoalTolerance(goal_checker, pose, goal));
-  EXPECT_TRUE(withinPositionGoalTolerance(0.25, pose, goal));
-
-  goal.position.x = 9.76;
-  goal.position.y = 1.0;
-  EXPECT_TRUE(withinPositionGoalTolerance(goal_checker, pose, goal));
-  EXPECT_TRUE(withinPositionGoalTolerance(0.25, pose, goal));
-
-  delete goal_checker;
-  goal_checker = nullptr;
-  EXPECT_FALSE(withinPositionGoalTolerance(goal_checker, pose, goal));
 }
 
 TEST(UtilsTests, AnglesTests)
@@ -339,7 +290,7 @@ TEST(UtilsTests, SmootherTest)
   std::mt19937 engine;
   std::normal_distribution<float> normal_dist = std::normal_distribution(0.0f, 0.2f);
   auto noises = Eigen::ArrayXf::NullaryExpr(
-    30, [&] () {return normal_dist(engine);});
+    30, [&]() {return normal_dist(engine);});
   noisey_sequence.vx += noises;
   noisey_sequence.vy += noises;
   noisey_sequence.wz += noises;
@@ -538,25 +489,29 @@ TEST(UtilsTests, NormalizeYawsBetweenPointsTest)
   yaw_between_points.setZero(10);
 
   // Try with both angles 0
-  Eigen::ArrayXf yaws_between_points_corrected = utils::normalize_yaws_between_points(last_yaws,
+  Eigen::ArrayXf yaws_between_points_corrected = utils::normalize_yaws_between_points(
+    last_yaws,
     yaw_between_points);
   EXPECT_TRUE(yaws_between_points_corrected.isApprox(yaw_between_points));
 
   // Try with yaw between points as pi/4
   yaw_between_points.setConstant(M_PIF_2 / 2);
-  yaws_between_points_corrected = utils::normalize_yaws_between_points(last_yaws,
+  yaws_between_points_corrected = utils::normalize_yaws_between_points(
+    last_yaws,
     yaw_between_points);
   EXPECT_TRUE(yaws_between_points_corrected.isApprox(yaw_between_points));
 
   // Try with yaw between points as pi/2
   yaw_between_points.setConstant(M_PIF_2);
-  yaws_between_points_corrected = utils::normalize_yaws_between_points(last_yaws,
+  yaws_between_points_corrected = utils::normalize_yaws_between_points(
+    last_yaws,
     yaw_between_points);
   EXPECT_TRUE(yaws_between_points_corrected.isApprox(yaw_between_points));
 
   // Try with a few yaw between points  more than pi/2
   yaw_between_points[1] = 1.2 * M_PIF_2;
-  yaws_between_points_corrected = utils::normalize_yaws_between_points(last_yaws,
+  yaws_between_points_corrected = utils::normalize_yaws_between_points(
+    last_yaws,
     yaw_between_points);
   EXPECT_NEAR(yaws_between_points_corrected[1], -0.8 * M_PIF_2, 1e-3);
   EXPECT_NEAR(yaws_between_points_corrected[0], yaw_between_points[0], 1e-3);
@@ -564,7 +519,8 @@ TEST(UtilsTests, NormalizeYawsBetweenPointsTest)
 
   // Try with goal angle 0
   float goal_angle = 0;
-  yaws_between_points_corrected = utils::normalize_yaws_between_points(goal_angle,
+  yaws_between_points_corrected = utils::normalize_yaws_between_points(
+    goal_angle,
     yaw_between_points);
   EXPECT_NEAR(yaws_between_points_corrected[1], -0.8 * M_PIF_2, 1e-3);
 }
@@ -650,62 +606,7 @@ TEST(UtilsTests, getLastPathPoseTest)
   EXPECT_NEAR(last_path_pose.orientation.w, 0.0, 1e-3);
 }
 
-TEST(UtilsTests, getCriticGoalTest)
-{
-  geometry_msgs::msg::Pose pose;
-  pose.position.x = 10.0;
-  pose.position.y = 1.0;
-
-  nav_msgs::msg::Path path;
-  path.poses.resize(10);
-  path.poses[9].pose.position.x = 5.0;
-  path.poses[9].pose.position.y = 50.0;
-  path.poses[9].pose.orientation.x = 0.0;
-  path.poses[9].pose.orientation.y = 0.0;
-  path.poses[9].pose.orientation.z = 1.0;
-  path.poses[9].pose.orientation.w = 0.0;
-
-  geometry_msgs::msg::Pose goal;
-  goal.position.x = 6.0;
-  goal.position.y = 60.0;
-  goal.orientation.x = 0.0;
-  goal.orientation.y = 0.0;
-  goal.orientation.z = 0.0;
-  goal.orientation.w = 1.0;
-
-  // Create CriticData with state and goal initialized
-  models::State state;
-  state.pose.pose = pose;
-  models::Trajectories generated_trajectories;
-  models::Path path_t = toTensor(path);
-  Eigen::ArrayXf costs;
-  float model_dt;
-  CriticData data = {
-    state, generated_trajectories, path_t, goal,
-    costs, model_dt, false, nullptr, nullptr, std::nullopt, std::nullopt};
-
-  bool enforce_path_inversion = true;
-  geometry_msgs::msg::Pose target_goal = utils::getCriticGoal(data, enforce_path_inversion);
-
-  EXPECT_EQ(target_goal.position.x, 5);
-  EXPECT_EQ(target_goal.position.y, 50);
-  EXPECT_NEAR(target_goal.orientation.x, 0.0, 1e-3);
-  EXPECT_NEAR(target_goal.orientation.y, 0.0, 1e-3);
-  EXPECT_NEAR(target_goal.orientation.z, 1.0, 1e-3);
-  EXPECT_NEAR(target_goal.orientation.w, 0.0, 1e-3);
-
-  enforce_path_inversion = false;
-  target_goal = utils::getCriticGoal(data, enforce_path_inversion);
-
-  EXPECT_EQ(target_goal.position.x, 6);
-  EXPECT_EQ(target_goal.position.y, 60);
-  EXPECT_NEAR(target_goal.orientation.x, 0.0, 1e-3);
-  EXPECT_NEAR(target_goal.orientation.y, 0.0, 1e-3);
-  EXPECT_NEAR(target_goal.orientation.z, 0.0, 1e-3);
-  EXPECT_NEAR(target_goal.orientation.w, 1.0, 1e-3);
-}
-
-int main(int argc, char **argv)
+int main(int argc, char ** argv)
 {
   ::testing::InitGoogleTest(&argc, argv);
 

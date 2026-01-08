@@ -40,7 +40,6 @@
 
 using namespace std::chrono_literals;
 using namespace std::chrono;  // NOLINT
-using nav2::declare_parameter_if_not_declared;
 using rcl_interfaces::msg::ParameterType;
 using std::placeholders::_1;
 
@@ -81,15 +80,11 @@ NavfnPlanner::configure(
 
   // Initialize parameters
   // Declare this plugin's parameters
-  declare_parameter_if_not_declared(node, name + ".tolerance", rclcpp::ParameterValue(0.5));
-  node->get_parameter(name + ".tolerance", tolerance_);
-  declare_parameter_if_not_declared(node, name + ".use_astar", rclcpp::ParameterValue(false));
-  node->get_parameter(name + ".use_astar", use_astar_);
-  declare_parameter_if_not_declared(node, name + ".allow_unknown", rclcpp::ParameterValue(true));
-  node->get_parameter(name + ".allow_unknown", allow_unknown_);
-  declare_parameter_if_not_declared(
-    node, name + ".use_final_approach_orientation", rclcpp::ParameterValue(false));
-  node->get_parameter(name + ".use_final_approach_orientation", use_final_approach_orientation_);
+  tolerance_ = node->declare_or_get_parameter(name + ".tolerance", 0.5);
+  use_astar_ = node->declare_or_get_parameter(name + ".use_astar", false);
+  allow_unknown_ = node->declare_or_get_parameter(name + ".allow_unknown", true);
+  use_final_approach_orientation_ = node->declare_or_get_parameter(name +
+    ".use_final_approach_orientation", false);
 
   // Create a planner based on the new costmap size
   planner_ = std::make_unique<NavFn>(
@@ -353,15 +348,20 @@ NavfnPlanner::smoothApproachToGoal(
   const geometry_msgs::msg::Pose & goal,
   nav_msgs::msg::Path & plan)
 {
-  // Replace the last pose of the computed path if it's actually further away
-  // to the second to last pose than the goal pose.
   if (plan.poses.size() >= 2) {
     auto second_to_last_pose = plan.poses.end()[-2];
     auto last_pose = plan.poses.back();
+    // Replace the last pose of the computed path if it's actually further away
+    // to the second to last pose than the goal pose.
     if (
       squared_distance(last_pose.pose, second_to_last_pose.pose) >
       squared_distance(goal, second_to_last_pose.pose))
     {
+      plan.poses.back().pose = goal;
+      return;
+    }
+    // Replace the last pose of the computed path if its position matches but orientation differs
+    if (squared_distance(last_pose.pose, goal) < 1e-6) {
       plan.poses.back().pose = goal;
       return;
     }
@@ -527,7 +527,7 @@ NavfnPlanner::dynamicParametersCallback(std::vector<rclcpp::Parameter> parameter
   for (auto parameter : parameters) {
     const auto & param_type = parameter.get_type();
     const auto & param_name = parameter.get_name();
-    if(param_name.find(name_ + ".") != 0) {
+    if (param_name.find(name_ + ".") != 0) {
       continue;
     }
     if (param_type == ParameterType::PARAMETER_DOUBLE) {

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.8)
 project(nav2_rotation_shim_controller)
 
 find_package(ament_cmake REQUIRED)
@@ -24,7 +24,8 @@ nav2_package()
 set(library_name nav2_rotation_shim_controller)
 
 add_library(${library_name} SHARED
-  src/nav2_rotation_shim_controller.cpp)
+  src/nav2_rotation_shim_controller.cpp
+  src/parameter_handler.cpp)
 target_include_directories(${library_name}
   PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"

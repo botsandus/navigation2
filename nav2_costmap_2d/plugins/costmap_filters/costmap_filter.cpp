@@ -85,7 +85,8 @@ void CostmapFilter::onInitialize()
     // Costmap Filter enabling service
     enable_service_ = node->create_service<std_srvs::srv::SetBool>(
       name_ + "/toggle_filter",
-      std::bind(&CostmapFilter::enableCallback, this, std::placeholders::_1,
+      std::bind(
+        &CostmapFilter::enableCallback, this, std::placeholders::_1,
         std::placeholders::_2, std::placeholders::_3));
   } catch (const std::exception & ex) {
     RCLCPP_ERROR(logger_, "Parameter problem: %s", ex.what());
@@ -171,8 +172,8 @@ bool CostmapFilter::transformPose(
     try {
       tf_->transform(in, out, mask_frame, transform_tolerance_);
     } catch (tf2::TransformException & ex) {
-      RCLCPP_ERROR(
-        logger_,
+      RCLCPP_ERROR_THROTTLE(
+        logger_, *(clock_), 2000,
         "CostmapFilter: failed to get costmap frame (%s) "
         "transformation to mask frame (%s) with error: %s",
         global_frame.c_str(), mask_frame.c_str(), ex.what());
@@ -193,36 +194,13 @@ bool CostmapFilter::transformPose(
   return true;
 }
 
-bool CostmapFilter::worldToMask(
-  nav_msgs::msg::OccupancyGrid::ConstSharedPtr filter_mask,
-  double wx, double wy, unsigned int & mx, unsigned int & my) const
-{
-  const double origin_x = filter_mask->info.origin.position.x;
-  const double origin_y = filter_mask->info.origin.position.y;
-  const double resolution = filter_mask->info.resolution;
-  const unsigned int size_x = filter_mask->info.width;
-  const unsigned int size_y = filter_mask->info.height;
-
-  if (wx < origin_x || wy < origin_y) {
-    return false;
-  }
-
-  mx = static_cast<unsigned int>((wx - origin_x) / resolution);
-  my = static_cast<unsigned int>((wy - origin_y) / resolution);
-  if (mx >= size_x || my >= size_y) {
-    return false;
-  }
-
-  return true;
-}
-
 unsigned char CostmapFilter::getMaskCost(
   nav_msgs::msg::OccupancyGrid::ConstSharedPtr filter_mask,
   const unsigned int mx, const unsigned int & my) const
 {
   const unsigned int index = my * filter_mask->info.width + mx;
 
-  const char data = filter_mask->data[index];
+  const signed char data = filter_mask->data[index];
   if (data == nav2_util::OCC_GRID_UNKNOWN) {
     return NO_INFORMATION;
   } else {

@@ -71,7 +71,7 @@ if(BUILD_TESTING)
 
   ament_find_gtest()
 
-  ament_add_gtest(test_theta_star test/test_theta_star.cpp)
+  nav2_add_gtest(test_theta_star test/test_theta_star.cpp)
   target_link_libraries(test_theta_star
     ${library_name}
     ${geometry_msgs_TARGETS}
@@ -87,7 +87,8 @@ ament_export_libraries(${library_name})
 ament_export_dependencies(
   geometry_msgs
   nav2_core
-  nav2_costmap_2dnav2_util
+  nav2_costmap_2d
+  nav2_util
   nav_msgs
   rclcpp
   rclcpp_lifecycle

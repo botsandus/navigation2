@@ -37,7 +37,6 @@
 #include <cmath>
 #include <string>
 #include <vector>
-#include "nav_2d_utils/parameters.hpp"
 #include "nav2_ros_common/node_utils.hpp"
 #include "dwb_core/exceptions.hpp"
 #include "pluginlib/class_list_macros.hpp"
@@ -99,16 +98,14 @@ void OscillationCritic::onInit()
 
   clock_ = node->get_clock();
 
-  oscillation_reset_dist_ = nav_2d_utils::searchAndGetParam(
-    node,
-    dwb_plugin_name_ + "." + name_ + ".oscillation_reset_dist", 0.05);
+  oscillation_reset_dist_ = node->declare_or_get_parameter(
+    dwb_plugin_name_ + "." + name_ +
+    ".oscillation_reset_dist", 0.05);
   oscillation_reset_dist_sq_ = oscillation_reset_dist_ * oscillation_reset_dist_;
-  oscillation_reset_angle_ = nav_2d_utils::searchAndGetParam(
-    node,
+  oscillation_reset_angle_ = node->declare_or_get_parameter(
     dwb_plugin_name_ + "." + name_ + ".oscillation_reset_angle", 0.2);
   oscillation_reset_time_ = rclcpp::Duration::from_seconds(
-    nav_2d_utils::searchAndGetParam(
-      node,
+    node->declare_or_get_parameter(
       dwb_plugin_name_ + "." + name_ + ".oscillation_reset_time", -1.0));
 
   nav2::declare_parameter_if_not_declared(
@@ -189,7 +186,7 @@ bool OscillationCritic::resetAvailable()
     tf2::fromMsg(prev_stationary_pose_.orientation, prev_stationary_pose_q);
 
     double th_diff = angles::shortest_angular_distance(
-       tf2::getYaw(pose_q), tf2::getYaw(prev_stationary_pose_q));
+      tf2::getYaw(pose_q), tf2::getYaw(prev_stationary_pose_q));
 
     if (fabs(th_diff) > oscillation_reset_angle_) {
       return true;

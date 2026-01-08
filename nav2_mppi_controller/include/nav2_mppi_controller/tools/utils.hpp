@@ -244,81 +244,6 @@ inline geometry_msgs::msg::Pose getLastPathPose(const models::Path & path)
 }
 
 /**
- * @brief Get the target pose to be evaluated by the critic
- * @param data Data to use
- * @param enforce_path_inversion True to return the cusp point (last pose of the path)
- * instead of the original goal
- * @return geometry_msgs::msg::Pose Target pose for the critic
- */
-inline geometry_msgs::msg::Pose getCriticGoal(
-  const CriticData & data,
-  bool enforce_path_inversion)
-{
-  if (enforce_path_inversion) {
-    return getLastPathPose(data.path);
-  } else {
-    return data.goal;
-  }
-}
-
-/**
- * @brief Check if the robot pose is within the Goal Checker's tolerances to goal
- * @param global_checker Pointer to the goal checker
- * @param robot Pose of robot
- * @param goal Goal pose
- * @return bool If robot is within goal checker tolerances to the goal
- */
-inline bool withinPositionGoalTolerance(
-  nav2_core::GoalChecker * goal_checker,
-  const geometry_msgs::msg::Pose & robot,
-  const geometry_msgs::msg::Pose & goal)
-{
-  if (goal_checker) {
-    geometry_msgs::msg::Pose pose_tolerance;
-    geometry_msgs::msg::Twist velocity_tolerance;
-    goal_checker->getTolerances(pose_tolerance, velocity_tolerance);
-
-    const auto pose_tolerance_sq = pose_tolerance.position.x * pose_tolerance.position.x;
-
-    auto dx = robot.position.x - goal.position.x;
-    auto dy = robot.position.y - goal.position.y;
-
-    auto dist_sq = dx * dx + dy * dy;
-
-    if (dist_sq < pose_tolerance_sq) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-/**
- * @brief Check if the robot pose is within tolerance to the goal
- * @param pose_tolerance Pose tolerance to use
- * @param robot Pose of robot
- * @param goal Goal pose
- * @return bool If robot is within tolerance to the goal
- */
-inline bool withinPositionGoalTolerance(
-  float pose_tolerance,
-  const geometry_msgs::msg::Pose & robot,
-  const geometry_msgs::msg::Pose & goal)
-{
-  const double & dist_sq =
-    std::pow(goal.position.x - robot.position.x, 2) +
-    std::pow(goal.position.y - robot.position.y, 2);
-
-  const float pose_tolerance_sq = pose_tolerance * pose_tolerance;
-
-  if (dist_sq < pose_tolerance_sq) {
-    return true;
-  }
-
-  return false;
-}
-
-/**
   * @brief normalize
   * Normalizes the angle to be -M_PIF circle to +M_PIF circle
   * It takes and returns radians.
@@ -328,10 +253,11 @@ inline bool withinPositionGoalTolerance(
 template<typename T>
 auto normalize_angles(const T & angles)
 {
-  return (angles + M_PIF).unaryExpr([&](const float x) {
-             float remainder = std::fmod(x, 2.0f * M_PIF);
-             return remainder < 0.0f ? remainder + M_PIF : remainder - M_PIF;
-             });
+  return (angles + M_PIF).unaryExpr(
+    [&](const float x) {
+      float remainder = std::fmod(x, 2.0f * M_PIF);
+      return remainder < 0.0f ? remainder + M_PIF : remainder - M_PIF;
+    });
 }
 
 /**
@@ -679,15 +605,15 @@ struct Pose2D
 inline void shiftColumnsByOnePlace(Eigen::Ref<Eigen::ArrayXXf> e, int direction)
 {
   int size = e.size();
-  if(size == 1) {return;}
-  if(abs(direction) != 1) {
+  if (size == 1) {return;}
+  if (abs(direction) != 1) {
     throw std::logic_error("Invalid direction, only 1 and -1 are valid values.");
   }
 
-  if((e.cols() == 1 || e.rows() == 1) && size > 1) {
+  if ((e.cols() == 1 || e.rows() == 1) && size > 1) {
     auto start_ptr = direction == 1 ? e.data() + size - 2 : e.data() + 1;
     auto end_ptr = direction == 1 ? e.data() : e.data() + size - 1;
-    while(start_ptr != end_ptr) {
+    while (start_ptr != end_ptr) {
       *(start_ptr + direction) = *start_ptr;
       start_ptr -= direction;
     }
@@ -696,7 +622,7 @@ inline void shiftColumnsByOnePlace(Eigen::Ref<Eigen::ArrayXXf> e, int direction)
     auto start_ptr = direction == 1 ? e.data() + size - 2 * e.rows() : e.data() + e.rows();
     auto end_ptr = direction == 1 ? e.data() : e.data() + size - e.rows();
     auto span = e.rows();
-    while(start_ptr != end_ptr) {
+    while (start_ptr != end_ptr) {
       std::copy(start_ptr, start_ptr + span, start_ptr + direction * span);
       start_ptr -= (direction * span);
     }
@@ -716,10 +642,10 @@ inline auto normalize_yaws_between_points(
   const Eigen::Ref<const Eigen::ArrayXf> & yaw_between_points)
 {
   Eigen::ArrayXf yaws = utils::shortest_angular_distance(
-          last_yaws, yaw_between_points).abs();
+    last_yaws, yaw_between_points).abs();
   int size = yaws.size();
   Eigen::ArrayXf yaws_between_points_corrected(size);
-  for(int i = 0; i != size; i++) {
+  for (int i = 0; i != size; i++) {
     const float & yaw_between_point = yaw_between_points[i];
     yaws_between_points_corrected[i] = yaws[i] < M_PIF_2 ?
       yaw_between_point : angles::normalize_angle(yaw_between_point + M_PIF);
@@ -738,7 +664,7 @@ inline auto normalize_yaws_between_points(
 {
   int size = yaw_between_points.size();
   Eigen::ArrayXf yaws_between_points_corrected(size);
-  for(int i = 0; i != size; i++) {
+  for (int i = 0; i != size; i++) {
     const float & yaw_between_point = yaw_between_points[i];
     yaws_between_points_corrected[i] = fabs(
       angles::normalize_angle(yaw_between_point - goal_yaw)) < M_PIF_2 ?

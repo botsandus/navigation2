@@ -35,7 +35,7 @@ RouteServer::on_configure(const rclcpp_lifecycle::State & /*state*/)
     get_node_base_interface(),
     get_node_timers_interface());
   tf_->setCreateTimerInterface(timer_interface);
-  transform_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_);
+  transform_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_, this, true);
 
   auto node = shared_from_this();
   graph_vis_publisher_ =
@@ -271,7 +271,8 @@ RouteServer::processRouteRequest(
 
       // Find the route
       Route route = findRoute(goal, rerouting_info);
-      RCLCPP_INFO(get_logger(), "Route found with %zu nodes and %zu edges",
+      RCLCPP_INFO(
+        get_logger(), "Route found with %zu nodes and %zu edges",
         route.edges.size() + 1u, route.edges.size());
       auto path = path_converter_->densify(route, rerouting_info, route_frame_, this->now());
 

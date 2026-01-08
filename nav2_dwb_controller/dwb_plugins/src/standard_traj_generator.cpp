@@ -38,7 +38,6 @@
 #include <algorithm>
 #include <memory>
 #include "dwb_plugins/xy_theta_iterator.hpp"
-#include "nav_2d_utils/parameters.hpp"
 #include "pluginlib/class_list_macros.hpp"
 #include "dwb_core/exceptions.hpp"
 #include "nav2_ros_common/node_utils.hpp"
@@ -96,6 +95,16 @@ void StandardTrajectoryGenerator::initialize(
   nh->get_parameter(plugin_name + ".angular_granularity", angular_granularity_);
   nh->get_parameter(plugin_name + ".include_last_point", include_last_point_);
   nh->get_parameter(plugin_name + ".limit_vel_cmd_in_traj", limit_vel_cmd_in_traj_);
+}
+
+void StandardTrajectoryGenerator::activate()
+{
+  kinematics_handler_->activate();
+}
+
+void StandardTrajectoryGenerator::deactivate()
+{
+  kinematics_handler_->deactivate();
 }
 
 void StandardTrajectoryGenerator::initializeIterator(

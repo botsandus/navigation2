@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.8)
 project(dwb_core)
 
 find_package(ament_cmake REQUIRED)
@@ -45,7 +45,6 @@ target_link_libraries(dwb_core PUBLIC
   nav2_util::nav2_util_core
   ${nav_2d_msgs_TARGETS}
   nav_2d_utils::conversions
-  nav_2d_utils::tf_help
   ${nav_msgs_TARGETS}
   pluginlib::pluginlib
   rclcpp::rclcpp

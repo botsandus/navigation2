@@ -18,7 +18,6 @@
 #include <memory>
 #include <vector>
 #include "angles/angles.h"
-#include "nav_2d_utils/conversions.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "geometry_msgs/msg/pose.hpp"
 #include "nav2_ros_common/node_utils.hpp"
@@ -40,9 +39,8 @@ void PoseProgressChecker::initialize(
   SimpleProgressChecker::initialize(parent, plugin_name);
   auto node = parent.lock();
 
-  nav2::declare_parameter_if_not_declared(
-    node, plugin_name + ".required_movement_angle", rclcpp::ParameterValue(0.5));
-  node->get_parameter_or(plugin_name + ".required_movement_angle", required_movement_angle_, 0.5);
+  required_movement_angle_ = node->declare_or_get_parameter(
+    plugin_name + ".required_movement_angle", 0.5);
 
   // Add callback for dynamic parameters
   dyn_params_handler_ = node->add_on_set_parameters_callback(

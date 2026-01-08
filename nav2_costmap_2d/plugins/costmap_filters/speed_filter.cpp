@@ -43,6 +43,7 @@
 #include <string>
 
 #include "nav2_costmap_2d/costmap_filters/filter_values.hpp"
+#include "nav2_util/occ_grid_utils.hpp"
 
 namespace nav2_costmap_2d
 {
@@ -151,7 +152,7 @@ void SpeedFilter::filterInfoCallback(
   mask_sub_ = node->create_subscription<nav_msgs::msg::OccupancyGrid>(
     mask_topic_,
     std::bind(&SpeedFilter::maskCallback, this, std::placeholders::_1),
-    nav2::qos::LatchedSubscriptionQoS());
+    nav2::qos::LatchedSubscriptionQoS(3));
 }
 
 void SpeedFilter::maskCallback(
@@ -198,8 +199,9 @@ void SpeedFilter::process(
 
   // Converting mask_pose robot position to filter_mask_ indexes (mask_robot_i, mask_robot_j)
   unsigned int mask_robot_i, mask_robot_j;
-  if (!worldToMask(filter_mask_, mask_pose.position.x, mask_pose.position.y, mask_robot_i,
-    mask_robot_j))
+  if (!nav2_util::worldToMap(
+      filter_mask_, mask_pose.position.x, mask_pose.position.y,
+      mask_robot_i, mask_robot_j))
   {
     return;
   }

@@ -49,7 +49,7 @@ TEST(ServiceClient, can_ServiceClient_use_passed_in_node)
   std::vector<std::string> introspection_modes = {
     "disabled", "metadata", "contents"
   };
-  for(const auto & mode : introspection_modes) {
+  for (const auto & mode : introspection_modes) {
     auto node = rclcpp::Node::make_shared("test_node" + mode);
     node->declare_parameter("introspection_mode", mode);
     TestServiceClient t("bar", node, true);
@@ -85,7 +85,9 @@ TEST(ServiceClient, can_ServiceClient_invoke_in_callback)
     });
 
   pub->publish(std_msgs::msg::Empty());
-  rclcpp::spin_some(sub_node);
+  rclcpp::executors::SingleThreadedExecutor executor;
+  executor.add_node(sub_node->get_node_base_interface());
+  executor.spin_some();
 
   rclcpp::shutdown();
   srv_thread.join();
@@ -98,7 +100,9 @@ TEST(ServiceClient, can_ServiceClient_timeout)
   rclcpp::init(0, nullptr);
   auto node = rclcpp::Node::make_shared("test_node");
   TestServiceClient t("bar", node, true);
-  rclcpp::spin_some(node);
+  rclcpp::executors::SingleThreadedExecutor executor;
+  executor.add_node(node->get_node_base_interface());
+  executor.spin_some();
   bool ready = t.wait_for_service(std::chrono::milliseconds(10));
   rclcpp::shutdown();
   ASSERT_EQ(ready, false);
@@ -112,10 +116,10 @@ TEST(ServiceClient, can_ServiceClient_async_call) {
   // Define service server
   auto service_node = rclcpp::Node::make_shared("service_node");
   auto service = service_node->create_service<std_srvs::srv::Empty>(
-  "empty_srv",
+    "empty_srv",
     [&a](std_srvs::srv::Empty::Request::SharedPtr, std_srvs::srv::Empty::Response::SharedPtr) {
       a = 1;
-  });
+    });
   auto srv_thread = std::thread([&]() {rclcpp::spin(service_node);});
   // Define service client
   auto node = rclcpp::Node::make_shared("test_node");
@@ -128,7 +132,9 @@ TEST(ServiceClient, can_ServiceClient_async_call) {
   // Test async_call
   client.async_call(req, callback);
   std::this_thread::sleep_for(std::chrono::seconds(1));
-  rclcpp::spin_some(node);
+  rclcpp::executors::SingleThreadedExecutor executor;
+  executor.add_node(node->get_node_base_interface());
+  executor.spin_some();
 
   rclcpp::shutdown();
   srv_thread.join();

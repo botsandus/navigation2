@@ -19,7 +19,7 @@
 #include "nav2_costmap_2d/costmap_2d.hpp"
 #include "nav2_costmap_2d/costmap_subscriber.hpp"
 #include "nav2_costmap_2d/cost_values.hpp"
-#include "tf2_ros/transform_listener.h"
+#include "tf2_ros/transform_listener.hpp"
 #include "nav2_costmap_2d/costmap_2d_ros.hpp"
 
 class CostmapRosLifecycleNode : public nav2::LifecycleNode
@@ -87,7 +87,7 @@ public:
     layer_sub_ = node->create_subscription<nav2_msgs::msg::Costmap>(
       topic_name,
       std::bind(&LayerSubscriber::layerCallback, this, std::placeholders::_1),
-      nav2::qos::LatchedSubscriptionQoS(),
+      nav2::qos::LatchedSubscriptionQoS(3),
       callback_group_);
 
     executor_ = std::make_shared<rclcpp::executors::SingleThreadedExecutor>();
@@ -168,7 +168,7 @@ TEST_F(CostmapRosTestFixture, costmap_pub_test)
   SUCCEED();
 }
 
-int main(int argc, char **argv)
+int main(int argc, char ** argv)
 {
   ::testing::InitGoogleTest(&argc, argv);
 

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.8)
 project(nav2_controller)
 
 find_package(ament_cmake REQUIRED)
@@ -11,8 +11,6 @@ find_package(nav2_common REQUIRED)
 find_package(nav2_costmap_2d REQUIRED)
 find_package(nav2_msgs REQUIRED)
 find_package(nav2_util REQUIRED)
-find_package(nav_2d_msgs REQUIRED)
-find_package(nav_2d_utils REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(rcl_interfaces REQUIRED)
 find_package(rclcpp REQUIRED)
@@ -42,9 +40,6 @@ target_link_libraries(${library_name} PUBLIC
   ${nav2_msgs_TARGETS}
   nav2_util::nav2_util_core
   nav2_ros_common::nav2_ros_common
-  ${nav_2d_msgs_TARGETS}
-  nav_2d_utils::conversions
-  nav_2d_utils::tf_help
   pluginlib::pluginlib
   rclcpp::rclcpp
   rclcpp_lifecycle::rclcpp_lifecycle
@@ -86,7 +81,6 @@ target_link_libraries(simple_progress_checker PUBLIC
 )
 target_link_libraries(simple_progress_checker PRIVATE
   nav2_util::nav2_util_core
-  nav_2d_utils::conversions
   pluginlib::pluginlib
 )
 
@@ -107,7 +101,6 @@ target_link_libraries(pose_progress_checker PUBLIC
 target_link_libraries(pose_progress_checker PRIVATE
   angles::angles
   nav2_util::nav2_util_core
-  nav_2d_utils::conversions
   pluginlib::pluginlib
 )
 
@@ -174,6 +167,28 @@ target_link_libraries(position_goal_checker PRIVATE
   pluginlib::pluginlib
 )
 
+add_library(axis_goal_checker SHARED plugins/axis_goal_checker.cpp)
+target_include_directories(axis_goal_checker
+  PUBLIC
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+    "$<INSTALL_INTERFACE:include/${PROJECT_NAME}>"
+)
+target_link_libraries(axis_goal_checker PUBLIC
+  ${geometry_msgs_TARGETS}
+  nav2_core::nav2_core
+  nav2_ros_common::nav2_ros_common
+  nav2_costmap_2d::nav2_costmap_2d_core
+  rclcpp::rclcpp
+  rclcpp_lifecycle::rclcpp_lifecycle
+  ${rcl_interfaces_TARGETS}
+)
+target_link_libraries(axis_goal_checker PRIVATE
+  angles::angles
+  nav2_util::nav2_util_core
+  pluginlib::pluginlib
+)
+
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   # the following line skips the linter which checks for copyrights
@@ -190,7 +205,14 @@ endif()
 
 rclcpp_components_register_nodes(${library_name} "nav2_controller::ControllerServer")
 
-install(TARGETS simple_progress_checker position_goal_checker pose_progress_checker simple_goal_checker stopped_goal_checker ${library_name}
+install(TARGETS
+  simple_progress_checker
+  position_goal_checker
+  axis_goal_checker
+  pose_progress_checker
+  simple_goal_checker
+  stopped_goal_checker
+  ${library_name}
   EXPORT ${library_name}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
@@ -211,6 +233,7 @@ ament_export_libraries(simple_progress_checker
   simple_goal_checker
   stopped_goal_checker
   position_goal_checker
+  axis_goal_checker
   ${library_name})
 ament_export_dependencies(
   geometry_msgs
@@ -218,8 +241,6 @@ ament_export_dependencies(
   nav2_costmap_2d
   nav2_msgs
   nav2_util
-  nav_2d_msgs
-  nav_2d_utils
   pluginlib
   rclcpp
   rclcpp_lifecycle
