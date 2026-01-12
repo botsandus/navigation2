@@ -27,38 +27,71 @@
 namespace nav2_controller
 {
 
-/**  * @class AxisGoalChecker
-  * @brief Goal Checker plugin that checks progress along the axis defined by the
-  * 2 last poses of the pathalong the axis defined by the last segment of the path to the goal.
+/**
+  * @class AxisGoalChecker
+  * @brief Goal Checker plugin that checks progress along the axis defined by the last segment
+  * of the path to the goal.
   *
   * This class can be configured to allow overshoot past the goal if the is_overshoot_valid
-  *  parameter is set to true (which it is false by default).
+  *  parameter is set to true (which is false by default).
   */
 class AxisGoalChecker : public nav2_core::GoalChecker
 {
 public:
+  /**
+   * @brief Construct a new Axis Goal Checker object
+   */
   AxisGoalChecker();
+
   // Standard GoalChecker Interface
+  /**
+   * @brief Initialize the goal checker
+   * @param parent Weak pointer to the lifecycle node
+   * @param plugin_name Name of the plugin
+   * @param costmap_ros Shared pointer to the costmap
+   */
   void initialize(
     const nav2::LifecycleNode::WeakPtr & parent,
     const std::string & plugin_name,
     const std::shared_ptr<nav2_costmap_2d::Costmap2DROS> costmap_ros) override;
+
+  /**
+   * @brief Reset the goal checker state
+   */
   void reset() override;
+
+  /**
+   * @brief Check if the goal is reached
+   * @param query_pose Current pose of the robot
+   * @param goal_pose Target goal pose
+   * @param velocity Current velocity of the robot
+   * @param transformed_global_plan The transformed global plan
+   * @return true if goal is reached, false otherwise
+   */
   bool isGoalReached(
     const geometry_msgs::msg::Pose & query_pose, const geometry_msgs::msg::Pose & goal_pose,
-    const std::optional<geometry_msgs::msg::Pose> & before_goal_pose,
-    const geometry_msgs::msg::Twist & velocity) override;
+    const geometry_msgs::msg::Twist & velocity,
+    const nav_msgs::msg::Path & transformed_global_plan) override;
+
+  /**
+   * @brief Get the position and velocity tolerances
+   * @param pose_tolerance Output parameter for pose tolerance
+   * @param vel_tolerance Output parameter for velocity tolerance
+   * @return true if tolerances are available, false otherwise
+   */
   bool getTolerances(
     geometry_msgs::msg::Pose & pose_tolerance,
     geometry_msgs::msg::Twist & vel_tolerance) override;
 
 protected:
-  double axis_progress_goal_tolerance_;
-  double axis_offset_goal_tolerance_;
+  double along_path_tolerance_;
+  double cross_track_tolerance_;
+  double path_length_tolerance_;
   bool is_overshoot_valid_;
   // Dynamic parameters handler
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr dyn_params_handler_;
   std::string plugin_name_;
+  rclcpp::Logger logger_{rclcpp::get_logger("AxisGoalChecker")};
 
   /**
    * @brief Callback executed when a parameter change is detected

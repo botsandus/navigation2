@@ -92,7 +92,7 @@ void KeepoutFilter::initializeFilter(
 }
 
 void KeepoutFilter::filterInfoCallback(
-  const nav2_msgs::msg::CostmapFilterInfo::SharedPtr msg)
+  const nav2_msgs::msg::CostmapFilterInfo::ConstSharedPtr & msg)
 {
   std::lock_guard<CostmapFilter::mutex_t> guard(*getMutex());
 
@@ -137,7 +137,7 @@ void KeepoutFilter::filterInfoCallback(
 }
 
 void KeepoutFilter::maskCallback(
-  const nav_msgs::msg::OccupancyGrid::SharedPtr msg)
+  const nav_msgs::msg::OccupancyGrid::ConstSharedPtr & msg)
 {
   std::lock_guard<CostmapFilter::mutex_t> guard(*getMutex());
 
@@ -175,6 +175,13 @@ void KeepoutFilter::updateBounds(
   }
 
   CostmapFilter::updateBounds(robot_x, robot_y, robot_yaw, min_x, min_y, max_x, max_y);
+
+  if (!filter_mask_) {
+    RCLCPP_WARN_THROTTLE(
+      logger_, *(clock_), 2000,
+      "KeepoutFilter: Filter mask was not received");
+    return;
+  }
 
   // If new keepout zone received
   if (has_updated_data_) {

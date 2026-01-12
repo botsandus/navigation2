@@ -78,6 +78,7 @@ rclcpp::NodeOptions getChildNodeOptions(
   const rclcpp::NodeOptions & parent_options)
 {
   std::vector<std::string> new_arguments = parent_options.arguments();
+  bool use_intra_process_comms = parent_options.use_intra_process_comms();
   nav2::replaceOrAddArgument(
     new_arguments, "-r", "__ns",
     "__ns:=" + nav2::add_namespaces(parent_namespace, name));
@@ -85,7 +86,8 @@ rclcpp::NodeOptions getChildNodeOptions(
   nav2::replaceOrAddArgument(
     new_arguments, "-p", "use_sim_time",
     "use_sim_time:=" + std::string(use_sim_time ? "true" : "false"));
-  return rclcpp::NodeOptions().arguments(new_arguments);
+  return rclcpp::NodeOptions().use_intra_process_comms(use_intra_process_comms).arguments(
+    new_arguments);
 }
 
 Costmap2DROS::Costmap2DROS(
@@ -133,6 +135,7 @@ void Costmap2DROS::init()
   declare_parameter("initial_transform_timeout", rclcpp::ParameterValue(60.0));
   declare_parameter("trinary_costmap", rclcpp::ParameterValue(true));
   declare_parameter("unknown_cost_value", rclcpp::ParameterValue(static_cast<unsigned char>(0xff)));
+  declare_parameter("inscribed_obstacle_cost_value", rclcpp::ParameterValue(99));
   declare_parameter("update_frequency", rclcpp::ParameterValue(5.0));
   declare_parameter("use_maximum", rclcpp::ParameterValue(false));
   declare_parameter("subscribe_to_stamped_footprint", rclcpp::ParameterValue(false));
@@ -225,11 +228,11 @@ Costmap2DROS::on_configure(const rclcpp_lifecycle::State & /*state*/)
   // Create the publishers and subscribers
   if (subscribe_to_stamped_footprint_) {
     footprint_stamped_sub_ = create_subscription<geometry_msgs::msg::PolygonStamped>(
-      "footprint", [this](const geometry_msgs::msg::PolygonStamped::SharedPtr footprint)
+      "footprint", [this](const geometry_msgs::msg::PolygonStamped::ConstSharedPtr & footprint)
       {setRobotFootprintPolygon(footprint->polygon);});
   } else {
     footprint_sub_ = create_subscription<geometry_msgs::msg::Polygon>(
-      "footprint", [this](const geometry_msgs::msg::Polygon::SharedPtr footprint)
+      "footprint", [this](const geometry_msgs::msg::Polygon::ConstSharedPtr & footprint)
       {setRobotFootprintPolygon(*footprint);});
   }
 
@@ -606,6 +609,19 @@ Costmap2DROS::updateMap()
       footprint_pub_->publish(std::move(footprint));
       initialized_ = true;
     }
+  }
+}
+
+void
+Costmap2DROS::waitUntilCurrent(const rclcpp::Duration & timeout)
+{
+  rclcpp::Rate r(100);
+  auto waiting_start = now();
+  while (!isCurrent()) {
+    if (now() - waiting_start > timeout) {
+      throw std::runtime_error("Costmap timed out waiting for update");
+    }
+    r.sleep();
   }
 }
 
