@@ -267,12 +267,14 @@ bool LayeredCostmap::isCurrent()
   for (vector<std::shared_ptr<Layer>>::iterator plugin = plugins_.begin();
     plugin != plugins_.end(); ++plugin)
   {
-    current_ = current_ && ((*plugin)->isCurrent() || !(*plugin)->isEnabled());
+    // Check isCurrent for both enabled and disabled layers
+    // Disabled layers can still be non-current after state changes
+    current_ = current_ && (*plugin)->isCurrent();
   }
   for (vector<std::shared_ptr<Layer>>::iterator filter = filters_.begin();
     filter != filters_.end(); ++filter)
   {
-    current_ = current_ && ((*filter)->isCurrent() || !(*filter)->isEnabled());
+    current_ = current_ && (*filter)->isCurrent();
   }
   return current_;
 }

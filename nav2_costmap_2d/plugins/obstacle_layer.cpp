@@ -385,9 +385,8 @@ ObstacleLayer::dynamicParametersCallback(
     } else if (param_type == ParameterType::PARAMETER_BOOL) {
       if (param_name == name_ + "." + "enabled" && enabled_ != parameter.as_bool()) {
         enabled_ = parameter.as_bool();
-        if (enabled_) {
-          current_ = false;
-        }
+        // Force costmap update wait in both enable and disable cases
+        current_ = false;
       } else if (param_name == name_ + "." + "footprint_clearing_enabled") {
         footprint_clearing_enabled_ = parameter.as_bool();
       }
@@ -606,6 +605,8 @@ ObstacleLayer::updateCosts(
 {
   std::lock_guard<Costmap2D::mutex_t> guard(*getMutex());
   if (!enabled_) {
+    // Mark as current after costmap update completes
+    current_ = true;
     return;
   }
 
