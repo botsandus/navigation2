@@ -361,7 +361,8 @@ AmclNode::nomotionUpdateCallback(
 }
 
 void
-AmclNode::initialPoseReceived(geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg)
+AmclNode::initialPoseReceived(
+  const geometry_msgs::msg::PoseWithCovarianceStamped::ConstSharedPtr & msg)
 {
   std::lock_guard<std::recursive_mutex> cfl(mutex_);
 
@@ -397,7 +398,7 @@ AmclNode::initialPoseReceived(geometry_msgs::msg::PoseWithCovarianceStamped::Sha
       "but AMCL is not yet in the active state");
     return;
   }
-  handleInitialPose(*msg);
+  handleInitialPose(last_published_pose_);
 }
 
 void
@@ -1012,7 +1013,13 @@ rcl_interfaces::msg::SetParametersResult AmclNode::validateParameterUpdatesCallb
       continue;
     }
     if (param_type == ParameterType::PARAMETER_DOUBLE) {
-      if (parameter.as_double() < 0.0 &&
+      if (parameter.as_double() <= 0.0 && param_name == "save_pose_rate") {
+        RCLCPP_WARN(
+          get_logger(), "The value of parameter '%s' is incorrectly set to %f, "
+          "it should be >0. Ignoring parameter update.",
+          param_name.c_str(), parameter.as_double());
+        result.successful = false;
+      } else if (parameter.as_double() < 0.0 &&  // NOLINT(readability/braces)
         (param_name != "laser_min_range" || param_name != "laser_max_range"))
       {
         RCLCPP_WARN(
@@ -1228,7 +1235,7 @@ AmclNode::updateParametersCallback(
 }
 
 void
-AmclNode::mapReceived(const nav_msgs::msg::OccupancyGrid::SharedPtr msg)
+AmclNode::mapReceived(const nav_msgs::msg::OccupancyGrid::ConstSharedPtr & msg)
 {
   RCLCPP_DEBUG(get_logger(), "AmclNode: A new map was received.");
   if (!nav2::validateMsg(*msg)) {
@@ -1352,7 +1359,7 @@ void
 AmclNode::initMessageFilters()
 {
   auto sub_opt = nav2::interfaces::createSubscriptionOptions(
-    scan_topic_, allow_parameter_qos_overrides_, callback_group_);
+    scan_topic_, allow_parameter_qos_overrides_);
 
   #if RCLCPP_VERSION_GTE(29, 6, 0)
   laser_scan_sub_ = std::make_unique<message_filters::Subscriber<sensor_msgs::msg::LaserScan>>(
