@@ -846,6 +846,7 @@ ObstacleLayer::reset()
   resetBuffersLastUpdated();
   current_ = false;
   was_reset_ = true;
+  setUpdatePending();
 }
 
 void
