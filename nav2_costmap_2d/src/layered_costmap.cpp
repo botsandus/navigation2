@@ -261,22 +261,49 @@ void LayeredCostmap::updateMap(double robot_x, double robot_y, double robot_yaw)
   byn_ = yn;
 
   initialized_ = true;
+
+  // Clear pending update flags on all layers after a successful update cycle
+  clearUpdatePending();
 }
 
 bool LayeredCostmap::isCurrent()
 {
-  current_ = true;
-  for (vector<std::shared_ptr<Layer>>::iterator plugin = plugins_.begin();
-    plugin != plugins_.end(); ++plugin)
-  {
-    current_ = current_ && ((*plugin)->isCurrent() || !(*plugin)->isEnabled());
+  for (const auto & plugin : plugins_) {
+    if (!plugin->isCurrent() && plugin->isEnabled()) {
+      return false;
+    }
   }
-  for (vector<std::shared_ptr<Layer>>::iterator filter = filters_.begin();
-    filter != filters_.end(); ++filter)
-  {
-    current_ = current_ && ((*filter)->isCurrent() || !(*filter)->isEnabled());
+  for (const auto & filter : filters_) {
+    if (!filter->isCurrent() && filter->isEnabled()) {
+      return false;
+    }
   }
-  return current_;
+  return true;
+}
+
+bool LayeredCostmap::isUpdatePending()
+{
+  for (const auto & plugin : plugins_) {
+    if (plugin->isUpdatePending()) {
+      return true;
+    }
+  }
+  for (const auto & filter : filters_) {
+    if (filter->isUpdatePending()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void LayeredCostmap::clearUpdatePending()
+{
+  for (auto & plugin : plugins_) {
+    plugin->clearUpdatePending();
+  }
+  for (auto & filter : filters_) {
+    filter->clearUpdatePending();
+  }
 }
 
 void LayeredCostmap::setFootprint(const std::vector<geometry_msgs::msg::Point> & footprint_spec)

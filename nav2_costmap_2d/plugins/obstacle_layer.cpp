@@ -385,6 +385,8 @@ ObstacleLayer::dynamicParametersCallback(
     } else if (param_type == ParameterType::PARAMETER_BOOL) {
       if (param_name == name_ + "." + "enabled" && enabled_ != parameter.as_bool()) {
         enabled_ = parameter.as_bool();
+        // Signal that a full costmap update is required before planners/controllers can use it
+        setUpdatePending();
         if (enabled_) {
           current_ = false;
         }

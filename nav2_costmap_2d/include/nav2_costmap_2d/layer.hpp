@@ -139,6 +139,36 @@ public:
     return current_;
   }
 
+  /**
+   * @brief Check if the layer has pending updates that require a full costmap update cycle.
+   *        Layers should set update_pending_ = true when configuration changes (e.g., enabling
+   *        or disabling the layer) require the costmap to be fully updated before it can be
+   *        used by planners/controllers.
+   * @return Whether the layer has pending updates.
+   */
+  bool isUpdatePending() const
+  {
+    return update_pending_;
+  }
+
+  /**
+   * @brief Clear the pending update flag. Called by LayeredCostmap after an update cycle.
+   */
+  void clearUpdatePending()
+  {
+    update_pending_ = false;
+  }
+
+  /**
+   * @brief Signal that the layer requires a full costmap update cycle.
+   *        Use this when layer configuration changes (e.g., enabled state, parameters)
+   *        and the costmap must be updated before planners/controllers can safely use it.
+   */
+  void setUpdatePending()
+  {
+    update_pending_ = true;
+  }
+
   /**@brief Gets whether the layer is enabled. */
   bool isEnabled() const
   {
@@ -199,6 +229,10 @@ protected:
   // Currently this var is managed by subclasses.
   // TODO(bpwilcox): make this managed by this class and/or container class.
   bool enabled_;
+  // Flag to indicate that the layer requires a full costmap update cycle.
+  // Set this when layer configuration changes require the costmap to be updated
+  // before planners/controllers can safely use it.
+  bool update_pending_{false};
 
   // Names of the parameters declared on the ROS node
   std::unordered_set<std::string> local_params_;

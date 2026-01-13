@@ -617,7 +617,8 @@ Costmap2DROS::waitUntilCurrent(const rclcpp::Duration & timeout)
 {
   rclcpp::Rate r(100);
   auto waiting_start = now();
-  while (!isCurrent()) {
+  // Wait for both: costmap to be current AND no pending layer updates
+  while (!isCurrent() || isUpdatePending()) {
     if (now() - waiting_start > timeout) {
       throw std::runtime_error("Costmap timed out waiting for update");
     }

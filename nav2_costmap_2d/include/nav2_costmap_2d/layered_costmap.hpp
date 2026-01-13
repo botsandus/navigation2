@@ -211,6 +211,20 @@ public:
   * of poorly configured setups. */
   bool isOutofBounds(double robot_x, double robot_y);
 
+  /**
+   * @brief Check if any layer has pending updates that require a full costmap update cycle.
+   *        This is used by planners/controllers to wait for the costmap to be fully updated
+   *        after layer configuration changes (e.g., enabling/disabling layers).
+   * @return True if any layer has pending updates, false otherwise.
+   */
+  bool isUpdatePending();
+
+  /**
+   * @brief Clear pending update flags on all layers.
+   *        Called after a successful costmap update cycle.
+   */
+  void clearUpdatePending();
+
 private:
   // primary_costmap_ is a bottom costmap used by plugins when costmap filters were enabled.
   // combined_costmap_ is a final costmap where all results produced by plugins and filters (if any)

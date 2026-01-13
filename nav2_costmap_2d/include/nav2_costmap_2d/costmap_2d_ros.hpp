@@ -189,6 +189,13 @@ public:
     return layered_costmap_->isCurrent();
   }
 
+  /** @brief Same as getLayeredCostmap()->isUpdatePending().
+   *  Returns true if any layer has pending updates that require a full costmap update cycle. */
+  bool isUpdatePending()
+  {
+    return layered_costmap_->isUpdatePending();
+  }
+
   /**
    * @brief Wait for the costmap to become current after updates or parameter changes
    * @param timeout Maximum time to wait for costmap to become current
