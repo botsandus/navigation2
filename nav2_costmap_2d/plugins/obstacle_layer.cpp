@@ -387,9 +387,6 @@ ObstacleLayer::dynamicParametersCallback(
         enabled_ = parameter.as_bool();
         // Signal that a full costmap update is required before planners/controllers can use it
         setUpdatePending();
-        if (enabled_) {
-          current_ = false;
-        }
       } else if (param_name == name_ + "." + "footprint_clearing_enabled") {
         footprint_clearing_enabled_ = parameter.as_bool();
       }
