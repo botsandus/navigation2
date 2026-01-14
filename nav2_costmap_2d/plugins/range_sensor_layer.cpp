@@ -470,6 +470,9 @@ void RangeSensorLayer::updateBounds(
         no_readings_timeout_);
       current_ = false;
     }
+  } else {
+    // We have fresh readings, layer is current
+    current_ = true;
   }
 }
 
