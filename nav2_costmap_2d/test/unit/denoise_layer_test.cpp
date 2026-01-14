@@ -64,9 +64,10 @@ public:
 
   bool reset()
   {
-    denoise_.current_ = true;
+    // reset() should mark the layer as needing an update via setUpdatePending()
+    denoise_.clearUpdatePending();  // Clear any pending state first
     denoise_.reset();
-    return denoise_.current_;
+    return denoise_.isUpdatePending();
   }
 
   static void initialize(nav2_costmap_2d::DenoiseLayer & d)
@@ -413,7 +414,8 @@ TEST_F(DenoiseLayerTester, constructorAndDestructor) {
 }
 
 TEST_F(DenoiseLayerTester, reset) {
-  ASSERT_FALSE(reset());
+  // reset() should set update_pending_ flag to true
+  ASSERT_TRUE(reset());
 }
 
 TEST_F(DenoiseLayerTester, isClearable) {

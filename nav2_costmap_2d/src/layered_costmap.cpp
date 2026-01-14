@@ -158,6 +158,8 @@ void LayeredCostmap::updateMap(double robot_x, double robot_y, double robot_yaw)
   }
 
   if (plugins_.size() == 0 && filters_.size() == 0) {
+    // No plugins or filters to process, but still clear pending flags
+    clearUpdatePending();
     return;
   }
 
@@ -215,6 +217,8 @@ void LayeredCostmap::updateMap(double robot_x, double robot_y, double robot_yaw)
       "nav2_costmap_2d"), "Updating area x: [%d, %d] y: [%d, %d]", x0, xn, y0, yn);
 
   if (xn < x0 || yn < y0) {
+    // No updates in bounds, but still clear pending flags
+    clearUpdatePending();
     return;
   }
 
