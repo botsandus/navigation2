@@ -623,6 +623,9 @@ Costmap2DROS::waitUntilCurrent(const rclcpp::Duration & timeout)
     }
     r.sleep();
   }
+  auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+    (now() - waiting_start).to_chrono<std::chrono::nanoseconds>()).count();
+  RCLCPP_INFO(get_logger(), "waitUntilCurrent took %ld ms", elapsed_ms);
 }
 
 void

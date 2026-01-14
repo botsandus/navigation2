@@ -63,7 +63,13 @@ BT::NodeStatus IsPathValidCondition::tick()
   request->layer_name = layer_name_;
   request->footprint = footprint_;
   request->check_full_path = check_full_path_;
+
+  auto start_time = std::chrono::steady_clock::now();
   auto response = client_->invoke(request, server_timeout_);
+  auto end_time = std::chrono::steady_clock::now();
+  auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_time -
+      start_time).count();
+  RCLCPP_INFO(node_->get_logger(), "IsPathValid service call took %ld ms", elapsed_ms);
 
   // Check if validation was successful
   if (!response->success) {

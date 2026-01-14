@@ -269,12 +269,28 @@ bool LayeredCostmap::isCurrent()
   for (vector<std::shared_ptr<Layer>>::iterator plugin = plugins_.begin();
     plugin != plugins_.end(); ++plugin)
   {
-    current_ = current_ && ((*plugin)->isCurrent() || !(*plugin)->isEnabled());
+    bool layer_current = (*plugin)->isCurrent();
+    bool layer_enabled = (*plugin)->isEnabled();
+    if (layer_enabled && !layer_current) {
+      RCLCPP_WARN_THROTTLE(
+        rclcpp::get_logger("layered_costmap"),
+        steady_clock_, 1000,
+        "Layer '%s' is not current", (*plugin)->getName().c_str());
+    }
+    current_ = current_ && (layer_current || !layer_enabled);
   }
   for (vector<std::shared_ptr<Layer>>::iterator filter = filters_.begin();
     filter != filters_.end(); ++filter)
   {
-    current_ = current_ && ((*filter)->isCurrent() || !(*filter)->isEnabled());
+    bool filter_current = (*filter)->isCurrent();
+    bool filter_enabled = (*filter)->isEnabled();
+    if (filter_enabled && !filter_current) {
+      RCLCPP_WARN_THROTTLE(
+        rclcpp::get_logger("layered_costmap"),
+        steady_clock_, 1000,
+        "Filter '%s' is not current", (*filter)->getName().c_str());
+    }
+    current_ = current_ && (filter_current || !filter_enabled);
   }
   return current_;
 }

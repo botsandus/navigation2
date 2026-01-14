@@ -233,6 +233,7 @@ private:
   bool size_locked_;
   std::atomic<double> circumscribed_radius_, inscribed_radius_;
   std::shared_ptr<std::vector<geometry_msgs::msg::Point>> footprint_;
+  rclcpp::Clock steady_clock_{RCL_STEADY_TIME};
 };
 
 }  // namespace nav2_costmap_2d
