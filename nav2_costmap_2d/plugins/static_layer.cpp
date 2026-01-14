@@ -124,7 +124,7 @@ void
 StaticLayer::reset()
 {
   has_updated_data_ = true;
-  current_ = false;
+  setUpdatePending();
 }
 
 void
@@ -472,7 +472,6 @@ StaticLayer::updateCosts(
     // restore the map region occupied by the polygon using cached data
     restoreMapRegionOccupiedByPolygon(map_region_to_restore);
   }
-  current_ = true;
 }
 
 /**
@@ -524,7 +523,6 @@ StaticLayer::dynamicParametersCallback(
         width_ = size_x_;
         height_ = size_y_;
         has_updated_data_ = true;
-        current_ = false;
         setUpdatePending();
       } else if (param_name == name_ + "." + "footprint_clearing_enabled") {
         footprint_clearing_enabled_ = parameter.as_bool();

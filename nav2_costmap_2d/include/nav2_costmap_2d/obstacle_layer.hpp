@@ -257,7 +257,6 @@ protected:
   std::vector<nav2_costmap_2d::Observation::ConstSharedPtr> static_marking_observations_;
 
   bool rolling_window_;
-  bool was_reset_;
   nav2_costmap_2d::CombinationMethod combination_method_;
   bool allow_parameter_qos_overrides_;
 };

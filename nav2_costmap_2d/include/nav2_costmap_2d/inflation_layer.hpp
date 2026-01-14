@@ -140,7 +140,7 @@ public:
   void reset() override
   {
     matchSize();
-    current_ = false;
+    setUpdatePending();
   }
 
   /** @brief  Given a distance, compute a cost.

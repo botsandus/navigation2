@@ -70,7 +70,7 @@ void CostmapLayer::matchSize()
 
 void CostmapLayer::clearArea(int start_x, int start_y, int end_x, int end_y, bool invert)
 {
-  current_ = false;
+  setUpdatePending();
   unsigned char * grid = getCharMap();
 
   int size_x = getSizeInCellsX();
