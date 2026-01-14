@@ -108,7 +108,7 @@ void CostmapFilter::reset()
 {
   resetFilter();
   initializeFilter(filter_info_topic_);
-  current_ = false;
+  setUpdatePending();
 }
 
 void CostmapFilter::updateBounds(
@@ -134,7 +134,6 @@ void CostmapFilter::updateCosts(
   }
 
   process(master_grid, min_i, min_j, max_i, max_j, latest_pose_);
-  current_ = true;
 }
 
 void CostmapFilter::enableCallback(
@@ -142,7 +141,10 @@ void CostmapFilter::enableCallback(
   const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
   std::shared_ptr<std_srvs::srv::SetBool::Response> response)
 {
-  enabled_ = request->data;
+  if (enabled_ != request->data) {
+    enabled_ = request->data;
+    setUpdatePending();
+  }
   response->success = true;
   if (enabled_) {
     response->message = "Enabled";

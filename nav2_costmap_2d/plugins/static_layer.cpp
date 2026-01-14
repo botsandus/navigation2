@@ -525,8 +525,10 @@ StaticLayer::dynamicParametersCallback(
         height_ = size_y_;
         has_updated_data_ = true;
         current_ = false;
+        setUpdatePending();
       } else if (param_name == name_ + "." + "footprint_clearing_enabled") {
         footprint_clearing_enabled_ = parameter.as_bool();
+        setUpdatePending();
       } else if (param_name == name_ + "." + "restore_cleared_footprint") {
         if (footprint_clearing_enabled_) {
           restore_cleared_footprint_ = parameter.as_bool();

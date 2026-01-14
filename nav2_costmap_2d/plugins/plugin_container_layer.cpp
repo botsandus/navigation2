@@ -126,8 +126,6 @@ void PluginContainerLayer::updateCosts(
     default:  // Nothing
       break;
   }
-
-  current_ = true;
 }
 
 void PluginContainerLayer::activate()
@@ -156,7 +154,7 @@ void PluginContainerLayer::reset()
     (*plugin)->reset();
   }
   resetMaps();
-  current_ = false;
+  setUpdatePending();
 }
 
 void PluginContainerLayer::onFootprintChanged()
@@ -224,11 +222,12 @@ rcl_interfaces::msg::SetParametersResult PluginContainerLayer::dynamicParameters
     if (param_type == ParameterType::PARAMETER_INTEGER) {
       if (param_name == name_ + "." + "combination_method") {
         combination_method_ = combination_method_from_int(parameter.as_int());
+        setUpdatePending();
       }
     } else if (param_type == ParameterType::PARAMETER_BOOL) {
       if (param_name == name_ + "." + "enabled" && enabled_ != parameter.as_bool()) {
         enabled_ = parameter.as_bool();
-        current_ = false;
+        setUpdatePending();
       }
     }
   }

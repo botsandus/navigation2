@@ -40,6 +40,7 @@
 #include <string>
 #include <vector>
 #include <unordered_set>
+#include <atomic>
 
 #include "tf2_ros/buffer.hpp"
 #include "rclcpp/rclcpp.hpp"
@@ -232,7 +233,7 @@ protected:
   // Flag to indicate that the layer requires a full costmap update cycle.
   // Set this when layer configuration changes require the costmap to be updated
   // before planners/controllers can safely use it.
-  bool update_pending_{false};
+  std::atomic<bool> update_pending_{false};
 
   // Names of the parameters declared on the ROS node
   std::unordered_set<std::string> local_params_;

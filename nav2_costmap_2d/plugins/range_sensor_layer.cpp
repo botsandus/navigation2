@@ -529,6 +529,7 @@ void RangeSensorLayer::reset()
   deactivate();
   resetMaps();
   was_reset_ = true;
+  setUpdatePending();
   activate();
 }
 

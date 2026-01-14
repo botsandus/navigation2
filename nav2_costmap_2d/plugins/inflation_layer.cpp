@@ -173,6 +173,7 @@ InflationLayer::onFootprintChanged()
   cell_inflation_radius_ = cellDistance(inflation_radius_);
   computeCaches();
   need_reinflation_ = true;
+  setUpdatePending();
 
   if (inflation_radius_ < inscribed_radius_) {
     RCLCPP_ERROR(
@@ -316,8 +317,6 @@ InflationLayer::updateCosts(
     // Note that dist_bin.clear() is not enough, because it won't free the memory
     dist_bin = std::vector<CellData>();
   }
-
-  current_ = true;
 }
 
 /**
@@ -455,28 +454,32 @@ InflationLayer::dynamicParametersCallback(
         inflation_radius_ = parameter.as_double();
         need_reinflation_ = true;
         need_cache_recompute = true;
+        setUpdatePending();
       } else if (param_name == name_ + "." + "cost_scaling_factor" && // NOLINT
         getCostScalingFactor() != parameter.as_double())
       {
         cost_scaling_factor_ = parameter.as_double();
         need_reinflation_ = true;
         need_cache_recompute = true;
+        setUpdatePending();
       }
     } else if (param_type == ParameterType::PARAMETER_BOOL) {
       if (param_name == name_ + "." + "enabled" && enabled_ != parameter.as_bool()) {
         enabled_ = parameter.as_bool();
         need_reinflation_ = true;
-        current_ = false;
+        setUpdatePending();
       } else if (param_name == name_ + "." + "inflate_unknown" && // NOLINT
         inflate_unknown_ != parameter.as_bool())
       {
         inflate_unknown_ = parameter.as_bool();
         need_reinflation_ = true;
+        setUpdatePending();
       } else if (param_name == name_ + "." + "inflate_around_unknown" && // NOLINT
         inflate_around_unknown_ != parameter.as_bool())
       {
         inflate_around_unknown_ = parameter.as_bool();
         need_reinflation_ = true;
+        setUpdatePending();
       }
     }
   }

@@ -83,7 +83,7 @@ DenoiseLayer::onInitialize()
 void
 DenoiseLayer::reset()
 {
-  current_ = false;
+  setUpdatePending();
 }
 
 bool
@@ -124,8 +124,6 @@ DenoiseLayer::updateCosts(
   } catch (std::exception & ex) {
     RCLCPP_ERROR(logger_, "%s", (std::string("Inner error: ") + ex.what()).c_str());
   }
-
-  current_ = true;
 }
 
 void

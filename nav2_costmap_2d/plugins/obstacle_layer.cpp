@@ -379,8 +379,10 @@ ObstacleLayer::dynamicParametersCallback(
     if (param_type == ParameterType::PARAMETER_DOUBLE) {
       if (param_name == name_ + "." + "min_obstacle_height") {
         min_obstacle_height_ = parameter.as_double();
+        setUpdatePending();
       } else if (param_name == name_ + "." + "max_obstacle_height") {
         max_obstacle_height_ = parameter.as_double();
+        setUpdatePending();
       }
     } else if (param_type == ParameterType::PARAMETER_BOOL) {
       if (param_name == name_ + "." + "enabled" && enabled_ != parameter.as_bool()) {
@@ -389,10 +391,12 @@ ObstacleLayer::dynamicParametersCallback(
         setUpdatePending();
       } else if (param_name == name_ + "." + "footprint_clearing_enabled") {
         footprint_clearing_enabled_ = parameter.as_bool();
+        setUpdatePending();
       }
     } else if (param_type == ParameterType::PARAMETER_INTEGER) {
       if (param_name == name_ + "." + "combination_method") {
         combination_method_ = combination_method_from_int(parameter.as_int());
+        setUpdatePending();
       }
     }
   }
