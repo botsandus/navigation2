@@ -570,20 +570,22 @@ Costmap2DROS::mapUpdateLoop(double frequency)
           last_publish_ = current_time;
         }
       }
+
+      // Warn if update took longer than the desired period
+      double update_time = timer.elapsed_time_in_seconds();
+      double desired_period = 1.0 / frequency;
+      if (update_time > desired_period) {
+        RCLCPP_WARN_THROTTLE(
+          get_logger(), *get_clock(), 5000,
+          "Costmap update loop missed its desired rate of %.2fHz: "
+          "update took %.3f sec (expected < %.3f sec). "
+          "This will cause delays for services waiting on costmap updates.",
+          frequency, update_time, desired_period);
+      }
     }
 
     // Make sure to sleep for the remainder of our cycle time
     r.sleep();
-
-#if 0
-    // TODO(bpwilcox): find ROS2 equivalent or port for r.cycletime()
-    if (r.period() > tf2::durationFromSec(1 / frequency)) {
-      RCLCPP_WARN(
-        get_logger(),
-        "Costmap2DROS: Map update loop missed its desired rate of %.4fHz... "
-        "the loop actually took %.4f seconds", frequency, r.period());
-    }
-#endif
   }
 }
 
@@ -617,13 +619,101 @@ Costmap2DROS::waitUntilCurrent(const rclcpp::Duration & timeout)
 {
   rclcpp::Rate r(100);
   auto waiting_start = now();
-  // Wait for both: costmap to be current AND no pending layer updates
-  while (!isCurrent() || isUpdatePending()) {
+
+  // Wait for all layers to become current
+  auto current_wait_start = now();
+  while (!isCurrent()) {
     if (now() - waiting_start > timeout) {
-      throw std::runtime_error("Costmap timed out waiting for update");
+      // Log which layers are not current before throwing
+      auto * plugins = layered_costmap_->getPlugins();
+      auto * filters = layered_costmap_->getFilters();
+      for (const auto & plugin : *plugins) {
+        if (!plugin->isCurrent() && plugin->isEnabled()) {
+          RCLCPP_WARN(get_logger(), "Layer '%s' is not current (timeout)",
+              plugin->getName().c_str());
+        }
+      }
+      for (const auto & filter : *filters) {
+        if (!filter->isCurrent() && filter->isEnabled()) {
+          RCLCPP_WARN(get_logger(), "Filter '%s' is not current (timeout)",
+              filter->getName().c_str());
+        }
+      }
+      throw std::runtime_error("Costmap timed out waiting for layers to become current");
     }
     r.sleep();
   }
+  auto current_wait_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+    (now() - current_wait_start).to_chrono<std::chrono::nanoseconds>()).count();
+
+  // Wait for pending updates to complete
+  auto pending_wait_start = now();
+  if (isUpdatePending()) {
+    // Log which layers have pending updates at the START of the wait
+    auto * plugins = layered_costmap_->getPlugins();
+    auto * filters = layered_costmap_->getFilters();
+    std::string pending_layers;
+    for (const auto & plugin : *plugins) {
+      if (plugin->isUpdatePending()) {
+        pending_layers += plugin->getName() + " ";
+      }
+    }
+    for (const auto & filter : *filters) {
+      if (filter->isUpdatePending()) {
+        pending_layers += filter->getName() + " ";
+      }
+    }
+    RCLCPP_INFO(get_logger(), "Waiting for pending updates on layers: %s", pending_layers.c_str());
+  }
+  while (isUpdatePending()) {
+    if (now() - waiting_start > timeout) {
+      // Log which layers have pending updates before throwing
+      auto * plugins = layered_costmap_->getPlugins();
+      auto * filters = layered_costmap_->getFilters();
+      for (const auto & plugin : *plugins) {
+        if (plugin->isUpdatePending()) {
+          RCLCPP_WARN(get_logger(), "Layer '%s' has pending update (timeout)",
+              plugin->getName().c_str());
+        }
+      }
+      for (const auto & filter : *filters) {
+        if (filter->isUpdatePending()) {
+          RCLCPP_WARN(get_logger(), "Filter '%s' has pending update (timeout)",
+              filter->getName().c_str());
+        }
+      }
+      throw std::runtime_error("Costmap timed out waiting for pending updates");
+    }
+    r.sleep();
+  }
+  auto pending_wait_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+    (now() - pending_wait_start).to_chrono<std::chrono::nanoseconds>()).count();
+
+  auto total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+    (now() - waiting_start).to_chrono<std::chrono::nanoseconds>()).count();
+
+  // Log per-layer status if wait was significant (> 500ms)
+  if (total_ms > 500) {
+    auto * plugins = layered_costmap_->getPlugins();
+    auto * filters = layered_costmap_->getFilters();
+    std::string layer_status;
+    for (const auto & plugin : *plugins) {
+      layer_status += plugin->getName() + "(enabled=" +
+        (plugin->isEnabled() ? "true" : "false") + ", current=" +
+        (plugin->isCurrent() ? "true" : "false") + ") ";
+    }
+    for (const auto & filter : *filters) {
+      layer_status += filter->getName() + "(enabled=" +
+        (filter->isEnabled() ? "true" : "false") + ", current=" +
+        (filter->isCurrent() ? "true" : "false") + ") ";
+    }
+    RCLCPP_WARN(get_logger(), "Slow costmap update - layer status: %s", layer_status.c_str());
+  }
+
+  RCLCPP_INFO(
+    get_logger(),
+    "waitUntilCurrent took %ld ms (isCurrent: %ld ms, updatePending: %ld ms)",
+    total_ms, current_wait_ms, pending_wait_ms);
 }
 
 void

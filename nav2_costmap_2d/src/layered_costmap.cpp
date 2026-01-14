@@ -139,6 +139,7 @@ void LayeredCostmap::updateMap(double robot_x, double robot_y, double robot_yaw)
   // Lock for the remainder of this function, some plugins (e.g. VoxelLayer)
   // implement thread unsafe updateBounds() functions.
   std::unique_lock<Costmap2D::mutex_t> lock(*(combined_costmap_.getMutex()));
+  auto update_start = std::chrono::steady_clock::now();
 
   // if we're using a rolling buffer costmap...
   // we need to update the origin using the robot's position
@@ -166,14 +167,21 @@ void LayeredCostmap::updateMap(double robot_x, double robot_y, double robot_yaw)
   minx_ = miny_ = std::numeric_limits<double>::max();
   maxx_ = maxy_ = std::numeric_limits<double>::lowest();
 
+  std::string bounds_timing;
   for (vector<std::shared_ptr<Layer>>::iterator plugin = plugins_.begin();
     plugin != plugins_.end(); ++plugin)
   {
+    auto layer_start = std::chrono::steady_clock::now();
     double prev_minx = minx_;
     double prev_miny = miny_;
     double prev_maxx = maxx_;
     double prev_maxy = maxy_;
     (*plugin)->updateBounds(robot_x, robot_y, robot_yaw, &minx_, &miny_, &maxx_, &maxy_);
+    auto layer_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::steady_clock::now() - layer_start).count();
+    if (layer_ms > 10) {
+      bounds_timing += (*plugin)->getName() + "=" + std::to_string(layer_ms) + "ms ";
+    }
     if (minx_ > prev_minx || miny_ > prev_miny || maxx_ < prev_maxx || maxy_ < prev_maxy) {
       RCLCPP_WARN(
         rclcpp::get_logger(
@@ -187,11 +195,17 @@ void LayeredCostmap::updateMap(double robot_x, double robot_y, double robot_yaw)
   for (vector<std::shared_ptr<Layer>>::iterator filter = filters_.begin();
     filter != filters_.end(); ++filter)
   {
+    auto layer_start = std::chrono::steady_clock::now();
     double prev_minx = minx_;
     double prev_miny = miny_;
     double prev_maxx = maxx_;
     double prev_maxy = maxy_;
     (*filter)->updateBounds(robot_x, robot_y, robot_yaw, &minx_, &miny_, &maxx_, &maxy_);
+    auto layer_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::steady_clock::now() - layer_start).count();
+    if (layer_ms > 10) {
+      bounds_timing += (*filter)->getName() + "=" + std::to_string(layer_ms) + "ms ";
+    }
     if (minx_ > prev_minx || miny_ > prev_miny || maxx_ < prev_maxx || maxy_ < prev_maxy) {
       RCLCPP_WARN(
         rclcpp::get_logger(
@@ -225,19 +239,41 @@ void LayeredCostmap::updateMap(double robot_x, double robot_y, double robot_yaw)
   if (filters_.size() == 0) {
     // If there are no filters enabled just update costmap sequentially by each plugin
     combined_costmap_.resetMap(x0, y0, xn, yn);
+    std::string costs_timing;
     for (vector<std::shared_ptr<Layer>>::iterator plugin = plugins_.begin();
       plugin != plugins_.end(); ++plugin)
     {
+      auto layer_start = std::chrono::steady_clock::now();
       (*plugin)->updateCosts(combined_costmap_, x0, y0, xn, yn);
+      auto layer_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - layer_start).count();
+      if (layer_ms > 10) {
+        costs_timing += (*plugin)->getName() + "=" + std::to_string(layer_ms) + "ms ";
+      }
+    }
+    auto total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::steady_clock::now() - update_start).count();
+    if (total_ms > 100) {
+      RCLCPP_WARN(
+        rclcpp::get_logger("nav2_costmap_2d"),
+        "Slow updateMap: %ld ms, updateBounds: [%s], updateCosts: [%s]",
+        total_ms, bounds_timing.c_str(), costs_timing.c_str());
     }
   } else {
     // Costmap Filters enabled
     // 1. Update costmap by plugins
     primary_costmap_.resetMap(x0, y0, xn, yn);
+    std::string costs_timing;
     for (vector<std::shared_ptr<Layer>>::iterator plugin = plugins_.begin();
       plugin != plugins_.end(); ++plugin)
     {
+      auto layer_start = std::chrono::steady_clock::now();
       (*plugin)->updateCosts(primary_costmap_, x0, y0, xn, yn);
+      auto layer_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - layer_start).count();
+      if (layer_ms > 10) {
+        costs_timing += (*plugin)->getName() + "=" + std::to_string(layer_ms) + "ms ";
+      }
     }
 
     // 2. Copy processed costmap window to a final costmap.
@@ -255,7 +291,21 @@ void LayeredCostmap::updateMap(double robot_x, double robot_y, double robot_yaw)
     for (vector<std::shared_ptr<Layer>>::iterator filter = filters_.begin();
       filter != filters_.end(); ++filter)
     {
+      auto layer_start = std::chrono::steady_clock::now();
       (*filter)->updateCosts(combined_costmap_, x0, y0, xn, yn);
+      auto layer_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - layer_start).count();
+      if (layer_ms > 10) {
+        costs_timing += (*filter)->getName() + "=" + std::to_string(layer_ms) + "ms ";
+      }
+    }
+    auto total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::steady_clock::now() - update_start).count();
+    if (total_ms > 100) {
+      RCLCPP_WARN(
+        rclcpp::get_logger("nav2_costmap_2d"),
+        "Slow updateMap: %ld ms, updateBounds: [%s], updateCosts: [%s]",
+        total_ms, bounds_timing.c_str(), costs_timing.c_str());
     }
   }
 

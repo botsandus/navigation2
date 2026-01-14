@@ -175,6 +175,7 @@ private:
     const std::shared_ptr<nav2_msgs::srv::IsPathValid::Request> request,
     std::shared_ptr<nav2_msgs::srv::IsPathValid::Response> response)
   {
+    auto callback_start = std::chrono::steady_clock::now();
     response->success = true;
     response->is_valid = true;
 
@@ -196,6 +197,7 @@ private:
         return;
       }
     }
+    auto after_wait = std::chrono::steady_clock::now();
 
     geometry_msgs::msg::PoseStamped current_pose;
     if (!costmap_ros_->getRobotPose(current_pose)) {
@@ -204,6 +206,7 @@ private:
       response->is_valid = false;
       return;
     }
+    auto after_get_pose = std::chrono::steady_clock::now();
 
     /**
      * The lethal check starts at the closest point to avoid points that have already been passed
@@ -221,8 +224,19 @@ private:
       return;
     }
 
+    auto before_lock = std::chrono::steady_clock::now();
     std::unique_lock<nav2_costmap_2d::Costmap2D::mutex_t> lock(
       *(costmap_to_check->getMutex()));
+    auto after_lock = std::chrono::steady_clock::now();
+    auto lock_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+      after_lock - before_lock).count();
+    if (lock_ms > 100) {
+      RCLCPP_WARN(
+        logger_,
+        "Costmap lock took %ld ms after waitUntilCurrent - "
+        "updateMap() is likely taking longer than the update period (1/update_frequency)",
+        lock_ms);
+    }
     unsigned int mx = 0;
     unsigned int my = 0;
 
@@ -245,6 +259,7 @@ private:
         costmap_to_check);
     }
 
+    auto before_loop = std::chrono::steady_clock::now();
     unsigned int cost = nav2_costmap_2d::FREE_SPACE;
     for (unsigned int i = closest_point_index; i < request->path.poses.size(); ++i) {
       auto & position = request->path.poses[i].pose.position;
@@ -283,6 +298,22 @@ private:
         }
       }
     }
+    auto after_loop = std::chrono::steady_clock::now();
+
+    auto wait_ms = std::chrono::duration_cast<std::chrono::milliseconds>(after_wait -
+        callback_start).count();
+    auto pose_ms = std::chrono::duration_cast<std::chrono::milliseconds>(after_get_pose -
+        after_wait).count();
+    auto loop_ms = std::chrono::duration_cast<std::chrono::milliseconds>(after_loop -
+        before_loop).count();
+    auto total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(after_loop -
+        callback_start).count();
+    RCLCPP_INFO(
+      logger_,
+      "IsPathValid breakdown: "
+      " wait=%ld ms, getRobotPose=%ld ms, lock=%ld ms, loop=%ld ms (poses=%zu), total=%ld ms",
+      wait_ms, pose_ms, lock_ms, loop_ms, request->path.poses.size() - closest_point_index,
+        total_ms);
   }
 
   nav2::LifecycleNode::WeakPtr node_;
