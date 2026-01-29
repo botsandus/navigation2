@@ -203,6 +203,7 @@ public:
   }
 
 protected:
+  static constexpr unsigned int kCostLutPrecision = 10;
   /**
    * @brief Process updates on footprint changes to the inflation layer
    */
@@ -282,10 +283,11 @@ protected:
 
   double resolution_;
 
-  std::vector<bool> seen_;
+  std::vector<uint8_t> seen_;
 
   std::vector<unsigned char> cached_costs_;
   std::vector<double> cached_distances_;
+  std::vector<unsigned char> cost_lut_;
   std::vector<std::vector<int>> distance_matrix_;
   unsigned int cache_length_;
   double last_min_x_, last_min_y_, last_max_x_, last_max_y_;
