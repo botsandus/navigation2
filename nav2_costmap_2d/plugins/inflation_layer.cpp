@@ -95,6 +95,7 @@ InflationLayer::onInitialize()
   declareParameter("cost_scaling_factor", rclcpp::ParameterValue(10.0));
   declareParameter("inflate_unknown", rclcpp::ParameterValue(false));
   declareParameter("inflate_around_unknown", rclcpp::ParameterValue(false));
+  declareParameter("cost_lut_precision", rclcpp::ParameterValue(10));
 
   {
     auto node = node_.lock();
@@ -106,6 +107,7 @@ InflationLayer::onInitialize()
     node->get_parameter(name_ + "." + "cost_scaling_factor", cost_scaling_factor_);
     node->get_parameter(name_ + "." + "inflate_unknown", inflate_unknown_);
     node->get_parameter(name_ + "." + "inflate_around_unknown", inflate_around_unknown_);
+    node->get_parameter(name_ + "." + "cost_lut_precision", cost_lut_precision_);
 
     dyn_params_handler_ = node->add_on_set_parameters_callback(
       std::bind(
@@ -115,7 +117,6 @@ InflationLayer::onInitialize()
 
   current_ = true;
   need_reinflation_ = false;
-  cell_inflation_radius_ = cellDistance(inflation_radius_);
   matchSize();
 }
 
@@ -238,7 +239,7 @@ InflationLayer::updateCosts(
       const unsigned char old_cost = master_array[index];
       const unsigned int d_scaled = std::min(
         lut_max,
-        static_cast<unsigned int>(distance_cells * kCostLutPrecision + 0.5f));
+        static_cast<unsigned int>(distance_cells * cost_lut_precision_ + 0.5f));
       const unsigned char cost = cost_lut_[d_scaled];
 
       if (old_cost == NO_INFORMATION &&
@@ -264,10 +265,10 @@ InflationLayer::computeCaches()
   }
 
   // Generate cost lookup table for distance -> cost mapping
-  const unsigned int max_dist_scaled = cell_inflation_radius_ * kCostLutPrecision + 1;
+  const unsigned int max_dist_scaled = cell_inflation_radius_ * cost_lut_precision_ + 1;
   cost_lut_.resize(max_dist_scaled + 1);
   for (unsigned int d_scaled = 0; d_scaled <= max_dist_scaled; ++d_scaled) {
-    const double distance = static_cast<double>(d_scaled) / kCostLutPrecision;
+    const double distance = static_cast<double>(d_scaled) / cost_lut_precision_;
     cost_lut_[d_scaled] = computeCost(distance);
   }
 }
@@ -304,6 +305,14 @@ InflationLayer::dynamicParametersCallback(
         getCostScalingFactor() != parameter.as_double())
       {
         cost_scaling_factor_ = parameter.as_double();
+        need_reinflation_ = true;
+        need_cache_recompute = true;
+      }
+    } else if (param_type == ParameterType::PARAMETER_INTEGER) {
+      if (param_name == name_ + "." + "cost_lut_precision" &&
+        cost_lut_precision_ != static_cast<unsigned int>(parameter.as_int()))
+      {
+        cost_lut_precision_ = static_cast<unsigned int>(parameter.as_int());
         need_reinflation_ = true;
         need_cache_recompute = true;
       }

@@ -204,7 +204,6 @@ public:
   }
 
 protected:
-  static constexpr unsigned int kCostLutPrecision = 10;
   /**
    * @brief Process updates on footprint changes to the inflation layer
    */
@@ -233,6 +232,7 @@ protected:
   double inflation_radius_, inscribed_radius_, cost_scaling_factor_;
   bool inflate_unknown_, inflate_around_unknown_;
   unsigned int cell_inflation_radius_;
+  unsigned int cost_lut_precision_;
   double resolution_;
   std::vector<unsigned char> cost_lut_;
   double last_min_x_, last_min_y_, last_max_x_, last_max_y_;
