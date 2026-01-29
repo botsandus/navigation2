@@ -68,9 +68,7 @@ InflationLayer::InflationLayer()
   inflate_unknown_(false),
   inflate_around_unknown_(false),
   cell_inflation_radius_(0),
-  cached_cell_inflation_radius_(0),
   resolution_(0),
-  cache_length_(0),
   last_min_x_(std::numeric_limits<double>::lowest()),
   last_min_y_(std::numeric_limits<double>::lowest()),
   last_max_x_(std::numeric_limits<double>::max()),
@@ -116,9 +114,6 @@ InflationLayer::onInitialize()
   }
 
   current_ = true;
-  seen_.clear();
-  cached_distances_.clear();
-  cached_costs_.clear();
   need_reinflation_ = false;
   cell_inflation_radius_ = cellDistance(inflation_radius_);
   matchSize();
@@ -132,7 +127,6 @@ InflationLayer::matchSize()
   resolution_ = costmap->getResolution();
   cell_inflation_radius_ = cellDistance(inflation_radius_);
   computeCaches();
-  seen_ = std::vector<uint8_t>(costmap->getSizeInCellsX() * costmap->getSizeInCellsY(), 0);
 }
 
 void
@@ -260,38 +254,6 @@ InflationLayer::updateCosts(
   current_ = true;
 }
 
-/**
- * @brief  Given an index of a cell in the costmap, place it into a list pending for obstacle inflation
- * @param  grid The costmap
- * @param  index The index of the cell
- * @param  mx The x coordinate of the cell (can be computed from the index, but saves time to store it)
- * @param  my The y coordinate of the cell (can be computed from the index, but saves time to store it)
- * @param  src_x The x index of the obstacle point inflation started at
- * @param  src_y The y index of the obstacle point inflation started at
- */
-void
-InflationLayer::enqueue(
-  unsigned int index, unsigned int mx, unsigned int my,
-  unsigned int src_x, unsigned int src_y)
-{
-  if (!seen_[index]) {
-    // we compute our distance table one cell further than the
-    // inflation radius dictates so we can make the check below
-    double distance = distanceLookup(mx, my, src_x, src_y);
-
-    // we only want to put the cell in the list if it is within
-    // the inflation radius of the obstacle point
-    if (distance > cell_inflation_radius_) {
-      return;
-    }
-
-    const unsigned int r = cell_inflation_radius_ + 2;
-
-    // push the cell data onto the inflation list and mark
-    const auto dist = distance_matrix_[mx - src_x + r][my - src_y + r];
-    inflation_cells_[dist].emplace_back(mx, my, src_x, src_y);
-  }
-}
 
 void
 InflationLayer::computeCaches()
@@ -301,79 +263,15 @@ InflationLayer::computeCaches()
     return;
   }
 
-  cache_length_ = cell_inflation_radius_ + 2;
-
-  // based on the inflation radius... compute distance and cost caches
-  if (cell_inflation_radius_ != cached_cell_inflation_radius_) {
-    cached_costs_.resize(cache_length_ * cache_length_);
-    cached_distances_.resize(cache_length_ * cache_length_);
-
-    for (unsigned int i = 0; i < cache_length_; ++i) {
-      for (unsigned int j = 0; j < cache_length_; ++j) {
-        cached_distances_[i * cache_length_ + j] = hypot(i, j);
-      }
-    }
-
-    cached_cell_inflation_radius_ = cell_inflation_radius_;
-  }
-
-  for (unsigned int i = 0; i < cache_length_; ++i) {
-    for (unsigned int j = 0; j < cache_length_; ++j) {
-      cached_costs_[i * cache_length_ + j] = computeCost(cached_distances_[i * cache_length_ + j]);
-    }
-  }
-
+  // Generate cost lookup table for distance -> cost mapping
   const unsigned int max_dist_scaled = cell_inflation_radius_ * kCostLutPrecision + 1;
   cost_lut_.resize(max_dist_scaled + 1);
   for (unsigned int d_scaled = 0; d_scaled <= max_dist_scaled; ++d_scaled) {
     const double distance = static_cast<double>(d_scaled) / kCostLutPrecision;
     cost_lut_[d_scaled] = computeCost(distance);
   }
-
-  int max_dist = generateIntegerDistances();
-  inflation_cells_.clear();
-  inflation_cells_.resize(max_dist + 1);
 }
 
-int
-InflationLayer::generateIntegerDistances()
-{
-  const int r = cell_inflation_radius_ + 2;
-  const int size = r * 2 + 1;
-
-  std::vector<std::pair<int, int>> points;
-
-  for (int y = -r; y <= r; y++) {
-    for (int x = -r; x <= r; x++) {
-      if (x * x + y * y <= r * r) {
-        points.emplace_back(x, y);
-      }
-    }
-  }
-
-  std::sort(
-    points.begin(), points.end(),
-    [](const std::pair<int, int> & a, const std::pair<int, int> & b) -> bool {
-      return a.first * a.first + a.second * a.second < b.first * b.first + b.second * b.second;
-    }
-  );
-
-  std::vector<std::vector<int>> distance_matrix(size, std::vector<int>(size, 0));
-  std::pair<int, int> last = {0, 0};
-  int level = 0;
-  for (auto const & p : points) {
-    if (p.first * p.first + p.second * p.second !=
-      last.first * last.first + last.second * last.second)
-    {
-      level++;
-    }
-    distance_matrix[p.first + r][p.second + r] = level;
-    last = p;
-  }
-
-  distance_matrix_ = distance_matrix;
-  return level;
-}
 
 /**
   * @brief Callback executed when a parameter change is detected
