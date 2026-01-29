@@ -310,9 +310,9 @@ InflationLayer::dynamicParametersCallback(
       }
     } else if (param_type == ParameterType::PARAMETER_INTEGER) {
       if (param_name == name_ + "." + "cost_lut_precision" &&
-        cost_lut_precision_ != static_cast<unsigned int>(parameter.as_int()))
+        cost_lut_precision_ != parameter.as_int())
       {
-        cost_lut_precision_ = static_cast<unsigned int>(parameter.as_int());
+        cost_lut_precision_ = parameter.as_int();
         need_reinflation_ = true;
         need_cache_recompute = true;
       }
