@@ -133,6 +133,9 @@ void compareCostmaps(
 
   std::array<size_t, 7> diff_bins{};  // 0:1, 1:2-5, 2:6-10, 3:11-20, 4:21-40, 5:41-80, 6:81+
 
+  // Track cost distributions for different cells
+  std::map<unsigned char, size_t> ref_cost_counts;  // reference cost -> count
+
   for (size_t i = 0; i < total; ++i) {
     const unsigned char cur = current[i];
     const unsigned char ref = reference[i];
@@ -147,6 +150,9 @@ void compareCostmaps(
       min_y = std::min(min_y, y);
       max_x = std::max(max_x, x);
       max_y = std::max(max_y, y);
+
+      // Count reference costs
+      ref_cost_counts[ref]++;
 
       if (ref == nav2_costmap_2d::FREE_SPACE) {
         diff_ref_free++;
@@ -214,6 +220,25 @@ void compareCostmaps(
               << " 41-80=" << diff_bins[5]
               << " 81+=" << diff_bins[6]
               << std::endl;
+
+    // Show distribution of reference costs for different cells
+    std::cout << "  Reference cost distribution (different cells):" << std::endl;
+
+    // Sort by count descending
+    std::vector<std::pair<size_t, unsigned char>> sorted_costs;
+    for (const auto & [cost, count] : ref_cost_counts) {
+      sorted_costs.emplace_back(count, cost);
+    }
+    std::sort(sorted_costs.rbegin(), sorted_costs.rend());
+
+    // Show top 15
+    std::cout << "    ";
+    for (size_t i = 0; i < std::min(size_t{15}, sorted_costs.size()); ++i) {
+      if (i > 0) {std::cout << ", ";}
+      std::cout << "cost_" << static_cast<int>(sorted_costs[i].second)
+                << ":" << sorted_costs[i].first;
+    }
+    std::cout << std::endl;
   }
 
   if (diff_count == 0) {
