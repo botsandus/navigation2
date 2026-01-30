@@ -120,6 +120,71 @@ bool loadCostmapRaw(
   return file.good();
 }
 
+// Save costmap visualization to PNG
+bool saveCostmapVisualization(
+  const nav2_costmap_2d::Costmap2D & costmap,
+  const std::string & path)
+{
+  unsigned int size_x = costmap.getSizeInCellsX();
+  unsigned int size_y = costmap.getSizeInCellsY();
+  const unsigned char * data = costmap.getCharMap();
+
+  // Create colorful visualization of costmap
+  cv::Mat vis(size_y, size_x, CV_8UC3);
+  
+  for (unsigned int y = 0; y < size_y; ++y) {
+    for (unsigned int x = 0; x < size_x; ++x) {
+      size_t idx = y * size_x + x;
+      unsigned char cost = data[idx];
+      
+      cv::Vec3b color;
+      if (cost == nav2_costmap_2d::NO_INFORMATION) {
+        // Unknown: gray
+        color = cv::Vec3b(128, 128, 128);
+      } else if (cost == nav2_costmap_2d::FREE_SPACE) {
+        // Free space: white
+        color = cv::Vec3b(255, 255, 255);
+      } else if (cost == nav2_costmap_2d::LETHAL_OBSTACLE) {
+        // Lethal: black
+        color = cv::Vec3b(0, 0, 0);
+      } else if (cost == nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE) {
+        // Inscribed: dark blue
+        color = cv::Vec3b(139, 0, 0);
+      } else {
+        // Inflated costs: gradient from blue to red
+        // cost ranges from 1 to 252
+        float normalized = (cost - 1) / 251.0f;  // 0.0 to 1.0
+        
+        if (normalized < 0.5f) {
+          // Blue to cyan to green (0.0 - 0.5)
+          float t = normalized * 2.0f;
+          color = cv::Vec3b(
+            static_cast<unsigned char>(255 * t),      // B: 255 -> 0
+            static_cast<unsigned char>(255 * t),      // G: 0 -> 255
+            static_cast<unsigned char>(255 * (1-t))   // R: 0 -> 0
+          );
+        } else {
+          // Green to yellow to red (0.5 - 1.0)
+          float t = (normalized - 0.5f) * 2.0f;
+          color = cv::Vec3b(
+            0,                                         // B: 0
+            static_cast<unsigned char>(255 * (1-t)),  // G: 255 -> 0
+            255                                        // R: 255
+          );
+        }
+      }
+      
+      vis.at<cv::Vec3b>(y, x) = color;
+    }
+  }
+
+  // Flip along horizontal axis for correct orientation
+  cv::Mat vis_flipped;
+  cv::flip(vis, vis_flipped, 0);
+
+  return cv::imwrite(path, vis_flipped);
+}
+
 // Save difference heatmap to PNG overlaid on original map
 bool saveDifferenceHeatmap(
   const nav2_costmap_2d::Costmap2D & costmap,
@@ -411,6 +476,7 @@ void printUsage(const char * prog_name)
   std::cout << "  --inflation <radius>  Inflation radius in meters (default: 2.0)" << std::endl;
   std::cout << "  --scaling <factor>    Cost scaling factor (default: 3.0)" << std::endl;
   std::cout << "  --output <path>       Save inflated costmap PNG" << std::endl;
+  std::cout << "  --visualize <path>    Save colorful costmap visualization PNG" << std::endl;
   std::cout << "  --save-raw <path>     Save raw costmap data for comparison" << std::endl;
   std::cout << "  --compare <path>      Compare against reference raw file" << std::endl;
   std::cout << "  --heatmap <path>      Save difference heatmap PNG (requires --compare)" <<
@@ -428,6 +494,7 @@ int main(int argc, char ** argv)
   double inflation_radius = 2.0;
   double cost_scaling_factor = 3.0;
   std::string output_path;
+  std::string visualize_path;
   std::string save_raw_path;
   std::string compare_path;
   std::string heatmap_path;
@@ -448,6 +515,8 @@ int main(int argc, char ** argv)
       cost_scaling_factor = std::stod(argv[++i]);
     } else if (arg == "--output" && i + 1 < argc) {
       output_path = argv[++i];
+    } else if (arg == "--visualize" && i + 1 < argc) {
+      visualize_path = argv[++i];
     } else if (arg == "--save-raw" && i + 1 < argc) {
       save_raw_path = argv[++i];
     } else if (arg == "--compare" && i + 1 < argc) {
@@ -625,6 +694,13 @@ int main(int argc, char ** argv)
   if (!output_path.empty()) {
     if (saveCostmapToPng(*costmap, output_path)) {
       std::cout << "\nSaved inflated costmap to: " << output_path << std::endl;
+    }
+  }
+
+  // Save visualization if requested
+  if (!visualize_path.empty()) {
+    if (saveCostmapVisualization(*costmap, visualize_path)) {
+      std::cout << "Saved costmap visualization to: " << visualize_path << std::endl;
     }
   }
 
