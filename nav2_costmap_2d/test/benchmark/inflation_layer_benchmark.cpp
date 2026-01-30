@@ -356,14 +356,14 @@ void compareCostmaps(
     std::cout << "  Result: IDENTICAL" << std::endl;
   } else {
     std::cout << "  Result: DIFFERENT" << std::endl;
+  }
 
-    // Save heatmap if path provided
-    if (!heatmap_path.empty()) {
-      if (saveDifferenceHeatmap(costmap, reference, ref_width, ref_height, heatmap_path)) {
-        std::cout << "  Heatmap saved to: " << heatmap_path << std::endl;
-      } else {
-        std::cout << "  Failed to save heatmap" << std::endl;
-      }
+  // Save heatmap if path provided (even if identical)
+  if (!heatmap_path.empty()) {
+    if (saveDifferenceHeatmap(costmap, reference, ref_width, ref_height, heatmap_path)) {
+      std::cout << "  Heatmap saved to: " << heatmap_path << std::endl;
+    } else {
+      std::cout << "  Failed to save heatmap" << std::endl;
     }
   }
 }
