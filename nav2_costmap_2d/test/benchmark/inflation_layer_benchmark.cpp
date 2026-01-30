@@ -19,6 +19,8 @@
 #include <string>
 #include <vector>
 #include <array>
+#include <sys/resource.h>
+#include <unistd.h>
 
 #include "nav2_costmap_2d/cost_values.hpp"
 #include "nav2_costmap_2d/costmap_2d.hpp"
@@ -37,6 +39,26 @@
 namespace
 {
 static constexpr const char * global_frame{"map"};
+
+struct ResourceUsage {
+  double cpu_time_ms;      // CPU time in milliseconds
+  long memory_kb;          // Peak memory usage in KB
+};
+
+// Get current resource usage
+ResourceUsage getResourceUsage() {
+  ResourceUsage usage{0.0, 0};
+  
+  struct rusage ru;
+  if (getrusage(RUSAGE_SELF, &ru) == 0) {
+    // CPU time = user time + system time
+    usage.cpu_time_ms = (ru.ru_utime.tv_sec * 1000.0 + ru.ru_utime.tv_usec / 1000.0) +
+                        (ru.ru_stime.tv_sec * 1000.0 + ru.ru_stime.tv_usec / 1000.0);
+    usage.memory_kb = ru.ru_maxrss;
+  }
+  
+  return usage;
+}
 
 // Save costmap to a PNG file for visualization
 bool saveCostmapToPng(
@@ -539,6 +561,9 @@ int main(int argc, char ** argv)
   // Benchmark
   std::vector<double> times;
   times.reserve(iterations);
+  
+  ResourceUsage usage_before = getResourceUsage();
+  long peak_memory_kb = 0;
 
   std::cout << "Running " << iterations << " iterations..." << std::endl;
 
@@ -551,9 +576,17 @@ int main(int argc, char ** argv)
 
     double ms = std::chrono::duration<double, std::milli>(end - start).count();
     times.push_back(ms);
+    
+    // Track peak memory
+    ResourceUsage current = getResourceUsage();
+    peak_memory_kb = std::max(peak_memory_kb, current.memory_kb);
+    
     std::cout << "  Run " << (i + 1) << ": " << std::fixed << std::setprecision(2) << ms << " ms"
               << std::endl;
   }
+  
+  ResourceUsage usage_after = getResourceUsage();
+  double cpu_time_used = usage_after.cpu_time_ms - usage_before.cpu_time_ms;
 
   // Statistics
   double sum = 0.0, min_time = times[0], max_time = times[0];
@@ -582,6 +615,11 @@ int main(int argc, char ** argv)
   std::cout << "  Max: " << std::fixed << std::setprecision(2) << max_time << " ms" << std::endl;
   std::cout << "  Throughput: " << std::fixed << std::setprecision(2)
             << (width * height / mean / 1000.0) << " M cells/ms" << std::endl;
+  std::cout << "  CPU time: " << std::fixed << std::setprecision(2) << cpu_time_used << " ms"
+            << " (" << std::setprecision(1) << (cpu_time_used / (mean * iterations) * 100.0) << "% of wall time)"
+            << std::endl;
+  std::cout << "  Peak memory: " << std::fixed << std::setprecision(2) << (peak_memory_kb / 1024.0)
+            << " MB" << std::endl;
 
   // Save output if requested
   if (!output_path.empty()) {
