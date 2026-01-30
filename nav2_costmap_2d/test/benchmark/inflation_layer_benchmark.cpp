@@ -97,12 +97,59 @@ bool loadCostmapRaw(
   return file.good();
 }
 
+// Save difference heatmap to PNG
+bool saveDifferenceHeatmap(
+  const nav2_costmap_2d::Costmap2D & costmap,
+  const std::vector<unsigned char> & reference,
+  unsigned int ref_width,
+  unsigned int ref_height,
+  const std::string & path)
+{
+  unsigned int size_x = costmap.getSizeInCellsX();
+  unsigned int size_y = costmap.getSizeInCellsY();
+
+  if (size_x != ref_width || size_y != ref_height) {
+    return false;
+  }
+
+  const unsigned char * current = costmap.getCharMap();
+
+  // Create difference map (absolute differences)
+  cv::Mat diff_map(size_y, size_x, CV_8UC1);
+  unsigned char max_diff = 0;
+
+  for (unsigned int y = 0; y < size_y; ++y) {
+    for (unsigned int x = 0; x < size_x; ++x) {
+      size_t idx = y * size_x + x;
+      unsigned char diff = std::abs(static_cast<int>(current[idx]) -
+          static_cast<int>(reference[idx]));
+      diff_map.at<unsigned char>(y, x) = diff;
+      max_diff = std::max(max_diff, diff);
+    }
+  }
+
+  // Normalize and apply colormap for better visualization
+  cv::Mat diff_normalized;
+  if (max_diff > 0) {
+    // Scale differences to full 0-255 range for better visibility
+    diff_map.convertTo(diff_normalized, CV_8UC1, 255.0 / max_diff);
+  } else {
+    diff_normalized = diff_map;
+  }
+
+  cv::Mat heatmap;
+  cv::applyColorMap(diff_normalized, heatmap, cv::COLORMAP_JET);
+
+  return cv::imwrite(path, heatmap);
+}
+
 // Compare costmap against reference and report differences
 void compareCostmaps(
   const nav2_costmap_2d::Costmap2D & costmap,
   const std::vector<unsigned char> & reference,
   unsigned int ref_width,
-  unsigned int ref_height)
+  unsigned int ref_height,
+  const std::string & heatmap_path = "")
 {
   unsigned int size_x = costmap.getSizeInCellsX();
   unsigned int size_y = costmap.getSizeInCellsY();
@@ -245,6 +292,15 @@ void compareCostmaps(
     std::cout << "  Result: IDENTICAL" << std::endl;
   } else {
     std::cout << "  Result: DIFFERENT" << std::endl;
+
+    // Save heatmap if path provided
+    if (!heatmap_path.empty()) {
+      if (saveDifferenceHeatmap(costmap, reference, ref_width, ref_height, heatmap_path)) {
+        std::cout << "  Heatmap saved to: " << heatmap_path << std::endl;
+      } else {
+        std::cout << "  Failed to save heatmap" << std::endl;
+      }
+    }
   }
 }
 
@@ -288,6 +344,8 @@ void printUsage(const char * prog_name)
   std::cout << "  --output <path>       Save inflated costmap PNG" << std::endl;
   std::cout << "  --save-raw <path>     Save raw costmap data for comparison" << std::endl;
   std::cout << "  --compare <path>      Compare against reference raw file" << std::endl;
+  std::cout << "  --heatmap <path>      Save difference heatmap PNG (requires --compare)" <<
+    std::endl;
   std::cout << "  --iterations <n>      Number of benchmark iterations (default: 10)" << std::endl;
   std::cout << "  --roi-size <cells>    Square ROI size from origin (default: full map)" <<
     std::endl;
@@ -303,6 +361,7 @@ int main(int argc, char ** argv)
   std::string output_path;
   std::string save_raw_path;
   std::string compare_path;
+  std::string heatmap_path;
   int iterations = 10;
   int roi_size = -1;  // Negative means use full map
 
@@ -324,6 +383,8 @@ int main(int argc, char ** argv)
       save_raw_path = argv[++i];
     } else if (arg == "--compare" && i + 1 < argc) {
       compare_path = argv[++i];
+    } else if (arg == "--heatmap" && i + 1 < argc) {
+      heatmap_path = argv[++i];
     } else if (arg == "--iterations" && i + 1 < argc) {
       iterations = std::stoi(argv[++i]);
     } else if (arg == "--roi-size" && i + 1 < argc) {
@@ -494,7 +555,7 @@ int main(int argc, char ** argv)
     std::vector<unsigned char> reference;
     unsigned int ref_width = 0, ref_height = 0;
     if (loadCostmapRaw(compare_path, reference, ref_width, ref_height)) {
-      compareCostmaps(*costmap, reference, ref_width, ref_height);
+      compareCostmaps(*costmap, reference, ref_width, ref_height, heatmap_path);
     } else {
       std::cerr << "Failed to load reference file: " << compare_path << std::endl;
     }
