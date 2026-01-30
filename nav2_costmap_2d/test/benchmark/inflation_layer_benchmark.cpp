@@ -32,6 +32,7 @@
 #include "tf2_ros/buffer.hpp"
 
 #include <opencv2/imgcodecs.hpp>
+#include <opencv2/imgproc.hpp>
 
 namespace
 {
