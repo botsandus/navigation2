@@ -289,12 +289,8 @@ void printUsage(const char * prog_name)
   std::cout << "  --save-raw <path>     Save raw costmap data for comparison" << std::endl;
   std::cout << "  --compare <path>      Compare against reference raw file" << std::endl;
   std::cout << "  --iterations <n>      Number of benchmark iterations (default: 10)" << std::endl;
-  std::cout << "  --roi-percent <pct>   ROI size as percentage of map (e.g., 5 for 5%)" <<
+  std::cout << "  --roi-size <cells>    Square ROI size from origin (default: full map)" <<
     std::endl;
-  std::cout << "  --roi-width <cells>   ROI width in cells" << std::endl;
-  std::cout << "  --roi-height <cells>  ROI height in cells" << std::endl;
-  std::cout << "  --roi-x <cells>       ROI center X coordinate (default: map center)" << std::endl;
-  std::cout << "  --roi-y <cells>       ROI center Y coordinate (default: map center)" << std::endl;
   std::cout << "  --help                Show this help message" << std::endl;
 }
 
@@ -308,11 +304,7 @@ int main(int argc, char ** argv)
   std::string save_raw_path;
   std::string compare_path;
   int iterations = 10;
-  double roi_percent = -1.0;  // Negative means use full map
-  int roi_width = -1;
-  int roi_height = -1;
-  int roi_x = -1;
-  int roi_y = -1;
+  int roi_size = -1;  // Negative means use full map
 
   // Parse arguments
   for (int i = 1; i < argc; ++i) {
@@ -334,16 +326,8 @@ int main(int argc, char ** argv)
       compare_path = argv[++i];
     } else if (arg == "--iterations" && i + 1 < argc) {
       iterations = std::stoi(argv[++i]);
-    } else if (arg == "--roi-percent" && i + 1 < argc) {
-      roi_percent = std::stod(argv[++i]);
-    } else if (arg == "--roi-width" && i + 1 < argc) {
-      roi_width = std::stoi(argv[++i]);
-    } else if (arg == "--roi-height" && i + 1 < argc) {
-      roi_height = std::stoi(argv[++i]);
-    } else if (arg == "--roi-x" && i + 1 < argc) {
-      roi_x = std::stoi(argv[++i]);
-    } else if (arg == "--roi-y" && i + 1 < argc) {
-      roi_y = std::stoi(argv[++i]);
+    } else if (arg == "--roi-size" && i + 1 < argc) {
+      roi_size = std::stoi(argv[++i]);
     } else if (arg == "--help" || arg == "-h") {
       printUsage(argv[0]);
       return 0;
@@ -425,27 +409,10 @@ int main(int argc, char ** argv)
   int roi_max_i = width;
   int roi_max_j = height;
 
-  if (roi_percent > 0.0) {
-    // Calculate ROI size based on percentage
-    double area = width * height * (roi_percent / 100.0);
-    double side = std::sqrt(area);
-    roi_width = static_cast<int>(side);
-    roi_height = static_cast<int>(side);
-  }
-
-  if (roi_width > 0 && roi_height > 0) {
-    // Center ROI in map unless specified
-    if (roi_x < 0) {
-      roi_x = width / 2;
-    }
-    if (roi_y < 0) {
-      roi_y = height / 2;
-    }
-
-    roi_min_i = std::max(0, roi_x - roi_width / 2);
-    roi_min_j = std::max(0, roi_y - roi_height / 2);
-    roi_max_i = std::min(static_cast<int>(width), roi_x + roi_width / 2);
-    roi_max_j = std::min(static_cast<int>(height), roi_y + roi_height / 2);
+  if (roi_size > 0) {
+    // Square ROI from origin
+    roi_max_i = std::min(static_cast<int>(width), roi_size);
+    roi_max_j = std::min(static_cast<int>(height), roi_size);
   }
 
   const int actual_roi_width = roi_max_i - roi_min_i;
@@ -453,10 +420,13 @@ int main(int argc, char ** argv)
   const double actual_roi_percent = (100.0 * actual_roi_width * actual_roi_height) /
     (width * height);
 
-  std::cout << "ROI: [" << roi_min_i << "," << roi_min_j << "] to ["
-            << roi_max_i << "," << roi_max_j << "] ("
-            << actual_roi_width << "x" << actual_roi_height << ", "
-            << std::fixed << std::setprecision(2) << actual_roi_percent << "%)" << std::endl;
+  if (roi_size > 0) {
+    std::cout << "ROI: " << actual_roi_width << "x" << actual_roi_height
+              << " from origin (" << (actual_roi_width * actual_roi_height) << " cells, "
+              << std::fixed << std::setprecision(2) << actual_roi_percent << "%)" << std::endl;
+  } else {
+    std::cout << "ROI: Full map (" << (width * height) << " cells)" << std::endl;
+  }
 
   // Benchmark
   std::vector<double> times;
