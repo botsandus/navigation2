@@ -98,7 +98,7 @@ bool loadCostmapRaw(
   return file.good();
 }
 
-// Save difference heatmap to PNG
+// Save difference heatmap to PNG overlaid on original map
 bool saveDifferenceHeatmap(
   const nav2_costmap_2d::Costmap2D & costmap,
   const std::vector<unsigned char> & reference,
@@ -115,6 +115,18 @@ bool saveDifferenceHeatmap(
 
   const unsigned char * current = costmap.getCharMap();
 
+  // Create base map visualization (grayscale)
+  cv::Mat base_map(size_y, size_x, CV_8UC3);
+  for (unsigned int y = 0; y < size_y; ++y) {
+    for (unsigned int x = 0; x < size_x; ++x) {
+      size_t idx = y * size_x + x;
+      unsigned char cost = current[idx];
+      // Invert for visualization (darker = obstacle, lighter = free)
+      unsigned char gray = 255 - cost;
+      base_map.at<cv::Vec3b>(y, x) = cv::Vec3b(gray, gray, gray);
+    }
+  }
+
   // Create difference map (absolute differences)
   cv::Mat diff_map(size_y, size_x, CV_8UC1);
   unsigned char max_diff = 0;
@@ -129,19 +141,53 @@ bool saveDifferenceHeatmap(
     }
   }
 
-  // Normalize and apply colormap for better visualization
+  // Normalize differences
   cv::Mat diff_normalized;
   if (max_diff > 0) {
-    // Scale differences to full 0-255 range for better visibility
     diff_map.convertTo(diff_normalized, CV_8UC1, 255.0 / max_diff);
   } else {
     diff_normalized = diff_map;
   }
 
-  cv::Mat heatmap;
-  cv::applyColorMap(diff_normalized, heatmap, cv::COLORMAP_JET);
+  // Overlay differences on base map
+  cv::Mat composite = base_map.clone();
+  for (unsigned int y = 0; y < size_y; ++y) {
+    for (unsigned int x = 0; x < size_x; ++x) {
+      unsigned char val = diff_normalized.at<unsigned char>(y, x);
 
-  return cv::imwrite(path, heatmap);
+      if (val > 0) {
+        // Generate heatmap color
+        cv::Vec3b color;
+        if (val < 85) {
+          // White to yellow (0-84)
+          unsigned char t = static_cast<unsigned char>((val / 85.0) * 255);
+          color = cv::Vec3b(255 - t, 255, 255);  // BGR: reduce blue
+        } else if (val < 170) {
+          // Yellow to orange (85-169)
+          unsigned char t = static_cast<unsigned char>(((val - 85) / 85.0) * 255);
+          color = cv::Vec3b(0, 255 - t / 2, 255);  // BGR: reduce green by half
+        } else {
+          // Orange to red (170-255)
+          unsigned char t = static_cast<unsigned char>(((val - 170) / 85.0) * 255);
+          color = cv::Vec3b(0, 165 - t, 255);  // BGR: reduce green to 0
+        }
+
+        // Blend: 70% heatmap color, 30% base map for visibility
+        cv::Vec3b base = base_map.at<cv::Vec3b>(y, x);
+        composite.at<cv::Vec3b>(y, x) = cv::Vec3b(
+          static_cast<unsigned char>(0.7 * color[0] + 0.3 * base[0]),
+          static_cast<unsigned char>(0.7 * color[1] + 0.3 * base[1]),
+          static_cast<unsigned char>(0.7 * color[2] + 0.3 * base[2])
+        );
+      }
+    }
+  }
+
+  // Flip along horizontal axis (vertical flip)
+  cv::Mat composite_flipped;
+  cv::flip(composite, composite_flipped, 0);
+
+  return cv::imwrite(path, composite_flipped);
 }
 
 // Compare costmap against reference and report differences
