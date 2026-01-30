@@ -68,7 +68,7 @@ InflationLayer::InflationLayer()
   inflate_unknown_(false),
   inflate_around_unknown_(false),
   cell_inflation_radius_(0),
-  cost_lut_precision_(100),
+  cost_lut_precision_(10),
   resolution_(0),
   last_min_x_(std::numeric_limits<double>::lowest()),
   last_min_y_(std::numeric_limits<double>::lowest()),
@@ -96,7 +96,7 @@ InflationLayer::onInitialize()
   declareParameter("cost_scaling_factor", rclcpp::ParameterValue(10.0));
   declareParameter("inflate_unknown", rclcpp::ParameterValue(false));
   declareParameter("inflate_around_unknown", rclcpp::ParameterValue(false));
-  declareParameter("cost_lut_precision", rclcpp::ParameterValue(100));
+  declareParameter("cost_lut_precision", rclcpp::ParameterValue(10));
 
   {
     auto node = node_.lock();
