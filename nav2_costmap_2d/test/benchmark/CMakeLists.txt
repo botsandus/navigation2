@@ -16,5 +16,6 @@ target_link_libraries(inflation_layer_benchmark
   rclcpp::rclcpp
   tf2_ros::tf2_ros
   rosbag2_cpp::rosbag2_cpp
-  ${OpenCV_LIBS}
+  opencv_core
+  opencv_imgcodecs
 )
