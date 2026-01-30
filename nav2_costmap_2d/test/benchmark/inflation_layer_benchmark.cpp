@@ -289,6 +289,12 @@ void printUsage(const char * prog_name)
   std::cout << "  --save-raw <path>     Save raw costmap data for comparison" << std::endl;
   std::cout << "  --compare <path>      Compare against reference raw file" << std::endl;
   std::cout << "  --iterations <n>      Number of benchmark iterations (default: 10)" << std::endl;
+  std::cout << "  --roi-percent <pct>   ROI size as percentage of map (e.g., 5 for 5%)" <<
+    std::endl;
+  std::cout << "  --roi-width <cells>   ROI width in cells" << std::endl;
+  std::cout << "  --roi-height <cells>  ROI height in cells" << std::endl;
+  std::cout << "  --roi-x <cells>       ROI center X coordinate (default: map center)" << std::endl;
+  std::cout << "  --roi-y <cells>       ROI center Y coordinate (default: map center)" << std::endl;
   std::cout << "  --help                Show this help message" << std::endl;
 }
 
@@ -302,6 +308,11 @@ int main(int argc, char ** argv)
   std::string save_raw_path;
   std::string compare_path;
   int iterations = 10;
+  double roi_percent = -1.0;  // Negative means use full map
+  int roi_width = -1;
+  int roi_height = -1;
+  int roi_x = -1;
+  int roi_y = -1;
 
   // Parse arguments
   for (int i = 1; i < argc; ++i) {
@@ -323,6 +334,16 @@ int main(int argc, char ** argv)
       compare_path = argv[++i];
     } else if (arg == "--iterations" && i + 1 < argc) {
       iterations = std::stoi(argv[++i]);
+    } else if (arg == "--roi-percent" && i + 1 < argc) {
+      roi_percent = std::stod(argv[++i]);
+    } else if (arg == "--roi-width" && i + 1 < argc) {
+      roi_width = std::stoi(argv[++i]);
+    } else if (arg == "--roi-height" && i + 1 < argc) {
+      roi_height = std::stoi(argv[++i]);
+    } else if (arg == "--roi-x" && i + 1 < argc) {
+      roi_x = std::stoi(argv[++i]);
+    } else if (arg == "--roi-y" && i + 1 < argc) {
+      roi_y = std::stoi(argv[++i]);
     } else if (arg == "--help" || arg == "-h") {
       printUsage(argv[0]);
       return 0;
@@ -398,6 +419,45 @@ int main(int argc, char ** argv)
   ilayer->initialize(&layers, "inflation", tf_buffer.get(), node, nullptr);
   layers.addPlugin(std::shared_ptr<nav2_costmap_2d::Layer>(ilayer));
 
+  // Compute ROI bounds
+  int roi_min_i = 0;
+  int roi_min_j = 0;
+  int roi_max_i = width;
+  int roi_max_j = height;
+
+  if (roi_percent > 0.0) {
+    // Calculate ROI size based on percentage
+    double area = width * height * (roi_percent / 100.0);
+    double side = std::sqrt(area);
+    roi_width = static_cast<int>(side);
+    roi_height = static_cast<int>(side);
+  }
+
+  if (roi_width > 0 && roi_height > 0) {
+    // Center ROI in map unless specified
+    if (roi_x < 0) {
+      roi_x = width / 2;
+    }
+    if (roi_y < 0) {
+      roi_y = height / 2;
+    }
+
+    roi_min_i = std::max(0, roi_x - roi_width / 2);
+    roi_min_j = std::max(0, roi_y - roi_height / 2);
+    roi_max_i = std::min(static_cast<int>(width), roi_x + roi_width / 2);
+    roi_max_j = std::min(static_cast<int>(height), roi_y + roi_height / 2);
+  }
+
+  const int actual_roi_width = roi_max_i - roi_min_i;
+  const int actual_roi_height = roi_max_j - roi_min_j;
+  const double actual_roi_percent = (100.0 * actual_roi_width * actual_roi_height) /
+    (width * height);
+
+  std::cout << "ROI: [" << roi_min_i << "," << roi_min_j << "] to ["
+            << roi_max_i << "," << roi_max_j << "] ("
+            << actual_roi_width << "x" << actual_roi_height << ", "
+            << std::fixed << std::setprecision(2) << actual_roi_percent << "%)" << std::endl;
+
   // Benchmark
   std::vector<double> times;
   times.reserve(iterations);
@@ -408,7 +468,7 @@ int main(int argc, char ** argv)
     std::copy(map_data.begin(), map_data.end(), costmap_data);
 
     auto start = std::chrono::high_resolution_clock::now();
-    ilayer->updateCosts(*costmap, 0, 0, width, height);
+    ilayer->updateCosts(*costmap, roi_min_i, roi_min_j, roi_max_i, roi_max_j);
     auto end = std::chrono::high_resolution_clock::now();
 
     double ms = std::chrono::duration<double, std::milli>(end - start).count();
@@ -435,6 +495,9 @@ int main(int argc, char ** argv)
   std::cout << "\n=== Results ===" << std::endl;
   std::cout << "  Map size: " << width << " x " << height << " (" << (width * height) << " cells)"
             << std::endl;
+  std::cout << "  ROI size: " << actual_roi_width << " x " << actual_roi_height
+            << " (" << (actual_roi_width * actual_roi_height) << " cells, "
+            << std::fixed << std::setprecision(2) << actual_roi_percent << "%)" << std::endl;
   std::cout << "  Mean: " << std::fixed << std::setprecision(2) << mean << " ms" << std::endl;
   std::cout << "  Std dev: " << std::fixed << std::setprecision(2) << stddev << " ms" << std::endl;
   std::cout << "  Min: " << std::fixed << std::setprecision(2) << min_time << " ms" << std::endl;
