@@ -237,17 +237,6 @@ InflationLayer::updateCosts(
   }
 
   cv::distanceTransform(mask, distance_map, cv::DIST_L2, cv::DIST_MASK_PRECISE);
-
-    // Bin distances to discrete levels to eliminate directional bias artifacts
-  // Round to nearest 0.5 cells so geometrically equidistant cells get same value
-  for (int j = 0; j < distance_map.rows; ++j) {
-    float * dist_row = distance_map.ptr<float>(j);
-    for (int i = 0; i < distance_map.cols; ++i) {
-      // Round to nearest 0.5: floor(d * 2 + 0.5) / 2
-      dist_row[i] = std::floor(dist_row[i] * 2.0f + 0.5f) / 2.0f;
-    }
-  }
-
   const float cell_inflation_radius_f = static_cast<float>(cell_inflation_radius_);
   const unsigned int lut_max = static_cast<unsigned int>(cost_lut_.size() - 1);
 
