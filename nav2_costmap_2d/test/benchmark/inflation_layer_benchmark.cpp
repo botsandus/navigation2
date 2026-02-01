@@ -587,15 +587,6 @@ int main(int argc, char ** argv)
   nav2_costmap_2d::LayeredCostmap layers(global_frame, false, false);
   layers.resizeMap(width, height, resolution, 0.0, 0.0);
 
-  // Set rectangular footprint (1.45m x 1.05m)
-  std::vector<geometry_msgs::msg::Point> footprint;
-  geometry_msgs::msg::Point pt;
-  pt.x =  0.725; pt.y =  0.525; pt.z = 0.0; footprint.push_back(pt);
-  pt.x =  0.725; pt.y = -0.525; pt.z = 0.0; footprint.push_back(pt);
-  pt.x = -0.725; pt.y = -0.525; pt.z = 0.0; footprint.push_back(pt);
-  pt.x = -0.725; pt.y =  0.525; pt.z = 0.0; footprint.push_back(pt);
-  layers.setFootprint(footprint);
-
   // Copy map data
   nav2_costmap_2d::Costmap2D * costmap = layers.getCostmap();
   unsigned char * costmap_data = costmap->getCharMap();
@@ -606,7 +597,16 @@ int main(int argc, char ** argv)
   ilayer->initialize(&layers, "inflation", tf_buffer.get(), node, nullptr);
   layers.addPlugin(std::shared_ptr<nav2_costmap_2d::Layer>(ilayer));
 
-  // Compute ROI bounds
+  // Set rectangular footprint (1.45m x 1.05m) AFTER adding the plugin
+  std::vector<geometry_msgs::msg::Point> footprint;
+  geometry_msgs::msg::Point pt;
+  pt.x =  0.725; pt.y =  0.525; pt.z = 0.0; footprint.push_back(pt);
+  pt.x =  0.725; pt.y = -0.525; pt.z = 0.0; footprint.push_back(pt);
+  pt.x = -0.725; pt.y = -0.525; pt.z = 0.0; footprint.push_back(pt);
+  pt.x = -0.725; pt.y =  0.525; pt.z = 0.0; footprint.push_back(pt);
+  layers.setFootprint(footprint);
+
+  // 0Compute ROI bounds
   int roi_min_i = 0;
   int roi_min_j = 0;
   int roi_max_i = width;
