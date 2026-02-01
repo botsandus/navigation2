@@ -27,6 +27,8 @@ find_package(nav2_ros_common REQUIRED)
 find_package(tf2_sensor_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(point_cloud_transport REQUIRED)
+# Force OpenCV 4.13+ from /usr/local to avoid system version
+set(OpenCV_DIR "/usr/local/lib/cmake/opencv4" CACHE PATH "Path to OpenCV config")
 find_package(OpenCV REQUIRED)
 
 nav2_package()
