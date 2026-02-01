@@ -236,7 +236,7 @@ InflationLayer::updateCosts(
     cv::compare(processing_region, LETHAL_OBSTACLE, mask, cv::CMP_NE);
   }
 
-  cv::distanceTransform(mask, distance_map, cv::DIST_L2, cv::DIST_MASK_5);
+  cv::distanceTransform(mask, distance_map, cv::DIST_L2, cv::DIST_MASK_PRECISE);
   const float cell_inflation_radius_f = static_cast<float>(cell_inflation_radius_);
   const unsigned int lut_max = static_cast<unsigned int>(cost_lut_.size() - 1);
 
