@@ -27,6 +27,8 @@
 #include "rclcpp/parameter_events_filter.hpp"
 
 #include <opencv2/imgproc.hpp>
+#include <opencv2/core.hpp>
+#include <opencv2/core/ocl.hpp>
 
 PLUGINLIB_EXPORT_CLASS(nav2_costmap_2d::OpenCVInflationLayer, nav2_costmap_2d::Layer)
 
@@ -96,6 +98,25 @@ OpenCVInflationLayer::onInitialize()
   current_ = true;
   need_reinflation_ = false;
   matchSize();
+
+  // Log OpenCV version and hardware optimization info
+  RCLCPP_INFO(
+    logger_,
+    "OpenCV version: %s", CV_VERSION);
+  RCLCPP_INFO(
+    logger_,
+    "OpenCV hardware optimizations: CPU=%s, OpenCL=%s, OpenCL_SVM=%s",
+    cv::useOptimized() ? "enabled" : "disabled",
+    cv::ocl::haveOpenCL() ? "available" : "not available",
+    cv::ocl::haveSVM() ? "available" : "not available");
+  if (cv::ocl::haveOpenCL()) {
+    cv::ocl::Device device = cv::ocl::Device::getDefault();
+    if (!device.empty()) {
+      RCLCPP_INFO(
+        logger_,
+        "OpenCL device: %s (%s)", device.name().c_str(), device.vendorName().c_str());
+    }
+  }
 }
 
 void
