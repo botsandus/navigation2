@@ -109,6 +109,9 @@ OpenCVInflationLayer::onInitialize()
     cv::useOptimized() ? "enabled" : "disabled",
     cv::ocl::haveOpenCL() ? "available" : "not available",
     cv::ocl::haveSVM() ? "available" : "not available");
+  RCLCPP_INFO(
+    logger_,
+    "OpenCV parallel threads: %d", cv::getNumThreads());
   if (cv::ocl::haveOpenCL()) {
     cv::ocl::Device device = cv::ocl::Device::getDefault();
     if (!device.empty()) {
@@ -237,33 +240,38 @@ OpenCVInflationLayer::updateCosts(
   cv::distanceTransform(mask, distance_map, cv::DIST_L2, cv::DIST_MASK_PRECISE);
   const float cell_inflation_radius_f = static_cast<float>(cell_inflation_radius_);
   const unsigned int lut_max = static_cast<unsigned int>(cost_lut_.size() - 1);
+  const unsigned char * lut_data = cost_lut_.data();
+  const int lut_precision = cost_lut_precision_;
+  const bool inflate_unk = inflate_unknown_;
 
-  for (int j = min_j; j < max_j; ++j) {
-    const float * dist_row = distance_map.ptr<float>(j - roi_min_j);
-    const int row_offset = j * size_x;
+  cv::parallel_for_(cv::Range(min_j, max_j), [&](const cv::Range & range) {
+    for (int j = range.start; j < range.end; ++j) {
+      const float * dist_row = distance_map.ptr<float>(j - roi_min_j);
+      const int row_offset = j * size_x;
 
-    for (int i = min_i; i < max_i; ++i) {
-      const float distance_cells = dist_row[i - roi_min_i];
-      if (distance_cells > cell_inflation_radius_f) {
-        continue;
-      }
+      for (int i = min_i; i < max_i; ++i) {
+        const float distance_cells = dist_row[i - roi_min_i];
+        if (distance_cells > cell_inflation_radius_f) {
+          continue;
+        }
 
-      const unsigned int index = row_offset + i;
-      const unsigned char old_cost = master_array[index];
-      const unsigned int d_scaled = std::min(
-        lut_max,
-        static_cast<unsigned int>(distance_cells * cost_lut_precision_ + 0.5f));
-      const unsigned char cost = cost_lut_[d_scaled];
+        const unsigned int index = row_offset + i;
+        const unsigned char old_cost = master_array[index];
+        const unsigned int d_scaled = std::min(
+          lut_max,
+          static_cast<unsigned int>(distance_cells * lut_precision + 0.5f));
+        const unsigned char cost = lut_data[d_scaled];
 
-      if (old_cost == NO_INFORMATION &&
-        (inflate_unknown_ ? (cost > FREE_SPACE) : (cost >= INSCRIBED_INFLATED_OBSTACLE)))
-      {
-        master_array[index] = cost;
-      } else {
-        master_array[index] = std::max(old_cost, cost);
+        if (old_cost == NO_INFORMATION &&
+          (inflate_unk ? (cost > FREE_SPACE) : (cost >= INSCRIBED_INFLATED_OBSTACLE)))
+        {
+          master_array[index] = cost;
+        } else {
+          master_array[index] = std::max(old_cost, cost);
+        }
       }
     }
-  }
+  });
 
   current_ = true;
 }
