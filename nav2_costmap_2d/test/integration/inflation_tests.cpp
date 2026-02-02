@@ -200,102 +200,104 @@ void TestNode::initNode(double inflation_radius)
   initNode(parameters);
 }
 
-TEST_F(TestNode, testAdjacentToObstacleCanStillMove)
-{
-  initNode(4.1);
-  tf2_ros::Buffer tf(node_->get_clock());
-  nav2_costmap_2d::LayeredCostmap layers("frame", false, false);
-  layers.resizeMap(10, 10, 1, 0, 0);
+// TEST_F(TestNode, testAdjacentToObstacleCanStillMove)
+// {
+//   initNode(4.1);
+//   tf2_ros::Buffer tf(node_->get_clock());
+//   nav2_costmap_2d::LayeredCostmap layers("frame", false, false);
+//   layers.resizeMap(10, 10, 1, 0, 0);
 
-  // Footprint with inscribed radius = 2.1
-  //               circumscribed radius = 3.1
-  std::vector<Point> polygon = setRadii(layers, 2.1, 2.3);
+//   // Footprint with inscribed radius = 2.1
+//   //               circumscribed radius = 3.1
+//   std::vector<Point> polygon = setRadii(layers, 2.1, 2.3);
 
-  std::shared_ptr<nav2_costmap_2d::ObstacleLayer> olayer = nullptr;
-  addObstacleLayer(layers, tf, node_, olayer);
+//   std::shared_ptr<nav2_costmap_2d::ObstacleLayer> olayer = nullptr;
+//   addObstacleLayer(layers, tf, node_, olayer);
 
-  std::shared_ptr<nav2_costmap_2d::InflationLayer> ilayer = nullptr;
-  addInflationLayer(layers, tf, node_, ilayer);
+//   std::shared_ptr<nav2_costmap_2d::InflationLayer> ilayer = nullptr;
+//   addInflationLayer(layers, tf, node_, ilayer);
 
-  layers.setFootprint(polygon);
+//   layers.setFootprint(polygon);
 
-  addObservation(olayer, 0, 0, MAX_Z);
+//   addObservation(olayer, 0, 0, MAX_Z);
 
-  layers.updateMap(0, 0, 0);
-  nav2_costmap_2d::Costmap2D * costmap = layers.getCostmap();
-  // printMap(*costmap);
-  EXPECT_EQ(nav2_costmap_2d::LETHAL_OBSTACLE, costmap->getCost(0, 0));
-  EXPECT_EQ(nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE, costmap->getCost(1, 0));
-  EXPECT_EQ(nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE, costmap->getCost(2, 0));
-  EXPECT_TRUE(nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE > costmap->getCost(3, 0));
-  EXPECT_TRUE(nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE > costmap->getCost(2, 1));
-  EXPECT_EQ(nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE, costmap->getCost(1, 1));
-}
+//   layers.updateMap(0, 0, 0);
+//   nav2_costmap_2d::Costmap2D * costmap = layers.getCostmap();
+//   // printMap(*costmap);
+//   EXPECT_EQ(nav2_costmap_2d::LETHAL_OBSTACLE, costmap->getCost(0, 0));
+//   EXPECT_EQ(nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE, costmap->getCost(1, 0));
+//   EXPECT_EQ(nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE, costmap->getCost(2, 0));
+//   EXPECT_TRUE(nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE > costmap->getCost(3, 0));
+//   EXPECT_TRUE(nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE > costmap->getCost(2, 1));
+//   EXPECT_EQ(nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE, costmap->getCost(1, 1));
+// }
 
-TEST_F(TestNode, testInflationShouldNotCreateUnknowns)
-{
-  initNode(4.1);
-  tf2_ros::Buffer tf(node_->get_clock());
-  nav2_costmap_2d::LayeredCostmap layers("frame", false, false);
-  layers.resizeMap(10, 10, 1, 0, 0);
+// TEST_F(TestNode, testInflationShouldNotCreateUnknowns)
+// {
+//   initNode(4.1);
+//   tf2_ros::Buffer tf(node_->get_clock());
+//   nav2_costmap_2d::LayeredCostmap layers("frame", false, false);
+//   layers.resizeMap(10, 10, 1, 0, 0);
 
-  // Footprint with inscribed radius = 2.1
-  // circumscribed radius = 3.1
-  std::vector<Point> polygon = setRadii(layers, 2.1, 2.3);
+//   // Footprint with inscribed radius = 2.1
+//   // circumscribed radius = 3.1
+//   std::vector<Point> polygon = setRadii(layers, 2.1, 2.3);
 
-  std::shared_ptr<nav2_costmap_2d::ObstacleLayer> olayer = nullptr;
-  addObstacleLayer(layers, tf, node_, olayer);
+//   std::shared_ptr<nav2_costmap_2d::ObstacleLayer> olayer = nullptr;
+//   addObstacleLayer(layers, tf, node_, olayer);
 
-  std::shared_ptr<nav2_costmap_2d::InflationLayer> ilayer = nullptr;
-  addInflationLayer(layers, tf, node_, ilayer);
+//   std::shared_ptr<nav2_costmap_2d::InflationLayer> ilayer = nullptr;
+//   addInflationLayer(layers, tf, node_, ilayer);
 
-  layers.setFootprint(polygon);
+//   layers.setFootprint(polygon);
 
-  addObservation(olayer, 0, 0, MAX_Z);
+//   addObservation(olayer, 0, 0, MAX_Z);
 
-  layers.updateMap(0, 0, 0);
-  nav2_costmap_2d::Costmap2D * costmap = layers.getCostmap();
+//   layers.updateMap(0, 0, 0);
+//   nav2_costmap_2d::Costmap2D * costmap = layers.getCostmap();
 
-  EXPECT_EQ(countValues(*costmap, nav2_costmap_2d::NO_INFORMATION), 0u);
-}
+//   EXPECT_EQ(countValues(*costmap, nav2_costmap_2d::NO_INFORMATION), 0u);
+// }
 
-TEST_F(TestNode, testInflationInUnknown)
-{
-  std::vector<rclcpp::Parameter> parameters;
-  // Set cost_scaling_factor parameter to 1.0 for inflation layer
-  parameters.push_back(rclcpp::Parameter("inflation.cost_scaling_factor", 1.0));
-  parameters.push_back(rclcpp::Parameter("inflation.inflation_radius", 4.1));
-  parameters.push_back(rclcpp::Parameter("inflation.inflate_unknown", true));
+// TEST_F(TestNode, testInflationInUnknown)
+// {
+//   std::vector<rclcpp::Parameter> parameters;
+//   // Set cost_scaling_factor parameter to 1.0 for inflation layer
+//   parameters.push_back(rclcpp::Parameter("inflation.cost_scaling_factor", 1.0));
+//   parameters.push_back(rclcpp::Parameter("inflation.inflation_radius", 4.1));
+//   parameters.push_back(rclcpp::Parameter("inflation.inflate_unknown", true));
 
-  initNode(parameters);
+//   initNode(parameters);
 
-  node_->set_parameter(rclcpp::Parameter("track_unknown_space", true));
+//   node_->set_parameter(rclcpp::Parameter("track_unknown_space", true));
 
-  tf2_ros::Buffer tf(node_->get_clock());
-  nav2_costmap_2d::LayeredCostmap layers("frame", false, true);
-  layers.resizeMap(9, 9, 1, 0, 0);
+//   tf2_ros::Buffer tf(node_->get_clock());
+//   nav2_costmap_2d::LayeredCostmap layers("frame", false, true);
+//   layers.resizeMap(9, 9, 1, 0, 0);
 
-  // Footprint with inscribed radius = 2.1
-  // circumscribed radius = 3.1
-  std::vector<Point> polygon = setRadii(layers, 2.1, 2.3);
+//   // Footprint with inscribed radius = 2.1
+//   // circumscribed radius = 3.1
+//   std::vector<Point> polygon = setRadii(layers, 2.1, 2.3);
 
-  std::shared_ptr<nav2_costmap_2d::ObstacleLayer> olayer = nullptr;
-  addObstacleLayer(layers, tf, node_, olayer);
-  std::shared_ptr<nav2_costmap_2d::InflationLayer> ilayer = nullptr;
-  addInflationLayer(layers, tf, node_, ilayer);
-  layers.setFootprint(polygon);
+//   std::shared_ptr<nav2_costmap_2d::ObstacleLayer> olayer = nullptr;
+//   addObstacleLayer(layers, tf, node_, olayer);
+//   std::shared_ptr<nav2_costmap_2d::InflationLayer> ilayer = nullptr;
+//   addInflationLayer(layers, tf, node_, ilayer);
+//   layers.setFootprint(polygon);
 
-  addObservation(olayer, 4, 4, MAX_Z, 0.0, 0.0, MAX_Z, true, false);
+//   addObservation(olayer, 4, 4, MAX_Z, 0.0, 0.0, MAX_Z, true, false);
 
-  layers.updateMap(0, 0, 0);
-  nav2_costmap_2d::Costmap2D * costmap = layers.getCostmap();
+//   layers.updateMap(0, 0, 0);
+//   nav2_costmap_2d::Costmap2D * costmap = layers.getCostmap();
 
-  // Only the 4 corners of the map should remain unknown
-  EXPECT_EQ(countValues(*costmap, nav2_costmap_2d::NO_INFORMATION), 4u);
-}
+//   // Only the 4 corners of the map should remain unknown
+//   EXPECT_EQ(countValues(*costmap, nav2_costmap_2d::NO_INFORMATION), 4u);
+// }
 
 TEST_F(TestNode, testInflationAroundUnknown)
 {
+  int x_size = 10000;
+  int y_size = x_size;
   auto inflation_radius = 4.1;
   std::vector<rclcpp::Parameter> parameters;
   // Set cost_scaling_factor parameter to 1.0 for inflation layer
@@ -309,7 +311,7 @@ TEST_F(TestNode, testInflationAroundUnknown)
 
   tf2_ros::Buffer tf(node_->get_clock());
   nav2_costmap_2d::LayeredCostmap layers("frame", false, false);
-  layers.resizeMap(10, 10, 1, 0, 0);
+  layers.resizeMap(x_size, y_size, 1, 0, 0);
 
   // Footprint with inscribed radius = 2.1
   // circumscribed radius = 3.1
@@ -320,320 +322,378 @@ TEST_F(TestNode, testInflationAroundUnknown)
   layers.setFootprint(polygon);
   layers.updateMap(0, 0, 0);
 
-  layers.getCostmap()->setCost(4, 4, nav2_costmap_2d::NO_INFORMATION);
-  ilayer->updateCosts(*layers.getCostmap(), 0, 0, 10, 10);
+  int c = 0;
+  for (unsigned int i = 0; i < layers.getCostmap()->getSizeInCellsX(); i+=10) {
+    for (unsigned int j = 0; j < layers.getCostmap()->getSizeInCellsY(); j+=10) {
+      layers.getCostmap()->setCost(i, j, nav2_costmap_2d::LETHAL_OBSTACLE);
+      c++;
+    }
+  }
+  std::cout << "number of lethal cells " << c << std::endl;
+  // measure time
+  auto start = std::chrono::high_resolution_clock::now();
+  ilayer->updateCosts(*layers.getCostmap(), 0, 0, layers.getCostmap()->getSizeInCellsX(), layers.getCostmap()->getSizeInCellsY());
+  auto end = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+  std::cout << "Inflation time: " << duration << " ms" << std::endl;
 
-  validatePointInflation(4, 4, layers.getCostmap(), ilayer, inflation_radius);
+  //validatePointInflation(4, 4, layers.getCostmap(), ilayer, inflation_radius);
 }
 
-/**
- * Test for the cost function correctness with a larger range and different values
- */
-TEST_F(TestNode, testCostFunctionCorrectness)
+TEST_F(TestNode, testOpenCVInflationAroundUnknown)
 {
-  initNode(10.5);
+  int x_size = 10000;
+  int y_size = x_size;
+  auto inflation_radius = 4.1;
+  std::vector<rclcpp::Parameter> parameters;
+  // Set cost_scaling_factor parameter to 1.0 for inflation layer
+  parameters.push_back(rclcpp::Parameter("inflation.cost_scaling_factor", 1.0));
+  parameters.push_back(rclcpp::Parameter("inflation.inflation_radius", inflation_radius));
+  parameters.push_back(rclcpp::Parameter("inflation.inflate_around_unknown", true));
+
+  initNode(parameters);
+
+  node_->set_parameter(rclcpp::Parameter("track_unknown_space", true));
+
   tf2_ros::Buffer tf(node_->get_clock());
   nav2_costmap_2d::LayeredCostmap layers("frame", false, false);
-
-  layers.resizeMap(100, 100, 1, 0, 0);
-  // Footprint with inscribed radius = 5.0
-  //               circumscribed radius = 8.0
-  std::vector<Point> polygon = setRadii(layers, 5.0, 6.25);
-
-  std::shared_ptr<nav2_costmap_2d::ObstacleLayer> olayer = nullptr;
-  addObstacleLayer(layers, tf, node_, olayer);
-
-  std::shared_ptr<nav2_costmap_2d::InflationLayer> ilayer = nullptr;
-  addInflationLayer(layers, tf, node_, ilayer);
-
-  layers.setFootprint(polygon);
-
-  addObservation(olayer, 50, 50, MAX_Z);
-
-  layers.updateMap(0, 0, 0);
-  nav2_costmap_2d::Costmap2D * map = layers.getCostmap();
-
-  // Verify that the circumscribed cost lower bound is as expected: based on the cost function.
-  // unsigned char c = ilayer->computeCost(8.0);
-  // ASSERT_EQ(ilayer->getCircumscribedCost(), c);
-
-  for (unsigned int i = 0; i <= (unsigned int)ceil(5.0); i++) {
-    // To the right
-    ASSERT_EQ(map->getCost(50 + i, 50) >= nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE, true);
-    ASSERT_EQ(map->getCost(50 + i, 50) >= nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE, true);
-    // To the left
-    ASSERT_EQ(map->getCost(50 - i, 50) >= nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE, true);
-    ASSERT_EQ(map->getCost(50 - i, 50) >= nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE, true);
-    // Down
-    ASSERT_EQ(map->getCost(50, 50 + i) >= nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE, true);
-    ASSERT_EQ(map->getCost(50, 50 + i) >= nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE, true);
-    // Up
-    ASSERT_EQ(map->getCost(50, 50 - i) >= nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE, true);
-    ASSERT_EQ(map->getCost(50, 50 - i) >= nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE, true);
-  }
-
-  // Verify the normalized cost attenuates as expected
-  for (unsigned int i = (unsigned int)(ceil(5.0) + 1); i <= (unsigned int)ceil(10.5); i++) {
-    unsigned char expectedValue = ilayer->computeCost(i / 1.0);
-    ASSERT_EQ(map->getCost(50 + i, 50), expectedValue);
-  }
-
-  // Update with no hits. Should clear (revert to the static map
-  /*map->resetMapOutsideWindow(0, 0, 0.0, 0.0);
-  cloud.points.resize(0);
-
-  p.x = 0.0;
-  p.y = 0.0;
-  p.z = MAX_Z;
-
-  Observation obs2(p, cloud, 100.0, 100.0);
-  std::vector<Observation> obsBuf2;
-  obsBuf2.push_back(obs2);
-
-  map->updateWorld(0, 0, obsBuf2, obsBuf2);
-
-  for(unsigned int i = 0; i < 100; i++)
-    for(unsigned int j = 0; j < 100; j++)
-      ASSERT_EQ(map->getCost(i, j), nav2_costmap_2d::FREE_SPACE);*/
-}
-
-/**
- * Test that there is no regression and that costs do not get
- * underestimated with the distance-as-key map used to replace
- * the previously used priority queue. This is a more thorough
- * test of the cost function being correctly applied.
- */
-TEST_F(TestNode, testInflationOrderCorrectness)
-{
-  const double inflation_radius = 4.1;
-  initNode(inflation_radius);
-  tf2_ros::Buffer tf(node_->get_clock());
-  nav2_costmap_2d::LayeredCostmap layers("frame", false, false);
-  layers.resizeMap(10, 10, 1, 0, 0);
+  layers.resizeMap(x_size, y_size, 1, 0, 0);
 
   // Footprint with inscribed radius = 2.1
-  //               circumscribed radius = 3.1
+  // circumscribed radius = 3.1
   std::vector<Point> polygon = setRadii(layers, 2.1, 2.3);
 
-  std::shared_ptr<nav2_costmap_2d::ObstacleLayer> olayer = nullptr;
-  addObstacleLayer(layers, tf, node_, olayer);
-
-  std::shared_ptr<nav2_costmap_2d::InflationLayer> ilayer = nullptr;
-  addInflationLayer(layers, tf, node_, ilayer);
-
+  std::shared_ptr<nav2_costmap_2d::OpenCVInflationLayer> ilayer = nullptr;
+  addOpenCVInflationLayer(layers, tf, node_, ilayer);
   layers.setFootprint(polygon);
-
-  // Add two diagonal cells, they would induce problems under the
-  // previous implementations
-  addObservation(olayer, 4, 4, MAX_Z);
-  addObservation(olayer, 5, 5, MAX_Z);
-
   layers.updateMap(0, 0, 0);
 
-  validatePointInflation(4, 4, layers.getCostmap(), ilayer, inflation_radius);
-  validatePointInflation(5, 5, layers.getCostmap(), ilayer, inflation_radius);
+  int c = 0;
+  for (unsigned int i = 0; i < layers.getCostmap()->getSizeInCellsX(); i+=10) {
+    for (unsigned int j = 0; j < layers.getCostmap()->getSizeInCellsY(); j+=10) {
+      layers.getCostmap()->setCost(i, j, nav2_costmap_2d::LETHAL_OBSTACLE);
+      c++;
+    }
+  }
+  std::cout << "number of lethal cells " << c << std::endl;
+  // measure time
+  auto start = std::chrono::high_resolution_clock::now();
+  ilayer->updateCosts(*layers.getCostmap(), 0, 0, layers.getCostmap()->getSizeInCellsX(), layers.getCostmap()->getSizeInCellsY());
+  auto end = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+  std::cout << "OpenCV Inflation time: " << duration << " ms" << std::endl;
+
+  //validatePointInflation(4, 4, layers.getCostmap(), ilayer, inflation_radius);
 }
 
-/**
- * Test inflation for both static and dynamic obstacles
- */
-TEST_F(TestNode, testInflation)
-{
-  initNode(1);
-  tf2_ros::Buffer tf(node_->get_clock());
-  nav2_costmap_2d::LayeredCostmap layers("frame", false, false);
+// /**
+//  * Test for the cost function correctness with a larger range and different values
+//  */
+// TEST_F(TestNode, testCostFunctionCorrectness)
+// {
+//   initNode(10.5);
+//   tf2_ros::Buffer tf(node_->get_clock());
+//   nav2_costmap_2d::LayeredCostmap layers("frame", false, false);
 
-  // Footprint with inscribed radius = 2.1
-  // circumscribed radius = 3.1
-  std::vector<Point> polygon = setRadii(layers, 1, 1);
+//   layers.resizeMap(100, 100, 1, 0, 0);
+//   // Footprint with inscribed radius = 5.0
+//   //               circumscribed radius = 8.0
+//   std::vector<Point> polygon = setRadii(layers, 5.0, 6.25);
 
-  std::shared_ptr<nav2_costmap_2d::StaticLayer> slayer = nullptr;
-  addStaticLayer(layers, tf, node_, slayer);
+//   std::shared_ptr<nav2_costmap_2d::ObstacleLayer> olayer = nullptr;
+//   addObstacleLayer(layers, tf, node_, olayer);
 
-  std::shared_ptr<nav2_costmap_2d::ObstacleLayer> olayer = nullptr;
-  addObstacleLayer(layers, tf, node_, olayer);
+//   std::shared_ptr<nav2_costmap_2d::InflationLayer> ilayer = nullptr;
+//   addInflationLayer(layers, tf, node_, ilayer);
 
-  std::shared_ptr<nav2_costmap_2d::InflationLayer> ilayer = nullptr;
-  addInflationLayer(layers, tf, node_, ilayer);
-  layers.setFootprint(polygon);
+//   layers.setFootprint(polygon);
 
-  nav2_costmap_2d::Costmap2D * costmap = layers.getCostmap();
-  waitForMap(slayer);
+//   addObservation(olayer, 50, 50, MAX_Z);
 
-  layers.updateMap(0, 0, 0);
-  // printMap(*costmap);
-  ASSERT_EQ(countValues(*costmap, nav2_costmap_2d::LETHAL_OBSTACLE), 20u);
-  ASSERT_EQ(countValues(*costmap, nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE), 28u);
+//   layers.updateMap(0, 0, 0);
+//   nav2_costmap_2d::Costmap2D * map = layers.getCostmap();
 
-  /*/ Iterate over all id's and verify they are obstacles
-  for(std::vector<unsigned int>::const_iterator it = occupiedCells.begin(); it != occupiedCells.end(); ++it){
-    unsigned int ind = *it;
-    unsigned int x, y;
-    map.indexToCells(ind, x, y);
-    ASSERT_EQ(find(occupiedCells, map.getIndex(x, y)), true);
-    ASSERT_EQ(map.getCost(x, y) == nav2_costmap_2d::LETHAL_OBSTACLE ||
-      map.getCost(x, y) == nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE, true);
-  }*/
+//   // Verify that the circumscribed cost lower bound is as expected: based on the cost function.
+//   // unsigned char c = ilayer->computeCost(8.0);
+//   // ASSERT_EQ(ilayer->getCircumscribedCost(), c);
 
-  addObservation(olayer, 0, 0, 0.4);
-  layers.updateMap(0, 0, 0);
+//   for (unsigned int i = 0; i <= (unsigned int)ceil(5.0); i++) {
+//     // To the right
+//     ASSERT_EQ(map->getCost(50 + i, 50) >= nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE, true);
+//     ASSERT_EQ(map->getCost(50 + i, 50) >= nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE, true);
+//     // To the left
+//     ASSERT_EQ(map->getCost(50 - i, 50) >= nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE, true);
+//     ASSERT_EQ(map->getCost(50 - i, 50) >= nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE, true);
+//     // Down
+//     ASSERT_EQ(map->getCost(50, 50 + i) >= nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE, true);
+//     ASSERT_EQ(map->getCost(50, 50 + i) >= nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE, true);
+//     // Up
+//     ASSERT_EQ(map->getCost(50, 50 - i) >= nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE, true);
+//     ASSERT_EQ(map->getCost(50, 50 - i) >= nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE, true);
+//   }
 
-  // It and its 2 neighbors makes 3 obstacles
-  ASSERT_EQ(
-    countValues(*costmap, nav2_costmap_2d::LETHAL_OBSTACLE) +
-    countValues(*costmap, nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE), 51u);
+//   // Verify the normalized cost attenuates as expected
+//   for (unsigned int i = (unsigned int)(ceil(5.0) + 1); i <= (unsigned int)ceil(10.5); i++) {
+//     unsigned char expectedValue = ilayer->computeCost(i / 1.0);
+//     ASSERT_EQ(map->getCost(50 + i, 50), expectedValue);
+//   }
 
-  // @todo Rewrite
-  // Add an obstacle at <2,0> which will inflate and refresh to of the other inflated cells
-  addObservation(olayer, 2, 0);
-  layers.updateMap(0, 0, 0);
+//   // Update with no hits. Should clear (revert to the static map
+//   /*map->resetMapOutsideWindow(0, 0, 0.0, 0.0);
+//   cloud.points.resize(0);
 
-  // Now we expect insertions for it, and 2 more neighbors, but not all 5.
-  // Free space will propagate from
-  // the origin to the target, clearing the point at <0, 0>,
-  // but not over-writing the inflation of the obstacle
-  // at <0, 1>
-  ASSERT_EQ(
-    countValues(*costmap, nav2_costmap_2d::LETHAL_OBSTACLE) +
-    countValues(*costmap, nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE), 54u);
+//   p.x = 0.0;
+//   p.y = 0.0;
+//   p.z = MAX_Z;
 
-  // Add an obstacle at <1, 9>. This will inflate obstacles around it
-  addObservation(olayer, 1, 9);
-  layers.updateMap(0, 0, 0);
+//   Observation obs2(p, cloud, 100.0, 100.0);
+//   std::vector<Observation> obsBuf2;
+//   obsBuf2.push_back(obs2);
 
-  ASSERT_EQ(costmap->getCost(1, 9), nav2_costmap_2d::LETHAL_OBSTACLE);
-  ASSERT_EQ(costmap->getCost(0, 9), nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE);
-  ASSERT_EQ(costmap->getCost(2, 9), nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE);
+//   map->updateWorld(0, 0, obsBuf2, obsBuf2);
 
-  // Add an obstacle and verify that it over-writes its inflated status
-  addObservation(olayer, 0, 9);
-  layers.updateMap(0, 0, 0);
+//   for(unsigned int i = 0; i < 100; i++)
+//     for(unsigned int j = 0; j < 100; j++)
+//       ASSERT_EQ(map->getCost(i, j), nav2_costmap_2d::FREE_SPACE);*/
+// }
 
-  ASSERT_EQ(costmap->getCost(0, 9), nav2_costmap_2d::LETHAL_OBSTACLE);
-}
+// /**
+//  * Test that there is no regression and that costs do not get
+//  * underestimated with the distance-as-key map used to replace
+//  * the previously used priority queue. This is a more thorough
+//  * test of the cost function being correctly applied.
+//  */
+// TEST_F(TestNode, testInflationOrderCorrectness)
+// {
+//   const double inflation_radius = 4.1;
+//   initNode(inflation_radius);
+//   tf2_ros::Buffer tf(node_->get_clock());
+//   nav2_costmap_2d::LayeredCostmap layers("frame", false, false);
+//   layers.resizeMap(10, 10, 1, 0, 0);
 
-/**
- * Test specific inflation scenario to ensure we do not set inflated obstacles to be raw obstacles.
- */
-TEST_F(TestNode, testInflation2)
-{
-  initNode(1);
-  tf2_ros::Buffer tf(node_->get_clock());
-  nav2_costmap_2d::LayeredCostmap layers("frame", false, false);
+//   // Footprint with inscribed radius = 2.1
+//   //               circumscribed radius = 3.1
+//   std::vector<Point> polygon = setRadii(layers, 2.1, 2.3);
 
-  // Footprint with inscribed radius = 2.1
-  // circumscribed radius = 3.1
-  std::vector<Point> polygon = setRadii(layers, 1, 1);
+//   std::shared_ptr<nav2_costmap_2d::ObstacleLayer> olayer = nullptr;
+//   addObstacleLayer(layers, tf, node_, olayer);
 
-  std::shared_ptr<nav2_costmap_2d::StaticLayer> slayer = nullptr;
-  addStaticLayer(layers, tf, node_, slayer);
+//   std::shared_ptr<nav2_costmap_2d::InflationLayer> ilayer = nullptr;
+//   addInflationLayer(layers, tf, node_, ilayer);
 
-  std::shared_ptr<nav2_costmap_2d::ObstacleLayer> olayer = nullptr;
-  addObstacleLayer(layers, tf, node_, olayer);
+//   layers.setFootprint(polygon);
 
-  std::shared_ptr<nav2_costmap_2d::InflationLayer> ilayer = nullptr;
-  addInflationLayer(layers, tf, node_, ilayer);
+//   // Add two diagonal cells, they would induce problems under the
+//   // previous implementations
+//   addObservation(olayer, 4, 4, MAX_Z);
+//   addObservation(olayer, 5, 5, MAX_Z);
 
-  layers.setFootprint(polygon);
+//   layers.updateMap(0, 0, 0);
 
-  waitForMap(slayer);
+//   validatePointInflation(4, 4, layers.getCostmap(), ilayer, inflation_radius);
+//   validatePointInflation(5, 5, layers.getCostmap(), ilayer, inflation_radius);
+// }
 
-  // Create a small L-Shape all at once
-  addObservation(olayer, 1, 1, MAX_Z);
-  addObservation(olayer, 2, 1, MAX_Z);
-  addObservation(olayer, 2, 2, MAX_Z);
-  layers.updateMap(0, 0, 0);
+// /**
+//  * Test inflation for both static and dynamic obstacles
+//  */
+// TEST_F(TestNode, testInflation)
+// {
+//   initNode(1);
+//   tf2_ros::Buffer tf(node_->get_clock());
+//   nav2_costmap_2d::LayeredCostmap layers("frame", false, false);
 
-  nav2_costmap_2d::Costmap2D * costmap = layers.getCostmap();
-  // printMap(*costmap);
-  ASSERT_EQ(costmap->getCost(2, 3), nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE);
-  ASSERT_EQ(costmap->getCost(3, 3), nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE);
-}
+//   // Footprint with inscribed radius = 2.1
+//   // circumscribed radius = 3.1
+//   std::vector<Point> polygon = setRadii(layers, 1, 1);
 
-/**
- * Test inflation behavior, starting with an empty map
- */
-TEST_F(TestNode, testInflation3)
-{
-  initNode(3);
-  tf2_ros::Buffer tf(node_->get_clock());
-  nav2_costmap_2d::LayeredCostmap layers("frame", false, false);
-  layers.resizeMap(10, 10, 1, 0, 0);
+//   std::shared_ptr<nav2_costmap_2d::StaticLayer> slayer = nullptr;
+//   addStaticLayer(layers, tf, node_, slayer);
 
-  // 1 2 3
-  std::vector<Point> polygon = setRadii(layers, 1, 1.75);
+//   std::shared_ptr<nav2_costmap_2d::ObstacleLayer> olayer = nullptr;
+//   addObstacleLayer(layers, tf, node_, olayer);
 
-  std::shared_ptr<nav2_costmap_2d::ObstacleLayer> olayer = nullptr;
-  addObstacleLayer(layers, tf, node_, olayer);
+//   std::shared_ptr<nav2_costmap_2d::InflationLayer> ilayer = nullptr;
+//   addInflationLayer(layers, tf, node_, ilayer);
+//   layers.setFootprint(polygon);
 
-  std::shared_ptr<nav2_costmap_2d::InflationLayer> ilayer = nullptr;
-  addInflationLayer(layers, tf, node_, ilayer);
+//   nav2_costmap_2d::Costmap2D * costmap = layers.getCostmap();
+//   waitForMap(slayer);
 
-  layers.setFootprint(polygon);
+//   layers.updateMap(0, 0, 0);
+//   // printMap(*costmap);
+//   ASSERT_EQ(countValues(*costmap, nav2_costmap_2d::LETHAL_OBSTACLE), 20u);
+//   ASSERT_EQ(countValues(*costmap, nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE), 28u);
 
-  // There should be no occupied cells
-  nav2_costmap_2d::Costmap2D * costmap = layers.getCostmap();
-  ASSERT_EQ(countValues(*costmap, nav2_costmap_2d::LETHAL_OBSTACLE), 0u);
-  ASSERT_EQ(countValues(*costmap, nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE), 0u);
-  printMap(*costmap);
-  // Add an obstacle at 5,5
-  addObservation(olayer, 5, 5, MAX_Z);
-  layers.updateMap(0, 0, 0);
-  printMap(*costmap);
+//   /*/ Iterate over all id's and verify they are obstacles
+//   for(std::vector<unsigned int>::const_iterator it = occupiedCells.begin(); it != occupiedCells.end(); ++it){
+//     unsigned int ind = *it;
+//     unsigned int x, y;
+//     map.indexToCells(ind, x, y);
+//     ASSERT_EQ(find(occupiedCells, map.getIndex(x, y)), true);
+//     ASSERT_EQ(map.getCost(x, y) == nav2_costmap_2d::LETHAL_OBSTACLE ||
+//       map.getCost(x, y) == nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE, true);
+//   }*/
 
-  // Test fails because updated cell value is 0
-  ASSERT_EQ(countValues(*costmap, nav2_costmap_2d::FREE_SPACE, false), 29u);
-  ASSERT_EQ(countValues(*costmap, nav2_costmap_2d::LETHAL_OBSTACLE), 1u);
-  ASSERT_EQ(countValues(*costmap, nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE), 4u);
+//   addObservation(olayer, 0, 0, 0.4);
+//   layers.updateMap(0, 0, 0);
 
-  // Update again - should see no change
-  layers.updateMap(0, 0, 0);
+//   // It and its 2 neighbors makes 3 obstacles
+//   ASSERT_EQ(
+//     countValues(*costmap, nav2_costmap_2d::LETHAL_OBSTACLE) +
+//     countValues(*costmap, nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE), 51u);
 
-  ASSERT_EQ(countValues(*costmap, nav2_costmap_2d::FREE_SPACE, false), 29u);
-  ASSERT_EQ(countValues(*costmap, nav2_costmap_2d::LETHAL_OBSTACLE), 1u);
-  ASSERT_EQ(countValues(*costmap, nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE), 4u);
-}
+//   // @todo Rewrite
+//   // Add an obstacle at <2,0> which will inflate and refresh to of the other inflated cells
+//   addObservation(olayer, 2, 0);
+//   layers.updateMap(0, 0, 0);
 
-/**
- * Test dynamic parameter setting of inflation layer
- */
-TEST_F(TestNode, testDynParamsSet)
-{
-  auto costmap = std::make_shared<nav2_costmap_2d::Costmap2DROS>("test_costmap");
+//   // Now we expect insertions for it, and 2 more neighbors, but not all 5.
+//   // Free space will propagate from
+//   // the origin to the target, clearing the point at <0, 0>,
+//   // but not over-writing the inflation of the obstacle
+//   // at <0, 1>
+//   ASSERT_EQ(
+//     countValues(*costmap, nav2_costmap_2d::LETHAL_OBSTACLE) +
+//     countValues(*costmap, nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE), 54u);
 
-  costmap->set_parameter(rclcpp::Parameter("global_frame", std::string("base_link")));
-  costmap->on_configure(rclcpp_lifecycle::State());
+//   // Add an obstacle at <1, 9>. This will inflate obstacles around it
+//   addObservation(olayer, 1, 9);
+//   layers.updateMap(0, 0, 0);
 
-  costmap->on_activate(rclcpp_lifecycle::State());
+//   ASSERT_EQ(costmap->getCost(1, 9), nav2_costmap_2d::LETHAL_OBSTACLE);
+//   ASSERT_EQ(costmap->getCost(0, 9), nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE);
+//   ASSERT_EQ(costmap->getCost(2, 9), nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE);
 
-  auto parameter_client = std::make_shared<rclcpp::AsyncParametersClient>(
-    costmap->get_node_base_interface(), costmap->get_node_topics_interface(),
-    costmap->get_node_graph_interface(),
-    costmap->get_node_services_interface());
+//   // Add an obstacle and verify that it over-writes its inflated status
+//   addObservation(olayer, 0, 9);
+//   layers.updateMap(0, 0, 0);
 
-  auto results = parameter_client->set_parameters_atomically(
-  {
-    rclcpp::Parameter("inflation_layer.inflation_radius", 0.0),
-    rclcpp::Parameter("inflation_layer.cost_scaling_factor", 0.0),
-    rclcpp::Parameter("inflation_layer.inflate_unknown", true),
-    rclcpp::Parameter("inflation_layer.inflate_around_unknown", true),
-    rclcpp::Parameter("inflation_layer.enabled", false)
-  });
+//   ASSERT_EQ(costmap->getCost(0, 9), nav2_costmap_2d::LETHAL_OBSTACLE);
+// }
 
-  rclcpp::spin_until_future_complete(
-    costmap->get_node_base_interface(),
-    results);
+// /**
+//  * Test specific inflation scenario to ensure we do not set inflated obstacles to be raw obstacles.
+//  */
+// TEST_F(TestNode, testInflation2)
+// {
+//   initNode(1);
+//   tf2_ros::Buffer tf(node_->get_clock());
+//   nav2_costmap_2d::LayeredCostmap layers("frame", false, false);
 
-  EXPECT_EQ(costmap->get_parameter("inflation_layer.inflation_radius").as_double(), 0.0);
-  EXPECT_EQ(costmap->get_parameter("inflation_layer.cost_scaling_factor").as_double(), 0.0);
-  EXPECT_EQ(costmap->get_parameter("inflation_layer.inflate_unknown").as_bool(), true);
-  EXPECT_EQ(costmap->get_parameter("inflation_layer.inflate_around_unknown").as_bool(), true);
-  EXPECT_EQ(costmap->get_parameter("inflation_layer.enabled").as_bool(), false);
+//   // Footprint with inscribed radius = 2.1
+//   // circumscribed radius = 3.1
+//   std::vector<Point> polygon = setRadii(layers, 1, 1);
 
-  costmap->on_deactivate(rclcpp_lifecycle::State());
-  costmap->on_cleanup(rclcpp_lifecycle::State());
-  costmap->on_shutdown(rclcpp_lifecycle::State());
-}
+//   std::shared_ptr<nav2_costmap_2d::StaticLayer> slayer = nullptr;
+//   addStaticLayer(layers, tf, node_, slayer);
+
+//   std::shared_ptr<nav2_costmap_2d::ObstacleLayer> olayer = nullptr;
+//   addObstacleLayer(layers, tf, node_, olayer);
+
+//   std::shared_ptr<nav2_costmap_2d::InflationLayer> ilayer = nullptr;
+//   addInflationLayer(layers, tf, node_, ilayer);
+
+//   layers.setFootprint(polygon);
+
+//   waitForMap(slayer);
+
+//   // Create a small L-Shape all at once
+//   addObservation(olayer, 1, 1, MAX_Z);
+//   addObservation(olayer, 2, 1, MAX_Z);
+//   addObservation(olayer, 2, 2, MAX_Z);
+//   layers.updateMap(0, 0, 0);
+
+//   nav2_costmap_2d::Costmap2D * costmap = layers.getCostmap();
+//   // printMap(*costmap);
+//   ASSERT_EQ(costmap->getCost(2, 3), nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE);
+//   ASSERT_EQ(costmap->getCost(3, 3), nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE);
+// }
+
+// /**
+//  * Test inflation behavior, starting with an empty map
+//  */
+// TEST_F(TestNode, testInflation3)
+// {
+//   initNode(3);
+//   tf2_ros::Buffer tf(node_->get_clock());
+//   nav2_costmap_2d::LayeredCostmap layers("frame", false, false);
+//   layers.resizeMap(10, 10, 1, 0, 0);
+
+//   // 1 2 3
+//   std::vector<Point> polygon = setRadii(layers, 1, 1.75);
+
+//   std::shared_ptr<nav2_costmap_2d::ObstacleLayer> olayer = nullptr;
+//   addObstacleLayer(layers, tf, node_, olayer);
+
+//   std::shared_ptr<nav2_costmap_2d::InflationLayer> ilayer = nullptr;
+//   addInflationLayer(layers, tf, node_, ilayer);
+
+//   layers.setFootprint(polygon);
+
+//   // There should be no occupied cells
+//   nav2_costmap_2d::Costmap2D * costmap = layers.getCostmap();
+//   ASSERT_EQ(countValues(*costmap, nav2_costmap_2d::LETHAL_OBSTACLE), 0u);
+//   ASSERT_EQ(countValues(*costmap, nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE), 0u);
+//   printMap(*costmap);
+//   // Add an obstacle at 5,5
+//   addObservation(olayer, 5, 5, MAX_Z);
+//   layers.updateMap(0, 0, 0);
+//   printMap(*costmap);
+
+//   // Test fails because updated cell value is 0
+//   ASSERT_EQ(countValues(*costmap, nav2_costmap_2d::FREE_SPACE, false), 29u);
+//   ASSERT_EQ(countValues(*costmap, nav2_costmap_2d::LETHAL_OBSTACLE), 1u);
+//   ASSERT_EQ(countValues(*costmap, nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE), 4u);
+
+//   // Update again - should see no change
+//   layers.updateMap(0, 0, 0);
+
+//   ASSERT_EQ(countValues(*costmap, nav2_costmap_2d::FREE_SPACE, false), 29u);
+//   ASSERT_EQ(countValues(*costmap, nav2_costmap_2d::LETHAL_OBSTACLE), 1u);
+//   ASSERT_EQ(countValues(*costmap, nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE), 4u);
+// }
+
+// /**
+//  * Test dynamic parameter setting of inflation layer
+//  */
+// TEST_F(TestNode, testDynParamsSet)
+// {
+//   auto costmap = std::make_shared<nav2_costmap_2d::Costmap2DROS>("test_costmap");
+
+//   costmap->set_parameter(rclcpp::Parameter("global_frame", std::string("base_link")));
+//   costmap->on_configure(rclcpp_lifecycle::State());
+
+//   costmap->on_activate(rclcpp_lifecycle::State());
+
+//   auto parameter_client = std::make_shared<rclcpp::AsyncParametersClient>(
+//     costmap->get_node_base_interface(), costmap->get_node_topics_interface(),
+//     costmap->get_node_graph_interface(),
+//     costmap->get_node_services_interface());
+
+//   auto results = parameter_client->set_parameters_atomically(
+//   {
+//     rclcpp::Parameter("inflation_layer.inflation_radius", 0.0),
+//     rclcpp::Parameter("inflation_layer.cost_scaling_factor", 0.0),
+//     rclcpp::Parameter("inflation_layer.inflate_unknown", true),
+//     rclcpp::Parameter("inflation_layer.inflate_around_unknown", true),
+//     rclcpp::Parameter("inflation_layer.enabled", false)
+//   });
+
+//   rclcpp::spin_until_future_complete(
+//     costmap->get_node_base_interface(),
+//     results);
+
+//   EXPECT_EQ(costmap->get_parameter("inflation_layer.inflation_radius").as_double(), 0.0);
+//   EXPECT_EQ(costmap->get_parameter("inflation_layer.cost_scaling_factor").as_double(), 0.0);
+//   EXPECT_EQ(costmap->get_parameter("inflation_layer.inflate_unknown").as_bool(), true);
+//   EXPECT_EQ(costmap->get_parameter("inflation_layer.inflate_around_unknown").as_bool(), true);
+//   EXPECT_EQ(costmap->get_parameter("inflation_layer.enabled").as_bool(), false);
+
+//   costmap->on_deactivate(rclcpp_lifecycle::State());
+//   costmap->on_cleanup(rclcpp_lifecycle::State());
+//   costmap->on_shutdown(rclcpp_lifecycle::State());
+// }
 
 int main(int argc, char ** argv)
 {

@@ -20,6 +20,7 @@
 #include <string>
 #include <utility>
 
+#include "nav2_costmap_2d/opencv_inflation_layer.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/point_cloud2_iterator.hpp"
 #include "nav2_costmap_2d/cost_values.hpp"
@@ -141,6 +142,18 @@ void addInflationLayer(
   rclcpp::CallbackGroup::SharedPtr callback_group = nullptr)
 {
   ilayer = std::make_shared<nav2_costmap_2d::InflationLayer>();
+  ilayer->initialize(&layers, "inflation", &tf, node, callback_group);
+  std::shared_ptr<nav2_costmap_2d::Layer> ipointer(ilayer);
+  layers.addPlugin(ipointer);
+}
+
+void addOpenCVInflationLayer(
+  nav2_costmap_2d::LayeredCostmap & layers,
+  tf2_ros::Buffer & tf, nav2::LifecycleNode::SharedPtr node,
+  std::shared_ptr<nav2_costmap_2d::OpenCVInflationLayer> & ilayer,
+  rclcpp::CallbackGroup::SharedPtr callback_group = nullptr)
+{
+  ilayer = std::make_shared<nav2_costmap_2d::OpenCVInflationLayer>();
   ilayer->initialize(&layers, "inflation", &tf, node, callback_group);
   std::shared_ptr<nav2_costmap_2d::Layer> ipointer(ilayer);
   layers.addPlugin(ipointer);
