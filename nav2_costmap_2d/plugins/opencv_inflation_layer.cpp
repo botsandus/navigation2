@@ -26,9 +26,7 @@
 #include "pluginlib/class_list_macros.hpp"
 #include "rclcpp/parameter_events_filter.hpp"
 
-#include <opencv2/imgproc.hpp>
-#include <opencv2/core.hpp>
-#include <opencv2/core/ocl.hpp>
+#include <Eigen/Core>
 
 PLUGINLIB_EXPORT_CLASS(nav2_costmap_2d::OpenCVInflationLayer, nav2_costmap_2d::Layer)
 
@@ -99,27 +97,17 @@ OpenCVInflationLayer::onInitialize()
   need_reinflation_ = false;
   matchSize();
 
-  // Log OpenCV version and hardware optimization info
+  // Log parallelization info
+#ifdef _OPENMP
   RCLCPP_INFO(
     logger_,
-    "OpenCV version: %s", CV_VERSION);
+    "OpenCVInflationLayer using Eigen-based distance transform with OpenMP (%d threads)",
+    omp_get_max_threads());
+#else
   RCLCPP_INFO(
     logger_,
-    "OpenCV hardware optimizations: CPU=%s, OpenCL=%s, OpenCL_SVM=%s",
-    cv::useOptimized() ? "enabled" : "disabled",
-    cv::ocl::haveOpenCL() ? "available" : "not available",
-    cv::ocl::haveSVM() ? "available" : "not available");
-  RCLCPP_INFO(
-    logger_,
-    "OpenCV parallel threads: %d", cv::getNumThreads());
-  if (cv::ocl::haveOpenCL()) {
-    cv::ocl::Device device = cv::ocl::Device::getDefault();
-    if (!device.empty()) {
-      RCLCPP_INFO(
-        logger_,
-        "OpenCL device: %s (%s)", device.name().c_str(), device.vendorName().c_str());
-    }
-  }
+    "OpenCVInflationLayer using Eigen-based distance transform (single-threaded)");
+#endif
 }
 
 void
@@ -191,6 +179,143 @@ OpenCVInflationLayer::onFootprintChanged()
 }
 
 void
+OpenCVInflationLayer::distanceTransform1D(
+  const float * f, float * d, int n,
+  int * v, float * z)
+{
+  int k = 0;
+  v[0] = 0;
+  z[0] = -DT_INF;
+  z[1] = DT_INF;
+
+  for (int q = 1; q < n; q++) {
+    float s = ((f[q] + static_cast<float>(q * q)) -
+      (f[v[k]] + static_cast<float>(v[k] * v[k]))) /
+      (2.0f * static_cast<float>(q - v[k]));
+    while (s <= z[k]) {
+      k--;
+      s = ((f[q] + static_cast<float>(q * q)) -
+        (f[v[k]] + static_cast<float>(v[k] * v[k]))) /
+        (2.0f * static_cast<float>(q - v[k]));
+    }
+    k++;
+    v[k] = q;
+    z[k] = s;
+    z[k + 1] = DT_INF;
+  }
+
+  k = 0;
+  for (int q = 0; q < n; q++) {
+    while (z[k + 1] < static_cast<float>(q)) {
+      k++;
+    }
+    d[q] = static_cast<float>((q - v[k]) * (q - v[k])) + f[v[k]];
+  }
+}
+
+void
+OpenCVInflationLayer::distanceTransform2D(MatrixXfRM & img, int height, int width)
+{
+  // Column pass (parallelizable)
+#ifdef _OPENMP
+  #pragma omp parallel for schedule(dynamic, 16)
+#endif
+  for (int x = 0; x < width; x++) {
+    // Thread-local buffers
+    std::vector<float> f(height);
+    std::vector<float> d(height);
+    std::vector<int> v(height);
+    std::vector<float> z(height + 1);
+
+    // Extract column
+    for (int y = 0; y < height; y++) {
+      f[y] = img(y, x);
+    }
+
+    // 1D transform
+    distanceTransform1D(f.data(), d.data(), height, v.data(), z.data());
+
+    // Write back
+    for (int y = 0; y < height; y++) {
+      img(y, x) = d[y];
+    }
+  }
+
+  // Row pass (parallelizable)
+#ifdef _OPENMP
+  #pragma omp parallel for schedule(dynamic, 16)
+#endif
+  for (int y = 0; y < height; y++) {
+    // Thread-local buffers
+    std::vector<float> f(width);
+    std::vector<float> d(width);
+    std::vector<int> v(width);
+    std::vector<float> z(width + 1);
+
+    // Extract row (already contiguous in row-major)
+    for (int x = 0; x < width; x++) {
+      f[x] = img(y, x);
+    }
+
+    // 1D transform
+    distanceTransform1D(f.data(), d.data(), width, v.data(), z.data());
+
+    // Write back
+    for (int x = 0; x < width; x++) {
+      img(y, x) = d[x];
+    }
+  }
+
+  // Square root to get Euclidean distance
+  img = img.cwiseSqrt();
+}
+
+void
+OpenCVInflationLayer::applyInflation(
+  unsigned char * master_array,
+  const MatrixXfRM & distance_map,
+  int min_i, int min_j, int max_i, int max_j,
+  int roi_min_i, int roi_min_j,
+  unsigned int size_x)
+{
+  const float cell_inflation_radius_f = static_cast<float>(cell_inflation_radius_);
+  const int lut_max = static_cast<int>(cost_lut_.size() - 1);
+  const unsigned char * lut_data = cost_lut_.data();
+  const int lut_precision = cost_lut_precision_;
+  const bool inflate_unk = inflate_unknown_;
+
+#ifdef _OPENMP
+  #pragma omp parallel for schedule(dynamic, 16)
+#endif
+  for (int j = min_j; j < max_j; ++j) {
+    const int row_offset = j * static_cast<int>(size_x);
+    const int dist_row = j - roi_min_j;
+
+    for (int i = min_i; i < max_i; ++i) {
+      const float distance_cells = distance_map(dist_row, i - roi_min_i);
+      if (distance_cells > cell_inflation_radius_f) {
+        continue;
+      }
+
+      const unsigned int index = row_offset + i;
+      const unsigned char old_cost = master_array[index];
+      const unsigned int d_scaled = std::min(
+        static_cast<unsigned int>(lut_max),
+        static_cast<unsigned int>(distance_cells * lut_precision + 0.5f));
+      const unsigned char cost = lut_data[d_scaled];
+
+      if (old_cost == NO_INFORMATION &&
+        (inflate_unk ? (cost > FREE_SPACE) : (cost >= INSCRIBED_INFLATED_OBSTACLE)))
+      {
+        master_array[index] = cost;
+      } else {
+        master_array[index] = std::max(old_cost, cost);
+      }
+    }
+  }
+}
+
+void
 OpenCVInflationLayer::updateCosts(
   nav2_costmap_2d::Costmap2D & master_grid, int min_i, int min_j,
   int max_i,
@@ -220,58 +345,37 @@ OpenCVInflationLayer::updateCosts(
   const int roi_width = roi_max_i - roi_min_i;
   const int roi_height = roi_max_j - roi_min_j;
 
-  cv::Mat master_mat(size_y, size_x, CV_8UC1, master_array);
-  cv::Mat distance_map;
+  // Create distance map: obstacles = 0, free space = INF
+  MatrixXfRM distance_map(roi_height, roi_width);
 
-  // Create ROI for mask creation and distance transform
-  cv::Mat processing_region = master_mat(cv::Rect(roi_min_i, roi_min_j, roi_width, roi_height));
+  // Initialize mask (parallelized)
+#ifdef _OPENMP
+  #pragma omp parallel for schedule(dynamic, 16)
+#endif
+  for (int y = 0; y < roi_height; y++) {
+    const int src_y = y + roi_min_j;
+    for (int x = 0; x < roi_width; x++) {
+      const int src_x = x + roi_min_i;
+      const unsigned char cell = master_array[src_y * size_x + src_x];
 
-  // Create mask
-  cv::Mat mask;
-  if (inflate_around_unknown_) {
-    cv::Mat not_lethal, not_unknown;
-    cv::compare(processing_region, LETHAL_OBSTACLE, not_lethal, cv::CMP_NE);
-    cv::compare(processing_region, NO_INFORMATION, not_unknown, cv::CMP_NE);
-    cv::bitwise_and(not_lethal, not_unknown, mask);
-  } else {
-    cv::compare(processing_region, LETHAL_OBSTACLE, mask, cv::CMP_NE);
-  }
-
-  cv::distanceTransform(mask, distance_map, cv::DIST_L2, cv::DIST_MASK_PRECISE);
-  const float cell_inflation_radius_f = static_cast<float>(cell_inflation_radius_);
-  const unsigned int lut_max = static_cast<unsigned int>(cost_lut_.size() - 1);
-  const unsigned char * lut_data = cost_lut_.data();
-  const int lut_precision = cost_lut_precision_;
-  const bool inflate_unk = inflate_unknown_;
-
-  cv::parallel_for_(cv::Range(min_j, max_j), [&](const cv::Range & range) {
-    for (int j = range.start; j < range.end; ++j) {
-      const float * dist_row = distance_map.ptr<float>(j - roi_min_j);
-      const int row_offset = j * size_x;
-
-      for (int i = min_i; i < max_i; ++i) {
-        const float distance_cells = dist_row[i - roi_min_i];
-        if (distance_cells > cell_inflation_radius_f) {
-          continue;
-        }
-
-        const unsigned int index = row_offset + i;
-        const unsigned char old_cost = master_array[index];
-        const unsigned int d_scaled = std::min(
-          lut_max,
-          static_cast<unsigned int>(distance_cells * lut_precision + 0.5f));
-        const unsigned char cost = lut_data[d_scaled];
-
-        if (old_cost == NO_INFORMATION &&
-          (inflate_unk ? (cost > FREE_SPACE) : (cost >= INSCRIBED_INFLATED_OBSTACLE)))
-        {
-          master_array[index] = cost;
-        } else {
-          master_array[index] = std::max(old_cost, cost);
-        }
+      if (inflate_around_unknown_) {
+        // Treat both LETHAL_OBSTACLE and NO_INFORMATION as obstacles
+        distance_map(y, x) = (cell != LETHAL_OBSTACLE && cell != NO_INFORMATION) ? DT_INF : 0.0f;
+      } else {
+        // Only LETHAL_OBSTACLE is treated as obstacle
+        distance_map(y, x) = (cell != LETHAL_OBSTACLE) ? DT_INF : 0.0f;
       }
     }
-  });
+  }
+
+  // Perform Felzenszwalb-Huttenlocher distance transform
+  distanceTransform2D(distance_map, roi_height, roi_width);
+
+  // Apply inflation costs
+  applyInflation(
+    master_array, distance_map,
+    min_i, min_j, max_i, max_j,
+    roi_min_i, roi_min_j, size_x);
 
   current_ = true;
 }

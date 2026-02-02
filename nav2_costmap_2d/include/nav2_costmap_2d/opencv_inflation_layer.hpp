@@ -21,6 +21,13 @@
 #include <mutex>
 #include <memory>
 #include <string>
+#include <limits>
+
+#include <Eigen/Core>
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 #include "rclcpp/rclcpp.hpp"
 #include "nav2_costmap_2d/layer.hpp"
@@ -30,10 +37,14 @@
 namespace nav2_costmap_2d
 {
 
+/// Row-major float matrix type for efficient row-wise access
+using MatrixXfRM = Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+
 /**
  * @class OpenCVInflationLayer
- * @brief Layer to convolve costmap by robot's radius or footprint using OpenCV's distance transform
- * for improved performance
+ * @brief Layer to convolve costmap by robot's radius or footprint using Eigen-based
+ * Felzenszwalb-Huttenlocher O(n) distance transform for improved performance.
+ * Note: Class name kept for backward compatibility (drop-in replacement).
  */
 class OpenCVInflationLayer : public Layer
 {
@@ -161,6 +172,49 @@ public:
   }
 
 protected:
+  /// Infinity constant for distance transform
+  static constexpr float DT_INF = std::numeric_limits<float>::max();
+
+  /**
+   * @brief Perform 1D distance transform using lower envelope of parabolas
+   * (Felzenszwalb-Huttenlocher algorithm)
+   * @param f Input array of squared distances
+   * @param d Output array for transformed distances
+   * @param n Length of the arrays
+   * @param v Buffer for parabola indices
+   * @param z Buffer for parabola boundaries
+   */
+  static void distanceTransform1D(
+    const float * f, float * d, int n,
+    int * v, float * z);
+
+  /**
+   * @brief Perform 2D Euclidean distance transform using separable passes
+   * @param img Input/output matrix (modified in place)
+   * @param height Number of rows
+   * @param width Number of columns
+   */
+  void distanceTransform2D(MatrixXfRM & img, int height, int width);
+
+  /**
+   * @brief Apply inflation costs from distance map to costmap
+   * @param master_array Pointer to the costmap data
+   * @param distance_map Distance transform result
+   * @param min_i Minimum x index of update region
+   * @param min_j Minimum y index of update region
+   * @param max_i Maximum x index of update region
+   * @param max_j Maximum y index of update region
+   * @param roi_min_i ROI minimum x offset
+   * @param roi_min_j ROI minimum y offset
+   * @param size_x Width of the costmap
+   */
+  void applyInflation(
+    unsigned char * master_array,
+    const MatrixXfRM & distance_map,
+    int min_i, int min_j, int max_i, int max_j,
+    int roi_min_i, int roi_min_j,
+    unsigned int size_x);
+
   /**
    * @brief Process updates on footprint changes to the inflation layer
    */

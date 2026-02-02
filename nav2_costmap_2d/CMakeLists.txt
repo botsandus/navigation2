@@ -28,28 +28,9 @@ find_package(tf2_sensor_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(point_cloud_transport REQUIRED)
 
-# Optional OpenCV inflation layer support
-option(BUILD_OPENCV_INFLATION_LAYER "Build OpenCVInflationLayer plugin (requires OpenCV 4.13+)" OFF)
-
-if(BUILD_OPENCV_INFLATION_LAYER)
-  # Force OpenCV 4.13+ from /opt/opencv-4.13 for the inflation layer only.
-  # This is needed for a bug fix for large maps with cv::distanceTransform
-  set(OpenCV_DIR "/opt/opencv-4.13/lib/cmake/opencv4" CACHE PATH "Path to OpenCV config")
-  set(CMAKE_PREFIX_PATH "/opt/opencv-4.13" ${CMAKE_PREFIX_PATH})
-
-  find_package(OpenCV 4.13 REQUIRED COMPONENTS core imgproc)
-
-  if(OpenCV_VERSION VERSION_LESS "4.13")
-    message(FATAL_ERROR "OpenCV ${OpenCV_VERSION} found, but 4.13+ required. Found at: ${OpenCV_DIR}")
-  endif()
-
-  message(STATUS "✓ Using OpenCV ${OpenCV_VERSION} from ${OpenCV_DIR}")
-  message(STATUS "✓ OpenCVInflationLayer plugin will be built")
-  # Add compile definition for conditional compilation
-  add_compile_definitions(BUILD_OPENCV_INFLATION_LAYER)
-else()
-  message(STATUS "OpenCVInflationLayer plugin disabled (set BUILD_OPENCV_INFLATION_LAYER=ON to enable)")
-endif()
+# Eigen-based inflation layer (no OpenCV required)
+find_package(Eigen3 REQUIRED)
+find_package(OpenMP)
 
 nav2_package()
 
@@ -96,17 +77,8 @@ add_library(layers SHARED
   plugins/range_sensor_layer.cpp
   plugins/denoise_layer.cpp
   plugins/plugin_container_layer.cpp
+  plugins/opencv_inflation_layer.cpp
 )
-
-# Conditionally add OpenCV inflation layer
-if(BUILD_OPENCV_INFLATION_LAYER)
-  target_sources(layers PRIVATE plugins/opencv_inflation_layer.cpp)
-  # Set RPATH so the library can find OpenCV at runtime
-  set_target_properties(layers PROPERTIES
-    INSTALL_RPATH "/opt/opencv-4.13/lib"
-    BUILD_RPATH "/opt/opencv-4.13/lib"
-  )
-endif()
 
 target_include_directories(layers
   PUBLIC
@@ -124,11 +96,10 @@ target_link_libraries(layers PUBLIC
   tf2::tf2
   nav2_ros_common::nav2_ros_common
   point_cloud_transport::point_cloud_transport
+  Eigen3::Eigen
 )
-
-# Conditionally link OpenCV libraries
-if(BUILD_OPENCV_INFLATION_LAYER)
-  target_link_libraries(layers PUBLIC opencv_core opencv_imgproc)
+if(OpenMP_CXX_FOUND)
+  target_link_libraries(layers PRIVATE OpenMP::OpenMP_CXX)
 endif()
 
 target_link_libraries(layers PRIVATE
@@ -267,10 +238,7 @@ ament_export_dependencies(
   point_cloud_transport
 )
 
-# Conditionally export OpenCV dependency
-if(BUILD_OPENCV_INFLATION_LAYER)
-  ament_export_dependencies(OpenCV)
-endif()
+ament_export_dependencies(Eigen3)
 
 pluginlib_export_plugin_description_file(nav2_costmap_2d costmap_plugins.xml)
 ament_package()
