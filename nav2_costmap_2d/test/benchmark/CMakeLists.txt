@@ -1,6 +1,4 @@
 find_package(ament_cmake_google_benchmark REQUIRED)
-find_package(OpenCV REQUIRED)
-find_package(rosbag2_cpp REQUIRED)
 
 ament_add_google_benchmark(observation_buffer_benchmark observation_buffer_benchmark.cpp)
 target_link_libraries(observation_buffer_benchmark
