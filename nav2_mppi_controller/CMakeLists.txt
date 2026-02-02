@@ -29,6 +29,13 @@ include_directories(
 
 nav2_package()
 
+# Check if BUILD_OPENCV_INFLATION_LAYER is enabled from nav2_costmap_2d
+option(BUILD_OPENCV_INFLATION_LAYER "Build with OpenCVInflationLayer support" OFF)
+if(BUILD_OPENCV_INFLATION_LAYER)
+  add_compile_definitions(BUILD_OPENCV_INFLATION_LAYER)
+  message(STATUS "nav2_mppi_controller: BUILD_OPENCV_INFLATION_LAYER enabled")
+endif()
+
 include(CheckCXXCompilerFlag)
 
 check_cxx_compiler_flag("-mfma" COMPILER_SUPPORTS_FMA)

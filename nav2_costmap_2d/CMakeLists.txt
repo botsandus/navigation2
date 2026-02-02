@@ -45,6 +45,8 @@ if(BUILD_OPENCV_INFLATION_LAYER)
 
   message(STATUS "✓ Using OpenCV ${OpenCV_VERSION} from ${OpenCV_DIR}")
   message(STATUS "✓ OpenCVInflationLayer plugin will be built")
+  # Add compile definition for conditional compilation
+  add_compile_definitions(BUILD_OPENCV_INFLATION_LAYER)
 else()
   message(STATUS "OpenCVInflationLayer plugin disabled (set BUILD_OPENCV_INFLATION_LAYER=ON to enable)")
 endif()

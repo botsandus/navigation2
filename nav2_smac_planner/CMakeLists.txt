@@ -24,6 +24,13 @@ find_package(nav2_ros_common REQUIRED)
 
 nav2_package()
 
+# Check if BUILD_OPENCV_INFLATION_LAYER is enabled from nav2_costmap_2d
+option(BUILD_OPENCV_INFLATION_LAYER "Build with OpenCVInflationLayer support" OFF)
+if(BUILD_OPENCV_INFLATION_LAYER)
+  add_compile_definitions(BUILD_OPENCV_INFLATION_LAYER)
+  message(STATUS "nav2_smac_planner: BUILD_OPENCV_INFLATION_LAYER enabled")
+endif()
+
 if(MSVC)
   add_compile_definitions(_USE_MATH_DEFINES)
 else()

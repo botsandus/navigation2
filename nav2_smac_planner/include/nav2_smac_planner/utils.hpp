@@ -26,6 +26,9 @@
 #include "tf2/utils.hpp"
 #include "nav2_costmap_2d/costmap_2d_ros.hpp"
 #include "nav2_costmap_2d/inflation_layer.hpp"
+#ifdef BUILD_OPENCV_INFLATION_LAYER
+#include "nav2_costmap_2d/opencv_inflation_layer.hpp"
+#endif
 #include "visualization_msgs/msg/marker_array.hpp"
 #include "nav2_smac_planner/types.hpp"
 #include <rclcpp/rclcpp.hpp>
@@ -78,7 +81,13 @@ inline double findCircumscribedCost(std::shared_ptr<nav2_costmap_2d::Costmap2DRO
   std::vector<std::shared_ptr<nav2_costmap_2d::Layer>>::iterator layer;
 
   // check if the costmap has an inflation layer
-  const auto inflation_layer = nav2_costmap_2d::InflationLayer::getInflationLayer(costmap);
+  auto inflation_layer = nav2_costmap_2d::InflationLayer::getInflationLayer(costmap);
+#ifdef BUILD_OPENCV_INFLATION_LAYER
+  auto opencv_inflation_layer =
+    nav2_costmap_2d::OpenCVInflationLayer::getOpenCVInflationLayer(costmap);
+#endif
+
+  // Use whichever inflation layer was found
   if (inflation_layer != nullptr) {
     double circum_radius = costmap->getLayeredCostmap()->getCircumscribedRadius();
     double resolution = costmap->getCostmap()->getResolution();
@@ -97,13 +106,36 @@ inline double findCircumscribedCost(std::shared_ptr<nav2_costmap_2d::Costmap2DRO
     }
     result = static_cast<double>(inflation_layer->computeCost(circum_radius / resolution));
   } else {
+#ifdef BUILD_OPENCV_INFLATION_LAYER
+    if (opencv_inflation_layer != nullptr) {
+      double circum_radius = costmap->getLayeredCostmap()->getCircumscribedRadius();
+      double resolution = costmap->getCostmap()->getResolution();
+      double inflation_radius = opencv_inflation_layer->getInflationRadius();
+      if (inflation_radius < circum_radius) {
+        RCLCPP_ERROR(
+          rclcpp::get_logger("computeCircumscribedCost"),
+          "The inflation radius (%f) is smaller than the circumscribed radius (%f) "
+          "If this is an SE2-collision checking plugin, it cannot use costmap potential "
+          "field to speed up collision checking by only checking the full footprint "
+          "when robot is within possibly-inscribed radius of an obstacle. This may "
+          "significantly slow down planning times!",
+          inflation_radius, circum_radius);
+        result = 0.0;
+        return result;
+      }
+      result = static_cast<double>(opencv_inflation_layer->computeCost(circum_radius / resolution));
+    } else {
+#endif
     RCLCPP_WARN(
-      rclcpp::get_logger("computeCircumscribedCost"),
-      "No inflation layer found in costmap configuration. "
-      "If this is an SE2-collision checking plugin, it cannot use costmap potential "
-      "field to speed up collision checking by only checking the full footprint "
-      "when robot is within possibly-inscribed radius of an obstacle. This may "
-      "significantly slow down planning times!");
+        rclcpp::get_logger("computeCircumscribedCost"),
+        "No inflation layer found in costmap configuration. "
+        "If this is an SE2-collision checking plugin, it cannot use costmap potential "
+        "field to speed up collision checking by only checking the full footprint "
+        "when robot is within possibly-inscribed radius of an obstacle. This may "
+        "significantly slow down planning times!");
+#ifdef BUILD_OPENCV_INFLATION_LAYER
+  }
+#endif
   }
 
   return result;
