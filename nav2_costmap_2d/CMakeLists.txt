@@ -27,18 +27,27 @@ find_package(nav2_ros_common REQUIRED)
 find_package(tf2_sensor_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(point_cloud_transport REQUIRED)
-# Force OpenCV 4.13+ from /usr/local to avoid system version.
-# This is needed for a bug fix for large maps with cv::disttransform
-set(OpenCV_DIR "/usr/local/lib/cmake/opencv4" CACHE PATH "Path to OpenCV config")
-set(CMAKE_PREFIX_PATH "/usr/local" ${CMAKE_PREFIX_PATH})
 
-find_package(OpenCV 4.13 REQUIRED COMPONENTS core imgproc)
+# Optional OpenCV inflation layer support
+option(BUILD_OPENCV_INFLATION_LAYER "Build OpenCVInflationLayer plugin (requires OpenCV 4.13+)" OFF)
 
-if(OpenCV_VERSION VERSION_LESS "4.13")
-  message(FATAL_ERROR "OpenCV ${OpenCV_VERSION} found, but 4.13+ required. Found at: ${OpenCV_DIR}")
+if(BUILD_OPENCV_INFLATION_LAYER)
+  # Force OpenCV 4.13+ from /opt/opencv-4.13 for the inflation layer only.
+  # This is needed for a bug fix for large maps with cv::distanceTransform
+  set(OpenCV_DIR "/opt/opencv-4.13/lib/cmake/opencv4" CACHE PATH "Path to OpenCV config")
+  set(CMAKE_PREFIX_PATH "/opt/opencv-4.13" ${CMAKE_PREFIX_PATH})
+
+  find_package(OpenCV 4.13 REQUIRED COMPONENTS core imgproc)
+
+  if(OpenCV_VERSION VERSION_LESS "4.13")
+    message(FATAL_ERROR "OpenCV ${OpenCV_VERSION} found, but 4.13+ required. Found at: ${OpenCV_DIR}")
+  endif()
+
+  message(STATUS "✓ Using OpenCV ${OpenCV_VERSION} from ${OpenCV_DIR}")
+  message(STATUS "✓ OpenCVInflationLayer plugin will be built")
+else()
+  message(STATUS "OpenCVInflationLayer plugin disabled (set BUILD_OPENCV_INFLATION_LAYER=ON to enable)")
 endif()
-
-message(STATUS "✓ Using OpenCV ${OpenCV_VERSION} from ${OpenCV_DIR}")
 
 nav2_package()
 
@@ -86,6 +95,12 @@ add_library(layers SHARED
   plugins/denoise_layer.cpp
   plugins/plugin_container_layer.cpp
 )
+
+# Conditionally add OpenCV inflation layer
+if(BUILD_OPENCV_INFLATION_LAYER)
+  target_sources(layers PRIVATE plugins/opencv_inflation_layer.cpp)
+endif()
+
 target_include_directories(layers
   PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
@@ -102,9 +117,13 @@ target_link_libraries(layers PUBLIC
   tf2::tf2
   nav2_ros_common::nav2_ros_common
   point_cloud_transport::point_cloud_transport
-  opencv_core
-  opencv_imgproc
 )
+
+# Conditionally link OpenCV libraries
+if(BUILD_OPENCV_INFLATION_LAYER)
+  target_link_libraries(layers PUBLIC opencv_core opencv_imgproc)
+endif()
+
 target_link_libraries(layers PRIVATE
   pluginlib::pluginlib
 )
@@ -239,7 +258,12 @@ ament_export_dependencies(
   tf2_sensor_msgs
   nav2_ros_common
   point_cloud_transport
-  OpenCV
 )
+
+# Conditionally export OpenCV dependency
+if(BUILD_OPENCV_INFLATION_LAYER)
+  ament_export_dependencies(OpenCV)
+endif()
+
 pluginlib_export_plugin_description_file(nav2_costmap_2d costmap_plugins.xml)
 ament_package()

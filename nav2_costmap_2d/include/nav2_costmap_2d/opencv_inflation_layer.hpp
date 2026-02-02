@@ -1,0 +1,206 @@
+// Copyright (c) 2026, Dexory (Tony Najjar)
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+
+#ifndef NAV2_COSTMAP_2D__OPENCV_INFLATION_LAYER_HPP_
+#define NAV2_COSTMAP_2D__OPENCV_INFLATION_LAYER_HPP_
+
+#include <map>
+#include <vector>
+#include <mutex>
+#include <memory>
+#include <string>
+
+#include "rclcpp/rclcpp.hpp"
+#include "nav2_costmap_2d/layer.hpp"
+#include "nav2_costmap_2d/layered_costmap.hpp"
+#include "nav2_costmap_2d/costmap_2d_ros.hpp"
+
+namespace nav2_costmap_2d
+{
+
+/**
+ * @class OpenCVInflationLayer
+ * @brief Layer to convolve costmap by robot's radius or footprint using OpenCV's distance transform
+ * for improved performance
+ */
+class OpenCVInflationLayer : public Layer
+{
+public:
+  /**
+    * @brief A constructor
+    */
+  OpenCVInflationLayer();
+
+  /**
+    * @brief A destructor
+    */
+  ~OpenCVInflationLayer();
+
+  /**
+   * @brief Initialization process of layer on startup
+   */
+  void onInitialize() override;
+
+  /**
+   * @brief Update the bounds of the master costmap by this layer's update dimensions
+   * @param robot_x X pose of robot
+   * @param robot_y Y pose of robot
+   * @param robot_yaw Robot orientation
+   * @param min_x X min map coord of the window to update
+   * @param min_y Y min map coord of the window to update
+   * @param max_x X max map coord of the window to update
+   * @param max_y Y max map coord of the window to update
+   */
+  void updateBounds(
+    double robot_x, double robot_y, double robot_yaw, double * min_x,
+    double * min_y,
+    double * max_x,
+    double * max_y) override;
+  /**
+   * @brief Update the costs in the master costmap in the window
+   * @param master_grid The master costmap grid to update
+   * @param min_x X min map coord of the window to update
+   * @param min_y Y min map coord of the window to update
+   * @param max_x X max map coord of the window to update
+   * @param max_y Y max map coord of the window to update
+   */
+  void updateCosts(
+    nav2_costmap_2d::Costmap2D & master_grid,
+    int min_i, int min_j, int max_i, int max_j) override;
+
+  /**
+   * @brief Match the size of the master costmap
+   */
+  void matchSize() override;
+
+  /**
+   * @brief If clearing operations should be processed on this layer or not
+   */
+  bool isClearable() override {return false;}
+
+  /**
+   * @brief Reset this costmap
+   */
+  void reset() override
+  {
+    matchSize();
+    current_ = false;
+    need_reinflation_ = true;
+  }
+
+  /** @brief  Given a distance, compute a cost.
+   * @param  distance The distance from an obstacle in cells
+   * @return A cost value for the distance */
+  inline unsigned char computeCost(double distance) const
+  {
+    unsigned char cost = 0;
+    if (distance == 0) {
+      cost = LETHAL_OBSTACLE;
+    } else if (distance * resolution_ <= inscribed_radius_) {
+      cost = INSCRIBED_INFLATED_OBSTACLE;
+    } else {
+      // make sure cost falls off by Euclidean distance
+      double factor =
+        exp(-1.0 * cost_scaling_factor_ * (distance * resolution_ - inscribed_radius_));
+      cost = static_cast<unsigned char>((INSCRIBED_INFLATED_OBSTACLE - 1) * factor);
+    }
+    return cost;
+  }
+
+  static std::shared_ptr<nav2_costmap_2d::OpenCVInflationLayer> getOpenCVInflationLayer(
+    std::shared_ptr<nav2_costmap_2d::Costmap2DROS> & costmap_ros,
+    const std::string layer_name = "")
+  {
+    const auto layered_costmap = costmap_ros->getLayeredCostmap();
+    for (auto layer = layered_costmap->getPlugins()->begin();
+      layer != layered_costmap->getPlugins()->end();
+      ++layer)
+    {
+      auto inflation_layer =
+        std::dynamic_pointer_cast<nav2_costmap_2d::OpenCVInflationLayer>(*layer);
+      if (inflation_layer) {
+        if (layer_name.empty() || inflation_layer->getName() == layer_name) {
+          return inflation_layer;
+        }
+      }
+    }
+    return nullptr;
+  }
+
+  // Provide a typedef to ease future code maintenance
+  typedef std::recursive_mutex mutex_t;
+
+  /**
+   * @brief Get the mutex of the inflation information
+   */
+  mutex_t * getMutex()
+  {
+    return access_;
+  }
+
+  double getCostScalingFactor()
+  {
+    return cost_scaling_factor_;
+  }
+
+  double getInflationRadius()
+  {
+    return inflation_radius_;
+  }
+
+protected:
+  /**
+   * @brief Process updates on footprint changes to the inflation layer
+   */
+  void onFootprintChanged() override;
+
+  /**
+   * @brief Convert world distance to cell distance
+   */
+  unsigned int cellDistance(double world_dist)
+  {
+    return layered_costmap_->getCostmap()->cellDistance(world_dist);
+  }
+
+  /**
+   * @brief Generate cost lookup table for distance to cost mapping
+   */
+  void computeCaches();
+
+  /**
+   * @brief Callback executed when a parameter change is detected
+   * @param event ParameterEvent message
+   */
+  rcl_interfaces::msg::SetParametersResult
+  dynamicParametersCallback(std::vector<rclcpp::Parameter> parameters);
+
+  double inflation_radius_, inscribed_radius_, cost_scaling_factor_;
+  bool inflate_unknown_, inflate_around_unknown_;
+  unsigned int cell_inflation_radius_;
+  int cost_lut_precision_;
+  double resolution_;
+  std::vector<unsigned char> cost_lut_;
+  double last_min_x_, last_min_y_, last_max_x_, last_max_y_;
+
+  // Indicates that the entire costmap should be reinflated next time around.
+  bool need_reinflation_;
+  mutex_t * access_;
+  // Dynamic parameters handler
+  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr dyn_params_handler_;
+};
+
+}  // namespace nav2_costmap_2d
+
+#endif  // NAV2_COSTMAP_2D__OPENCV_INFLATION_LAYER_HPP_
