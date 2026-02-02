@@ -99,6 +99,11 @@ add_library(layers SHARED
 # Conditionally add OpenCV inflation layer
 if(BUILD_OPENCV_INFLATION_LAYER)
   target_sources(layers PRIVATE plugins/opencv_inflation_layer.cpp)
+  # Set RPATH so the library can find OpenCV at runtime
+  set_target_properties(layers PROPERTIES
+    INSTALL_RPATH "/opt/opencv-4.13/lib"
+    BUILD_RPATH "/opt/opencv-4.13/lib"
+  )
 endif()
 
 target_include_directories(layers
