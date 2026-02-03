@@ -141,6 +141,30 @@ void generateClusteredObstacles(
   }
 }
 
+/**
+ * @brief Create a robot footprint (rectangular)
+ * @param length Length of robot in meters
+ * @param width Width of robot in meters
+ */
+std::vector<geometry_msgs::msg::Point> createRectangularFootprint(
+  double length = 0.6, double width = 0.4)
+{
+  std::vector<geometry_msgs::msg::Point> footprint;
+  
+  geometry_msgs::msg::Point p1, p2, p3, p4;
+  p1.x = length / 2.0;  p1.y = width / 2.0;
+  p2.x = length / 2.0;  p2.y = -width / 2.0;
+  p3.x = -length / 2.0; p3.y = -width / 2.0;
+  p4.x = -length / 2.0; p4.y = width / 2.0;
+  
+  footprint.push_back(p1);
+  footprint.push_back(p2);
+  footprint.push_back(p3);
+  footprint.push_back(p4);
+  
+  return footprint;
+}
+
 }  // namespace
 
 /**
@@ -167,6 +191,10 @@ public:
     // Setup layered costmap
     layers_ = std::make_unique<nav2_costmap_2d::LayeredCostmap>(global_frame, false, false);
     layers_->resizeMap(width_, height_, resolution_, 0.0, 0.0);
+    
+    // Set robot footprint (1.2m x 1.5m rectangular robot)
+    auto footprint = createRectangularFootprint(1.2, 1.5);
+    layers_->setFootprint(footprint);
 
     // Create and setup inflation layer
     inflation_layer_ = std::make_shared<TestInflationLayer>();
@@ -266,6 +294,10 @@ public:
     
     nav2_costmap_2d::LayeredCostmap layers(global_frame, false, false);
     layers.resizeMap(width, height, 0.05, 0.0, 0.0);
+    
+    // Set robot footprint (1.2m x 1.5m rectangular robot)
+    auto footprint = createRectangularFootprint(1.2, 1.5);
+    layers.setFootprint(footprint);
 
     auto inflation_layer = std::make_shared<TestInflationLayer>();
     inflation_layer->setupForBenchmark(layers, node);
@@ -318,6 +350,8 @@ public:
     std::cout << "  Map size: " << width << " x " << height << " cells\n";
     std::cout << "  Total cells: " << (width * height) << "\n";
     std::cout << "  Occupancy: " << (occupancy * 100.0) << "%\n";
+    std::cout << "  Robot footprint: 1.2m x 1.5m rectangular\n";
+    std::cout << "  Inscribed radius: " << layers.getInscribedRadius() << " m\n";
     std::cout << "  Inflation radius: " << inflation_radius << " m\n";
     std::cout << "  Cost scaling factor: " << cost_scaling_factor << "\n";
     std::cout << "  Iterations: " << num_iterations << "\n";
