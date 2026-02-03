@@ -27,6 +27,20 @@ find_package(nav2_ros_common REQUIRED)
 find_package(tf2_sensor_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(point_cloud_transport REQUIRED)
+find_package(OpenCV REQUIRED COMPONENTS core imgproc)
+
+# # Force OpenCV 4.13+ from /usr/local to avoid system version.
+# # This is needed for a bug fix for large maps with cv::disttransform
+# set(OpenCV_DIR "/usr/local/lib/cmake/opencv4" CACHE PATH "Path to OpenCV config")
+# set(CMAKE_PREFIX_PATH "/usr/local" ${CMAKE_PREFIX_PATH})
+
+# find_package(OpenCV 4.13 REQUIRED COMPONENTS core imgproc)
+
+# if(OpenCV_VERSION VERSION_LESS "4.13")
+#   message(FATAL_ERROR "OpenCV ${OpenCV_VERSION} found, but 4.13+ required. Found at: ${OpenCV_DIR}")
+# endif()
+
+# message(STATUS "✓ Using OpenCV ${OpenCV_VERSION} from ${OpenCV_DIR}")
 
 nav2_package()
 
@@ -90,6 +104,8 @@ target_link_libraries(layers PUBLIC
   tf2::tf2
   nav2_ros_common::nav2_ros_common
   point_cloud_transport::point_cloud_transport
+  opencv_core
+  opencv_imgproc
 )
 target_link_libraries(layers PRIVATE
   pluginlib::pluginlib
@@ -225,6 +241,7 @@ ament_export_dependencies(
   tf2_sensor_msgs
   nav2_ros_common
   point_cloud_transport
+  OpenCV
 )
 pluginlib_export_plugin_description_file(nav2_costmap_2d costmap_plugins.xml)
 ament_package()
