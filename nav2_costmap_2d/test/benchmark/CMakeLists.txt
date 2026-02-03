@@ -4,3 +4,9 @@ target_link_libraries(observation_buffer_benchmark
   nav2_costmap_2d_core
   layers
 )
+
+ament_add_google_benchmark(inflation_layer_updatecosts_benchmark inflation_layer_updatecosts_benchmark.cpp)
+target_link_libraries(inflation_layer_updatecosts_benchmark
+  nav2_costmap_2d_core
+  layers
+)

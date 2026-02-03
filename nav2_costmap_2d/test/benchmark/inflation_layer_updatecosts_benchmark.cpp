@@ -1,0 +1,425 @@
+// Copyright (c) 2026
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#include <random>
+#include <chrono>
+#include <memory>
+#include <string>
+#include <vector>
+#include <iostream>
+#include <iomanip>
+
+#include "benchmark/benchmark.h"
+#include "rclcpp_lifecycle/lifecycle_node.hpp"
+#include "nav2_costmap_2d/inflation_layer.hpp"
+#include "nav2_costmap_2d/layered_costmap.hpp"
+#include "nav2_costmap_2d/costmap_2d.hpp"
+
+namespace
+{
+static constexpr const char * global_frame{"map"};
+
+/**
+ * @brief Test wrapper for InflationLayer to expose protected methods
+ */
+class TestInflationLayer : public nav2_costmap_2d::InflationLayer
+{
+public:
+  void setupForBenchmark(
+    nav2_costmap_2d::LayeredCostmap & layers,
+    nav2::LifecycleNode::SharedPtr node)
+  {
+    initialize(&layers, "inflation", nullptr, node, nullptr);
+  }
+
+  // Expose updateCosts for direct benchmarking
+  void benchmarkUpdateCosts(
+    nav2_costmap_2d::Costmap2D & master_grid,
+    int min_i, int min_j, int max_i, int max_j)
+  {
+    updateCosts(master_grid, min_i, min_j, max_i, max_j);
+  }
+};
+
+/**
+ * @brief Configuration for benchmark scenarios
+ */
+struct BenchmarkConfig
+{
+  unsigned int width;        // Costmap width in cells
+  unsigned int height;       // Costmap height in cells
+  double resolution;         // Meters per cell
+  double occupancy;          // Percentage of cells occupied (0.0 to 1.0)
+  double inflation_radius;   // Inflation radius in meters
+  std::string description;   // Human-readable description
+};
+
+/**
+ * @brief Generate obstacles in a costmap based on occupancy percentage
+ */
+[[maybe_unused]]
+static void generateObstacles(
+  nav2_costmap_2d::Costmap2D & costmap,
+  double occupancy_percent,
+  unsigned int seed = 42)
+{
+  const unsigned int size_x = costmap.getSizeInCellsX();
+  const unsigned int size_y = costmap.getSizeInCellsY();
+  const unsigned int total_cells = size_x * size_y;
+  const unsigned int num_obstacles = static_cast<unsigned int>(total_cells * occupancy_percent);
+
+  std::mt19937 gen(seed);
+  std::uniform_int_distribution<unsigned int> dist_x(0, size_x - 1);
+  std::uniform_int_distribution<unsigned int> dist_y(0, size_y - 1);
+
+  // First, clear the costmap
+  unsigned char * master_array = costmap.getCharMap();
+  memset(master_array, nav2_costmap_2d::FREE_SPACE, total_cells);
+
+  // Add obstacles randomly
+  for (unsigned int i = 0; i < num_obstacles; ++i) {
+    unsigned int x = dist_x(gen);
+    unsigned int y = dist_y(gen);
+    costmap.setCost(x, y, nav2_costmap_2d::LETHAL_OBSTACLE);
+  }
+}
+
+/**
+ * @brief Generate clustered obstacles (more realistic)
+ */
+void generateClusteredObstacles(
+  nav2_costmap_2d::Costmap2D & costmap,
+  double occupancy_percent,
+  unsigned int num_clusters = 10,
+  unsigned int seed = 42)
+{
+  const unsigned int size_x = costmap.getSizeInCellsX();
+  const unsigned int size_y = costmap.getSizeInCellsY();
+  const unsigned int total_cells = size_x * size_y;
+  const unsigned int num_obstacles = static_cast<unsigned int>(total_cells * occupancy_percent);
+
+  std::mt19937 gen(seed);
+  std::uniform_int_distribution<unsigned int> dist_x(0, size_x - 1);
+  std::uniform_int_distribution<unsigned int> dist_y(0, size_y - 1);
+  std::normal_distribution<double> offset_dist(0.0, 5.0);
+
+  // First, clear the costmap
+  unsigned char * master_array = costmap.getCharMap();
+  memset(master_array, nav2_costmap_2d::FREE_SPACE, total_cells);
+
+  // Generate cluster centers
+  std::vector<std::pair<unsigned int, unsigned int>> cluster_centers;
+  for (unsigned int i = 0; i < num_clusters; ++i) {
+    cluster_centers.emplace_back(dist_x(gen), dist_y(gen));
+  }
+
+  // Distribute obstacles around clusters
+  std::uniform_int_distribution<size_t> cluster_dist(0, num_clusters - 1);
+  for (unsigned int i = 0; i < num_obstacles; ++i) {
+    size_t cluster_idx = cluster_dist(gen);
+    int x = static_cast<int>(cluster_centers[cluster_idx].first) +
+      static_cast<int>(offset_dist(gen));
+    int y = static_cast<int>(cluster_centers[cluster_idx].second) +
+      static_cast<int>(offset_dist(gen));
+
+    // Clamp to valid range
+    x = std::max(0, std::min(static_cast<int>(size_x - 1), x));
+    y = std::max(0, std::min(static_cast<int>(size_y - 1), y));
+
+    costmap.setCost(x, y, nav2_costmap_2d::LETHAL_OBSTACLE);
+  }
+}
+
+}  // namespace
+
+/**
+ * @brief Fixture for inflation layer benchmarks
+ */
+class InflationLayerFixture : public benchmark::Fixture
+{
+public:
+  void SetUp(benchmark::State & state) override
+  {
+    // Get parameters from benchmark state
+    width_ = state.range(0);
+    height_ = state.range(1);
+    occupancy_ = state.range(2) / 100.0;  // Convert percentage to decimal
+    inflation_radius_ = state.range(3) / 100.0;  // Convert cm to meters
+    resolution_ = 0.05;  // 5cm per cell by default
+    cost_scaling_factor_ = 3.0;  // Cost scaling factor
+
+    // Initialize ROS node
+    if (!node_) {
+      node_ = std::make_shared<nav2::LifecycleNode>("inflation_benchmark_node");
+    }
+
+    // Setup layered costmap
+    layers_ = std::make_unique<nav2_costmap_2d::LayeredCostmap>(global_frame, false, false);
+    layers_->resizeMap(width_, height_, resolution_, 0.0, 0.0);
+
+    // Create and setup inflation layer
+    inflation_layer_ = std::make_shared<TestInflationLayer>();
+    inflation_layer_->setupForBenchmark(*layers_, node_);
+    
+    // Get the master costmap
+    master_costmap_ = layers_->getCostmap();
+
+    // Generate obstacles based on occupancy
+    generateClusteredObstacles(*master_costmap_, occupancy_);
+  }
+
+  void TearDown(benchmark::State & /*state*/) override
+  {
+    inflation_layer_.reset();
+    layers_.reset();
+  }
+
+  unsigned int width_;
+  unsigned int height_;
+  double occupancy_;
+  double resolution_;
+  double inflation_radius_;
+  double cost_scaling_factor_;
+  nav2::LifecycleNode::SharedPtr node_;
+  std::unique_ptr<nav2_costmap_2d::LayeredCostmap> layers_;
+  std::shared_ptr<TestInflationLayer> inflation_layer_;
+  nav2_costmap_2d::Costmap2D * master_costmap_;
+};
+
+/**
+ * @brief Benchmark the updateCosts function with various configurations
+ */
+BENCHMARK_DEFINE_F(InflationLayerFixture, UpdateCosts)(benchmark::State & state)
+{
+  const int min_i = 0;
+  const int min_j = 0;
+  const int max_i = width_;
+  const int max_j = height_;
+
+  for (auto _ : state) {
+    // Benchmark the updateCosts function
+    inflation_layer_->benchmarkUpdateCosts(*master_costmap_, min_i, min_j, max_i, max_j);
+  }
+
+  // Report additional metrics
+  const size_t total_cells = width_ * height_;
+  const size_t occupied_cells = static_cast<size_t>(total_cells * occupancy_);
+  
+  state.counters["cells"] = total_cells;
+  state.counters["occupied"] = occupied_cells;
+  state.counters["occupancy_%"] = occupancy_ * 100.0;
+  state.counters["inflation_r"] = inflation_radius_;
+  state.counters["cost_scale"] = cost_scaling_factor_;
+  state.counters["width"] = width_;
+  state.counters["height"] = height_;
+  state.counters["cells/s"] = benchmark::Counter(
+    total_cells, benchmark::Counter::kIsIterationInvariantRate);
+}
+
+// Predefined scenarios - Various inflation radii with 10% occupancy
+// Arguments: width, height, occupancy_%, inflation_radius_cm
+
+// Small maps (300x300) with varying inflation radii
+BENCHMARK_REGISTER_F(InflationLayerFixture, UpdateCosts)
+  ->Args({300, 300, 10, 55})     // 300x300, 10% occupancy, 0.55m inflation
+  ->Args({300, 300, 10, 200})    // 300x300, 10% occupancy, 2.0m inflation
+  ->Args({300, 300, 10, 1000})   // 300x300, 10% occupancy, 10.0m inflation
+  ->Unit(benchmark::kMillisecond);
+
+// Medium maps (1500x1500) with varying inflation radii
+BENCHMARK_REGISTER_F(InflationLayerFixture, UpdateCosts)
+  ->Args({1500, 1500, 10, 55})     // 1500x1500, 10% occupancy, 0.55m inflation
+  ->Args({1500, 1500, 10, 200})    // 1500x1500, 10% occupancy, 2.0m inflation
+  ->Args({1500, 1500, 10, 1000})   // 1500x1500, 10% occupancy, 10.0m inflation
+  ->Unit(benchmark::kMillisecond);
+
+// Large maps (8500x8500) with varying inflation radii
+BENCHMARK_REGISTER_F(InflationLayerFixture, UpdateCosts)
+  ->Args({8500, 8500, 10, 55})     // 8500x8500, 10% occupancy, 0.55m inflation
+  ->Args({8500, 8500, 10, 200})    // 8500x8500, 10% occupancy, 2.0m inflation
+  ->Args({8500, 8500, 10, 1000})   // 8500x8500, 10% occupancy, 10.0m inflation
+  ->Unit(benchmark::kMillisecond);
+
+/**
+ * @brief Custom benchmark that allows command-line specification
+ */
+class CustomInflationBenchmark
+{
+public:
+  static void run(
+    unsigned int width, unsigned int height,
+    double occupancy, double inflation_radius = 0.55,
+    double cost_scaling_factor = 3.0)
+  {
+    auto node = std::make_shared<nav2::LifecycleNode>("custom_benchmark_node");
+    
+    nav2_costmap_2d::LayeredCostmap layers(global_frame, false, false);
+    layers.resizeMap(width, height, 0.05, 0.0, 0.0);
+
+    auto inflation_layer = std::make_shared<TestInflationLayer>();
+    inflation_layer->setupForBenchmark(layers, node);
+    
+    auto master_costmap = layers.getCostmap();
+    generateClusteredObstacles(*master_costmap, occupancy);
+
+    // Warm-up run
+    inflation_layer->benchmarkUpdateCosts(*master_costmap, 0, 0, width, height);
+
+    // Timed runs
+    const int num_iterations = 5;
+    std::vector<double> times;
+    times.reserve(num_iterations);
+
+    for (int i = 0; i < num_iterations; ++i) {
+      auto start = std::chrono::high_resolution_clock::now();
+      inflation_layer->benchmarkUpdateCosts(*master_costmap, 0, 0, width, height);
+      auto end = std::chrono::high_resolution_clock::now();
+      
+      std::chrono::duration<double, std::milli> duration = end - start;
+      times.push_back(duration.count());
+    }
+
+    // Calculate statistics
+    double sum = 0.0;
+    double min_time = times[0];
+    double max_time = times[0];
+    
+    for (double t : times) {
+      sum += t;
+      min_time = std::min(min_time, t);
+      max_time = std::max(max_time, t);
+    }
+    
+    double mean = sum / num_iterations;
+    
+    double variance = 0.0;
+    for (double t : times) {
+      variance += (t - mean) * (t - mean);
+    }
+    variance /= num_iterations;
+    double stddev = std::sqrt(variance);
+
+    // Print results
+    std::cout << "\n========================================\n";
+    std::cout << "Custom Inflation Layer Benchmark Results\n";
+    std::cout << "========================================\n";
+    std::cout << "Configuration:\n";
+    std::cout << "  Map size: " << width << " x " << height << " cells\n";
+    std::cout << "  Total cells: " << (width * height) << "\n";
+    std::cout << "  Occupancy: " << (occupancy * 100.0) << "%\n";
+    std::cout << "  Inflation radius: " << inflation_radius << " m\n";
+    std::cout << "  Cost scaling factor: " << cost_scaling_factor << "\n";
+    std::cout << "  Iterations: " << num_iterations << "\n";
+    std::cout << "\nTiming Results:\n";
+    std::cout << std::fixed << std::setprecision(3);
+    std::cout << "  Mean: " << mean << " ms\n";
+    std::cout << "  Std Dev: " << stddev << " ms\n";
+    std::cout << "  Min: " << min_time << " ms\n";
+    std::cout << "  Max: " << max_time << " ms\n";
+    std::cout << "\nPerformance Metrics:\n";
+    std::cout << "  Cells/second: " << std::fixed << std::setprecision(0) 
+              << ((width * height) / (mean / 1000.0)) << "\n";
+    std::cout << "  Throughput: " << std::fixed << std::setprecision(2) 
+              << (1000.0 / mean) << " updates/second\n";
+    std::cout << "========================================\n\n";
+  }
+};
+
+void printUsage()
+{
+  std::cout << "\nInflation Layer UpdateCosts Benchmark\n";
+  std::cout << "======================================\n\n";
+  std::cout << "Usage:\n";
+  std::cout << "  Run predefined scenarios:\n";
+  std::cout << "    ./inflation_layer_updatecosts_benchmark\n\n";
+  std::cout << "  Run custom benchmark:\n";
+  std::cout << "    ./inflation_layer_updatecosts_benchmark --custom --width=<W> --height=<H> --occupancy=<O>\n\n";
+  std::cout << "Options:\n";
+  std::cout << "  --custom              Run custom benchmark instead of Google Benchmark suite\n";
+  std::cout << "  --width=<N>           Map width in cells (default: 1000)\n";
+  std::cout << "  --height=<N>          Map height in cells (default: 1000)\n";
+  std::cout << "  --occupancy=<N>       Obstacle occupancy percentage 0-100 (default: 10)\n";
+  std::cout << "  --inflation=<N>       Inflation radius in meters (default: 0.55)\n";
+  std::cout << "  --cost_scaling=<N>    Cost scaling factor (default: 3.0)\n\n";
+  std::cout << "Google Benchmark Options:\n";
+  std::cout << "  --benchmark_filter=<regex>     Run only benchmarks matching the regex\n";
+  std::cout << "  --benchmark_min_time=<N>       Minimum time in seconds to run each benchmark\n";
+  std::cout << "  --benchmark_repetitions=<N>    Number of times to repeat each benchmark\n";
+  std::cout << "  --benchmark_format=<console|json|csv>\n";
+  std::cout << "  --benchmark_out=<filename>     Output file for benchmark results\n";
+  std::cout << "  --help                         Show Google Benchmark help\n\n";
+  std::cout << "Examples:\n";
+  std::cout << "  # Run all predefined scenarios\n";
+  std::cout << "  ./inflation_layer_updatecosts_benchmark\n\n";
+  std::cout << "  # Run custom 2000x2000 map with 15% occupancy\n";
+  std::cout << "  ./inflation_layer_updatecosts_benchmark --custom --width=2000 --height=2000 --occupancy=15\n\n";
+  std::cout << "  # Run only medium-sized benchmarks\n";
+  std::cout << "  ./inflation_layer_updatecosts_benchmark --benchmark_filter=500x500\n\n";
+  std::cout << "  # Run with multiple repetitions and save to CSV\n";
+  std::cout << "  ./inflation_layer_updatecosts_benchmark --benchmark_repetitions=10 --benchmark_format=csv --benchmark_out=results.csv\n\n";
+}
+
+int main(int argc, char ** argv)
+{
+  // Check for custom benchmark mode
+  bool custom_mode = false;
+  unsigned int custom_width = 1000;
+  unsigned int custom_height = 1000;
+  double custom_occupancy = 0.10;
+  double custom_inflation = 0.55;
+  double custom_cost_scaling = 3.0;
+
+  // Parse custom arguments
+  for (int i = 1; i < argc; ++i) {
+    std::string arg = argv[i];
+    
+    if (arg == "--custom") {
+      custom_mode = true;
+    } else if (arg.find("--width=") == 0) {
+      custom_width = std::stoul(arg.substr(8));
+    } else if (arg.find("--height=") == 0) {
+      custom_height = std::stoul(arg.substr(9));
+    } else if (arg.find("--occupancy=") == 0) {
+      custom_occupancy = std::stod(arg.substr(12)) / 100.0;
+    } else if (arg.find("--inflation=") == 0) {
+      custom_inflation = std::stod(arg.substr(12));
+    } else if (arg.find("--cost_scaling=") == 0) {
+      custom_cost_scaling = std::stod(arg.substr(15));
+    } else if (arg == "--usage") {
+      printUsage();
+      return 0;
+    }
+  }
+
+  // Initialize ROS
+  rclcpp::init(argc, argv);
+
+  if (custom_mode) {
+    // Run custom benchmark
+    CustomInflationBenchmark::run(custom_width, custom_height, custom_occupancy, custom_inflation, custom_cost_scaling);
+  } else {
+    // Run Google Benchmark suite
+    benchmark::Initialize(&argc, argv);
+    if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
+      printUsage();
+      rclcpp::shutdown();
+      return 1;
+    }
+    benchmark::RunSpecifiedBenchmarks();
+  }
+
+  // Shutdown ROS
+  rclcpp::shutdown();
+  return 0;
+}
