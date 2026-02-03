@@ -99,6 +99,7 @@ static void generateObstacles(
 /**
  * @brief Generate clustered obstacles (more realistic)
  */
+[[maybe_unused]]
 void generateClusteredObstacles(
   nav2_costmap_2d::Costmap2D & costmap,
   double occupancy_percent,
@@ -139,6 +140,71 @@ void generateClusteredObstacles(
     y = std::max(0, std::min(static_cast<int>(size_y - 1), y));
 
     costmap.setCost(x, y, nav2_costmap_2d::LETHAL_OBSTACLE);
+  }
+}
+
+/**
+ * @brief Generate rectangular obstacles until occupancy ratio is satisfied
+ */
+void generateRectangularObstacles(
+  nav2_costmap_2d::Costmap2D & costmap,
+  double occupancy_percent,
+  unsigned int min_rect_width = 1000,
+  unsigned int max_rect_width = 2000,
+  unsigned int min_rect_height = 1000,
+  unsigned int max_rect_height = 2000,
+  unsigned int seed = 42)
+{
+  const unsigned int size_x = costmap.getSizeInCellsX();
+  const unsigned int size_y = costmap.getSizeInCellsY();
+  const unsigned int total_cells = size_x * size_y;
+  const unsigned int target_occupied_cells = static_cast<unsigned int>(total_cells * occupancy_percent);
+
+  std::mt19937 gen(seed);
+  std::uniform_int_distribution<unsigned int> dist_x(0, size_x - 1);
+  std::uniform_int_distribution<unsigned int> dist_y(0, size_y - 1);
+  std::uniform_int_distribution<unsigned int> dist_width(min_rect_width, max_rect_width);
+  std::uniform_int_distribution<unsigned int> dist_height(min_rect_height, max_rect_height);
+
+  // First, clear the costmap
+  unsigned char * master_array = costmap.getCharMap();
+  memset(master_array, nav2_costmap_2d::FREE_SPACE, total_cells);
+
+  // Track occupied cells
+  unsigned int occupied_count = 0;
+
+  // Place rectangles until we reach target occupancy
+  const unsigned int max_attempts = 10000;  // Prevent infinite loop
+  unsigned int attempts = 0;
+  
+  while (occupied_count < target_occupied_cells && attempts < max_attempts) {
+    // Generate random rectangle
+    unsigned int rect_x = dist_x(gen);
+    unsigned int rect_y = dist_y(gen);
+    unsigned int rect_width = dist_width(gen);
+    unsigned int rect_height = dist_height(gen);
+
+    // Clamp rectangle to fit within costmap
+    unsigned int end_x = std::min(rect_x + rect_width, size_x);
+    unsigned int end_y = std::min(rect_y + rect_height, size_y);
+
+    // Fill rectangle with obstacles and count new occupied cells
+    for (unsigned int y = rect_y; y < end_y; ++y) {
+      for (unsigned int x = rect_x; x < end_x; ++x) {
+        unsigned char current_cost = costmap.getCost(x, y);
+        if (current_cost != nav2_costmap_2d::LETHAL_OBSTACLE) {
+          costmap.setCost(x, y, nav2_costmap_2d::LETHAL_OBSTACLE);
+          occupied_count++;
+          
+          // Early exit if we've reached target
+          if (occupied_count >= target_occupied_cells) {
+            return;
+          }
+        }
+      }
+    }
+
+    attempts++;
   }
 }
 
@@ -300,8 +366,8 @@ public:
     // Get the master costmap
     master_costmap_ = layers_->getCostmap();
 
-    // Generate obstacles based on occupancy
-    generateClusteredObstacles(*master_costmap_, occupancy_);
+    // Generate obstacles based on occupancy (using rectangular obstacles)
+    generateRectangularObstacles(*master_costmap_, occupancy_);
   }
 
   void TearDown(benchmark::State & /*state*/) override
@@ -400,7 +466,7 @@ public:
     inflation_layer->setupForBenchmark(layers, node);
     
     auto master_costmap = layers.getCostmap();
-    generateClusteredObstacles(*master_costmap, occupancy);
+    generateRectangularObstacles(*master_costmap, occupancy);
 
     // Warm-up run
     inflation_layer->benchmarkUpdateCosts(*master_costmap, 0, 0, width, height);
