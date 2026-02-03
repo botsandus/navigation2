@@ -40,23 +40,25 @@ namespace
 {
 static constexpr const char * global_frame{"map"};
 
-struct ResourceUsage {
+struct ResourceUsage
+{
   double cpu_time_ms;      // CPU time in milliseconds
   long memory_kb;          // Peak memory usage in KB
 };
 
 // Get current resource usage
-ResourceUsage getResourceUsage() {
+ResourceUsage getResourceUsage()
+{
   ResourceUsage usage{0.0, 0};
-  
+
   struct rusage ru;
   if (getrusage(RUSAGE_SELF, &ru) == 0) {
     // CPU time = user time + system time
     usage.cpu_time_ms = (ru.ru_utime.tv_sec * 1000.0 + ru.ru_utime.tv_usec / 1000.0) +
-                        (ru.ru_stime.tv_sec * 1000.0 + ru.ru_stime.tv_usec / 1000.0);
+      (ru.ru_stime.tv_sec * 1000.0 + ru.ru_stime.tv_usec / 1000.0);
     usage.memory_kb = ru.ru_maxrss;
   }
-  
+
   return usage;
 }
 
@@ -131,12 +133,12 @@ bool saveCostmapVisualization(
 
   // Create colorful visualization of costmap
   cv::Mat vis(size_y, size_x, CV_8UC3);
-  
+
   for (unsigned int y = 0; y < size_y; ++y) {
     for (unsigned int x = 0; x < size_x; ++x) {
       size_t idx = y * size_x + x;
       unsigned char cost = data[idx];
-      
+
       cv::Vec3b color;
       if (cost == nav2_costmap_2d::NO_INFORMATION) {
         // Unknown: gray
@@ -154,26 +156,26 @@ bool saveCostmapVisualization(
         // Inflated costs: gradient from blue to red
         // cost ranges from 1 to 252
         float normalized = (cost - 1) / 251.0f;  // 0.0 to 1.0
-        
+
         if (normalized < 0.5f) {
           // Blue to cyan to green (0.0 - 0.5)
           float t = normalized * 2.0f;
           color = cv::Vec3b(
             static_cast<unsigned char>(255 * t),      // B: 255 -> 0
             static_cast<unsigned char>(255 * t),      // G: 0 -> 255
-            static_cast<unsigned char>(255 * (1-t))   // R: 0 -> 0
+            static_cast<unsigned char>(255 * (1 - t))   // R: 0 -> 0
           );
         } else {
           // Green to yellow to red (0.5 - 1.0)
           float t = (normalized - 0.5f) * 2.0f;
           color = cv::Vec3b(
             0,                                         // B: 0
-            static_cast<unsigned char>(255 * (1-t)),  // G: 255 -> 0
+            static_cast<unsigned char>(255 * (1 - t)),  // G: 255 -> 0
             255                                        // R: 255
           );
         }
       }
-      
+
       vis.at<cv::Vec3b>(y, x) = color;
     }
   }
@@ -600,10 +602,10 @@ int main(int argc, char ** argv)
   // Set rectangular footprint (1.45m x 1.05m) AFTER adding the plugin
   std::vector<geometry_msgs::msg::Point> footprint;
   geometry_msgs::msg::Point pt;
-  pt.x =  0.725; pt.y =  0.525; pt.z = 0.0; footprint.push_back(pt);
-  pt.x =  0.725; pt.y = -0.525; pt.z = 0.0; footprint.push_back(pt);
+  pt.x = 0.725; pt.y = 0.525; pt.z = 0.0; footprint.push_back(pt);
+  pt.x = 0.725; pt.y = -0.525; pt.z = 0.0; footprint.push_back(pt);
   pt.x = -0.725; pt.y = -0.525; pt.z = 0.0; footprint.push_back(pt);
-  pt.x = -0.725; pt.y =  0.525; pt.z = 0.0; footprint.push_back(pt);
+  pt.x = -0.725; pt.y = 0.525; pt.z = 0.0; footprint.push_back(pt);
   layers.setFootprint(footprint);
 
   // 0Compute ROI bounds
@@ -634,7 +636,7 @@ int main(int argc, char ** argv)
   // Benchmark
   std::vector<double> times;
   times.reserve(iterations);
-  
+
   ResourceUsage usage_before = getResourceUsage();
   long peak_memory_kb = 0;
 
@@ -649,15 +651,15 @@ int main(int argc, char ** argv)
 
     double ms = std::chrono::duration<double, std::milli>(end - start).count();
     times.push_back(ms);
-    
+
     // Track peak memory
     ResourceUsage current = getResourceUsage();
     peak_memory_kb = std::max(peak_memory_kb, current.memory_kb);
-    
+
     std::cout << "  Run " << (i + 1) << ": " << std::fixed << std::setprecision(2) << ms << " ms"
               << std::endl;
   }
-  
+
   ResourceUsage usage_after = getResourceUsage();
   double cpu_time_used = usage_after.cpu_time_ms - usage_before.cpu_time_ms;
 
@@ -689,7 +691,8 @@ int main(int argc, char ** argv)
   std::cout << "  Throughput: " << std::fixed << std::setprecision(2)
             << (width * height / mean / 1000.0) << " M cells/ms" << std::endl;
   std::cout << "  CPU time: " << std::fixed << std::setprecision(2) << cpu_time_used << " ms"
-            << " (" << std::setprecision(1) << (cpu_time_used / (mean * iterations) * 100.0) << "% of wall time)"
+            << " (" << std::setprecision(1) << (cpu_time_used / (mean * iterations) * 100.0) <<
+    "% of wall time)"
             << std::endl;
   std::cout << "  Peak memory: " << std::fixed << std::setprecision(2) << (peak_memory_kb / 1024.0)
             << " MB" << std::endl;
