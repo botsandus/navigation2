@@ -19,6 +19,7 @@
 #include <vector>
 #include <iostream>
 #include <iomanip>
+#include <fstream>
 
 #include "benchmark/benchmark.h"
 #include "rclcpp_lifecycle/lifecycle_node.hpp"
@@ -165,6 +166,102 @@ std::vector<geometry_msgs::msg::Point> createRectangularFootprint(
   return footprint;
 }
 
+/**
+ * @brief Save costmap as grayscale PGM image
+ */
+bool saveCostmapAsPGM(
+  const nav2_costmap_2d::Costmap2D & costmap,
+  const std::string & filename)
+{
+  std::ofstream file(filename, std::ios::binary);
+  if (!file) {
+    return false;
+  }
+
+  unsigned int width = costmap.getSizeInCellsX();
+  unsigned int height = costmap.getSizeInCellsY();
+  const unsigned char * data = costmap.getCharMap();
+
+  // PGM header
+  file << "P5\n";
+  file << width << " " << height << "\n";
+  file << "255\n";
+
+  // Write pixel data (inverted: 255=free, 0=lethal)
+  for (unsigned int y = 0; y < height; ++y) {
+    for (unsigned int x = 0; x < width; ++x) {
+      unsigned char cost = data[y * width + x];
+      unsigned char pixel = 255 - cost;  // Invert so obstacles are dark
+      file.put(pixel);
+    }
+  }
+
+  return file.good();
+}
+
+/**
+ * @brief Save costmap as color PPM image with inflation visualization
+ */
+bool saveCostmapAsColorPPM(
+  const nav2_costmap_2d::Costmap2D & costmap,
+  const std::string & filename)
+{
+  std::ofstream file(filename, std::ios::binary);
+  if (!file) {
+    return false;
+  }
+
+  unsigned int width = costmap.getSizeInCellsX();
+  unsigned int height = costmap.getSizeInCellsY();
+  const unsigned char * data = costmap.getCharMap();
+
+  // PPM header
+  file << "P6\n";
+  file << width << " " << height << "\n";
+  file << "255\n";
+
+  // Write RGB pixel data
+  for (unsigned int y = 0; y < height; ++y) {
+    for (unsigned int x = 0; x < width; ++x) {
+      unsigned char cost = data[y * width + x];
+      unsigned char r = 255, g = 255, b = 255;  // Default: white (free space)
+
+      if (cost == nav2_costmap_2d::LETHAL_OBSTACLE) {
+        // Lethal: black
+        r = g = b = 0;
+      } else if (cost == nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE) {
+        // Inscribed: red
+        r = 255; g = 0; b = 0;
+      } else if (cost > nav2_costmap_2d::FREE_SPACE && 
+                 cost < nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE) {
+        // Inflated costs: gradient from blue (low) to yellow (high)
+        float normalized = static_cast<float>(cost) / 
+                          static_cast<float>(nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE);
+        
+        if (normalized < 0.5f) {
+          // Blue to cyan (0.0 - 0.5)
+          float t = normalized * 2.0f;
+          r = 0;
+          g = static_cast<unsigned char>(255 * t);
+          b = 255;
+        } else {
+          // Cyan to yellow (0.5 - 1.0)
+          float t = (normalized - 0.5f) * 2.0f;
+          r = static_cast<unsigned char>(255 * t);
+          g = 255;
+          b = static_cast<unsigned char>(255 * (1.0f - t));
+        }
+      }
+
+      file.put(r);
+      file.put(g);
+      file.put(b);
+    }
+  }
+
+  return file.good();
+}
+
 }  // namespace
 
 /**
@@ -288,7 +385,7 @@ public:
   static void run(
     unsigned int width, unsigned int height,
     double occupancy, double inflation_radius = 0.55,
-    double cost_scaling_factor = 3.0)
+    double cost_scaling_factor = 3.0, const std::string & visualize_path = "")
   {
     auto node = std::make_shared<nav2::LifecycleNode>("custom_benchmark_node");
     
@@ -367,6 +464,31 @@ public:
     std::cout << "  Throughput: " << std::fixed << std::setprecision(2) 
               << (1000.0 / mean) << " updates/second\n";
     std::cout << "========================================\n\n";
+
+    // Save visualization if requested
+    if (!visualize_path.empty()) {
+      std::string pgm_path = visualize_path;
+      std::string ppm_path = visualize_path;
+      
+      // Ensure proper extensions
+      if (pgm_path.size() < 4 || pgm_path.substr(pgm_path.size() - 4) != ".pgm") {
+        pgm_path += ".pgm";
+      }
+      ppm_path = pgm_path.substr(0, pgm_path.size() - 4) + ".ppm";
+      
+      std::cout << "Saving visualizations...\n";
+      if (saveCostmapAsPGM(*master_costmap, pgm_path)) {
+        std::cout << "  Grayscale PGM saved to: " << pgm_path << "\n";
+      } else {
+        std::cout << "  Failed to save PGM\n";
+      }
+      
+      if (saveCostmapAsColorPPM(*master_costmap, ppm_path)) {
+        std::cout << "  Color PPM saved to: " << ppm_path << "\n";
+      } else {
+        std::cout << "  Failed to save PPM\n";
+      }
+    }
   }
 };
 
@@ -385,7 +507,8 @@ void printUsage()
   std::cout << "  --height=<N>          Map height in cells (default: 1000)\n";
   std::cout << "  --occupancy=<N>       Obstacle occupancy percentage 0-100 (default: 10)\n";
   std::cout << "  --inflation=<N>       Inflation radius in meters (default: 0.55)\n";
-  std::cout << "  --cost_scaling=<N>    Cost scaling factor (default: 3.0)\n\n";
+  std::cout << "  --cost_scaling=<N>    Cost scaling factor (default: 3.0)\n";
+  std::cout << "  --visualize=<path>    Save costmap as PGM/PPM images (custom mode only)\n\n";
   std::cout << "Google Benchmark Options:\n";
   std::cout << "  --benchmark_filter=<regex>     Run only benchmarks matching the regex\n";
   std::cout << "  --benchmark_min_time=<N>       Minimum time in seconds to run each benchmark\n";
@@ -413,6 +536,7 @@ int main(int argc, char ** argv)
   double custom_occupancy = 0.10;
   double custom_inflation = 0.55;
   double custom_cost_scaling = 3.0;
+  std::string visualize_path;
 
   // Parse custom arguments
   for (int i = 1; i < argc; ++i) {
@@ -430,6 +554,8 @@ int main(int argc, char ** argv)
       custom_inflation = std::stod(arg.substr(12));
     } else if (arg.find("--cost_scaling=") == 0) {
       custom_cost_scaling = std::stod(arg.substr(15));
+    } else if (arg.find("--visualize=") == 0) {
+      visualize_path = arg.substr(12);
     } else if (arg == "--usage") {
       printUsage();
       return 0;
@@ -441,7 +567,7 @@ int main(int argc, char ** argv)
 
   if (custom_mode) {
     // Run custom benchmark
-    CustomInflationBenchmark::run(custom_width, custom_height, custom_occupancy, custom_inflation, custom_cost_scaling);
+    CustomInflationBenchmark::run(custom_width, custom_height, custom_occupancy, custom_inflation, custom_cost_scaling, visualize_path);
   } else {
     // Run Google Benchmark suite
     benchmark::Initialize(&argc, argv);
