@@ -92,6 +92,8 @@ private Q_SLOTS:
 
   void on_edit_node_button_toggled(void);
 
+  void on_remove_node_button_toggled(void);
+
   void on_make_bidirectional_button_clicked(void);
 
   /**
