@@ -74,12 +74,11 @@ public:
     event.current_status = toStr(status, false);
     event_log_.push_back(std::move(event));
 
-    RCLCPP_DEBUG(
-      logger_, "[%.3f]: %25s %s -> %s",
-      std::chrono::duration<double>(timestamp).count(),
-      node.name().c_str(),
+    RCLCPP_INFO(
+      logger_, "%-10s -> %-10s %s",
       toStr(prev_status, true).c_str(),
-      toStr(status, true).c_str() );
+      toStr(status, true).c_str(),
+      node.name().c_str());
   }
 
   /**
