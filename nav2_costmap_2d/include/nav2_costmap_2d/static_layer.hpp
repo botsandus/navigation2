@@ -38,11 +38,13 @@
 #ifndef NAV2_COSTMAP_2D__STATIC_LAYER_HPP_
 #define NAV2_COSTMAP_2D__STATIC_LAYER_HPP_
 
+#include <atomic>
 #include <mutex>
 #include <string>
 #include <vector>
 
 #include "map_msgs/msg/occupancy_grid_update.hpp"
+#include "std_msgs/msg/empty.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "nav2_costmap_2d/costmap_layer.hpp"
 #include "nav2_costmap_2d/layered_costmap.hpp"
@@ -148,6 +150,12 @@ protected:
   void incomingUpdate(map_msgs::msg::OccupancyGridUpdate::ConstSharedPtr update);
 
   /**
+   * @brief Callback for external invalidation requests.
+   * Sets pending_invalidation_ so updateCosts() keeps current_=false until new map data arrives.
+   */
+  void incomingInvalidation(const std_msgs::msg::Empty::ConstSharedPtr & msg);
+
+  /**
    * @brief Interpret the value in the static map given on the topic to
    * convert into costs for the costmap to utilize
    */
@@ -208,6 +216,9 @@ protected:
   bool map_received_in_update_bounds_{false};
   tf2::Duration transform_tolerance_;
   nav_msgs::msg::OccupancyGrid::ConstSharedPtr map_buffer_;
+  // External invalidation support
+  std::atomic<bool> pending_invalidation_{false};
+  nav2::Subscription<std_msgs::msg::Empty>::SharedPtr invalidation_sub_;
   // Dynamic parameters handler
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr dyn_params_handler_;
 };

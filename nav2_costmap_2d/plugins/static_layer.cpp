@@ -103,6 +103,14 @@ StaticLayer::onInitialize()
       map_topic_ + "_updates",
       std::bind(&StaticLayer::incomingUpdate, this, std::placeholders::_1));
   }
+
+  // Subscribe to external invalidation requests on map_topic_/invalidate
+  rclcpp::QoS invalidation_qos(1);
+  invalidation_qos.durability_volatile();
+  invalidation_sub_ = node->create_subscription<std_msgs::msg::Empty>(
+    map_topic_ + "/invalidate",
+    std::bind(&StaticLayer::incomingInvalidation, this, std::placeholders::_1),
+    invalidation_qos);
 }
 
 void
@@ -245,6 +253,7 @@ StaticLayer::processMap(const nav_msgs::msg::OccupancyGrid & new_map)
   height_ = size_y_;
   has_updated_data_ = true;
 
+  pending_invalidation_ = false;
   current_ = true;
 }
 
@@ -288,6 +297,7 @@ StaticLayer::incomingMap(const nav_msgs::msg::OccupancyGrid::ConstSharedPtr & ne
     RCLCPP_ERROR(logger_, "Received map message is malformed. Rejecting.");
     return;
   }
+  current_ = false;
   if (!map_received_) {
     processMap(*new_map);
     map_received_ = true;
@@ -335,6 +345,13 @@ StaticLayer::incomingUpdate(map_msgs::msg::OccupancyGridUpdate::ConstSharedPtr u
   }
 
   has_updated_data_ = true;
+}
+
+void
+StaticLayer::incomingInvalidation(const std_msgs::msg::Empty::ConstSharedPtr & /*msg*/)
+{
+  pending_invalidation_ = true;
+  current_ = false;
 }
 
 
@@ -472,7 +489,8 @@ StaticLayer::updateCosts(
     // restore the map region occupied by the polygon using cached data
     restoreMapRegionOccupiedByPolygon(map_region_to_restore);
   }
-  current_ = true;
+
+  current_ = !pending_invalidation_.load();
 }
 
 /**
