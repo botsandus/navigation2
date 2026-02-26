@@ -38,6 +38,7 @@
 #include "nav2_costmap_2d/layered_costmap.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdio>
 #include <memory>
 #include <string>
@@ -170,7 +171,16 @@ void LayeredCostmap::updateMap(double robot_x, double robot_y, double robot_yaw)
     double prev_miny = miny_;
     double prev_maxx = maxx_;
     double prev_maxy = maxy_;
+    auto bounds_start = std::chrono::steady_clock::now();
     (*plugin)->updateBounds(robot_x, robot_y, robot_yaw, &minx_, &miny_, &maxx_, &maxy_);
+    auto bounds_elapsed = std::chrono::steady_clock::now() - bounds_start;
+    if (bounds_elapsed > std::chrono::milliseconds(1)) {
+      RCLCPP_WARN(
+        rclcpp::get_logger("nav2_costmap_2d"),
+        "Layer '%s' updateBounds took %.3f ms",
+        (*plugin)->getName().c_str(),
+        std::chrono::duration<double, std::milli>(bounds_elapsed).count());
+    }
     if (minx_ > prev_minx || miny_ > prev_miny || maxx_ < prev_maxx || maxy_ < prev_maxy) {
       RCLCPP_WARN(
         rclcpp::get_logger(
@@ -188,7 +198,16 @@ void LayeredCostmap::updateMap(double robot_x, double robot_y, double robot_yaw)
     double prev_miny = miny_;
     double prev_maxx = maxx_;
     double prev_maxy = maxy_;
+    auto filter_bounds_start = std::chrono::steady_clock::now();
     (*filter)->updateBounds(robot_x, robot_y, robot_yaw, &minx_, &miny_, &maxx_, &maxy_);
+    auto filter_bounds_elapsed = std::chrono::steady_clock::now() - filter_bounds_start;
+    if (filter_bounds_elapsed > std::chrono::milliseconds(1)) {
+      RCLCPP_WARN(
+        rclcpp::get_logger("nav2_costmap_2d"),
+        "Filter '%s' updateBounds took %.3f ms",
+        (*filter)->getName().c_str(),
+        std::chrono::duration<double, std::milli>(filter_bounds_elapsed).count());
+    }
     if (minx_ > prev_minx || miny_ > prev_miny || maxx_ < prev_maxx || maxy_ < prev_maxy) {
       RCLCPP_WARN(
         rclcpp::get_logger(
@@ -209,7 +228,7 @@ void LayeredCostmap::updateMap(double robot_x, double robot_y, double robot_yaw)
   y0 = std::max(0, y0);
   yn = std::min(static_cast<int>(combined_costmap_.getSizeInCellsY()), yn + 1);
 
-  RCLCPP_DEBUG(
+  RCLCPP_INFO(
     rclcpp::get_logger(
       "nav2_costmap_2d"), "Updating area x: [%d, %d] y: [%d, %d]", x0, xn, y0, yn);
 
@@ -223,7 +242,16 @@ void LayeredCostmap::updateMap(double robot_x, double robot_y, double robot_yaw)
     for (vector<std::shared_ptr<Layer>>::iterator plugin = plugins_.begin();
       plugin != plugins_.end(); ++plugin)
     {
+      auto costs_start = std::chrono::steady_clock::now();
       (*plugin)->updateCosts(combined_costmap_, x0, y0, xn, yn);
+      auto costs_elapsed = std::chrono::steady_clock::now() - costs_start;
+      if (costs_elapsed > std::chrono::milliseconds(1)) {
+        RCLCPP_WARN(
+          rclcpp::get_logger("nav2_costmap_2d"),
+          "Layer '%s' updateCosts took %.3f ms",
+          (*plugin)->getName().c_str(),
+          std::chrono::duration<double, std::milli>(costs_elapsed).count());
+      }
     }
   } else {
     // Costmap Filters enabled
@@ -232,7 +260,16 @@ void LayeredCostmap::updateMap(double robot_x, double robot_y, double robot_yaw)
     for (vector<std::shared_ptr<Layer>>::iterator plugin = plugins_.begin();
       plugin != plugins_.end(); ++plugin)
     {
+      auto costs_start = std::chrono::steady_clock::now();
       (*plugin)->updateCosts(primary_costmap_, x0, y0, xn, yn);
+      auto costs_elapsed = std::chrono::steady_clock::now() - costs_start;
+      if (costs_elapsed > std::chrono::milliseconds(1)) {
+        RCLCPP_WARN(
+          rclcpp::get_logger("nav2_costmap_2d"),
+          "Layer '%s' updateCosts took %.3f ms",
+          (*plugin)->getName().c_str(),
+          std::chrono::duration<double, std::milli>(costs_elapsed).count());
+      }
     }
 
     // 2. Copy processed costmap window to a final costmap.
@@ -250,7 +287,16 @@ void LayeredCostmap::updateMap(double robot_x, double robot_y, double robot_yaw)
     for (vector<std::shared_ptr<Layer>>::iterator filter = filters_.begin();
       filter != filters_.end(); ++filter)
     {
+      auto filter_costs_start = std::chrono::steady_clock::now();
       (*filter)->updateCosts(combined_costmap_, x0, y0, xn, yn);
+      auto filter_costs_elapsed = std::chrono::steady_clock::now() - filter_costs_start;
+      if (filter_costs_elapsed > std::chrono::milliseconds(1)) {
+        RCLCPP_WARN(
+          rclcpp::get_logger("nav2_costmap_2d"),
+          "Filter '%s' updateCosts took %.3f ms",
+          (*filter)->getName().c_str(),
+          std::chrono::duration<double, std::milli>(filter_costs_elapsed).count());
+      }
     }
   }
 
