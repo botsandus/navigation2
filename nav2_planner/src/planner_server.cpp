@@ -279,15 +279,21 @@ bool PlannerServer::isServerInactive(
   return false;
 }
 
-void PlannerServer::waitForCostmap()
+double PlannerServer::waitForCostmap()
 {
   if (costmap_update_timeout_ > rclcpp::Duration(0, 0)) {
+    auto waiting_start = now();
+    bool was_waiting = !costmap_ros_->isCurrent();
     try {
       costmap_ros_->waitUntilCurrent(costmap_update_timeout_);
     } catch (const std::runtime_error & ex) {
       throw nav2_core::PlannerTimedOut(ex.what());
     }
+    if (was_waiting) {
+      return (now() - waiting_start).seconds();
+    }
   }
+  return 0.0;
 }
 
 template<typename T>
@@ -384,7 +390,7 @@ void PlannerServer::computePlanThroughPoses()
       return;
     }
 
-    waitForCostmap();
+    double costmap_wait = waitForCostmap();
 
     getPreemptedGoalIfRequested<ActionThroughPoses>(action_server_poses_, goal);
 
@@ -479,8 +485,11 @@ void PlannerServer::computePlanThroughPoses()
     if (max_planner_duration_ && cycle_duration.seconds() > max_planner_duration_) {
       RCLCPP_WARN(
         get_logger(),
-        "Planner loop missed its desired rate of %.4f Hz. Current loop rate is %.4f Hz",
-        1 / max_planner_duration_, 1 / cycle_duration.seconds());
+        "Planner loop missed its desired rate of %.4f Hz. Current loop rate is %.4f Hz"
+        "%s",
+        1 / max_planner_duration_, 1 / cycle_duration.seconds(),
+        costmap_wait > 0.0 ?
+          (" Waited " + std::to_string(costmap_wait) + "s for costmap update.").c_str() : "");
     }
 
     action_server_poses_->succeeded_current(result);
@@ -552,7 +561,7 @@ PlannerServer::computePlan()
       return;
     }
 
-    waitForCostmap();
+    double costmap_wait = waitForCostmap();
 
     getPreemptedGoalIfRequested<ActionToPose>(action_server_pose_, goal);
 
@@ -586,8 +595,11 @@ PlannerServer::computePlan()
     if (max_planner_duration_ && cycle_duration.seconds() > max_planner_duration_) {
       RCLCPP_WARN(
         get_logger(),
-        "Planner loop missed its desired rate of %.4f Hz. Current loop rate is %.4f Hz",
-        1 / max_planner_duration_, 1 / cycle_duration.seconds());
+        "Planner loop missed its desired rate of %.4f Hz. Current loop rate is %.4f Hz"
+        "%s",
+        1 / max_planner_duration_, 1 / cycle_duration.seconds(),
+        costmap_wait > 0.0 ?
+          (" Waited " + std::to_string(costmap_wait) + "s for costmap update.").c_str() : "");
     }
     action_server_pose_->succeeded_current(result);
   } catch (nav2_core::InvalidPlanner & ex) {
