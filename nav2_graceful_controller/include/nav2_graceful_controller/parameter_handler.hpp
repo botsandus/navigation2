@@ -50,6 +50,11 @@ struct Parameters
   bool allow_backward;
   double in_place_collision_resolution;
   bool use_collision_detection;
+  double footprint_scaling_linear_vel;
+  double footprint_scaling_factor;
+  double footprint_scaling_step;
+  int obstacle_cost_margin;
+  double final_rotation_search_step;
 };
 
 /**

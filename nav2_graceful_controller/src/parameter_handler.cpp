@@ -70,6 +70,16 @@ ParameterHandler::ParameterHandler(
     plugin_name_ + ".in_place_collision_resolution", 0.1);
   params_.use_collision_detection = node->declare_or_get_parameter(
     plugin_name_ + ".use_collision_detection", true);
+  params_.footprint_scaling_linear_vel = node->declare_or_get_parameter(
+    plugin_name_ + ".footprint_scaling_linear_vel", 0.5);
+  params_.footprint_scaling_factor = node->declare_or_get_parameter(
+    plugin_name_ + ".footprint_scaling_factor", 0.25);
+  params_.footprint_scaling_step = node->declare_or_get_parameter(
+    plugin_name_ + ".footprint_scaling_step", 0.1);
+  params_.obstacle_cost_margin = node->declare_or_get_parameter(
+    plugin_name_ + ".obstacle_cost_margin", 1);
+  params_.final_rotation_search_step = node->declare_or_get_parameter(
+    plugin_name_ + ".final_rotation_search_step", 0.1);
   if (params_.initial_rotation && params_.allow_backward) {
     RCLCPP_WARN(
       logger_, "Initial rotation and allow backward parameters are both true, "
@@ -160,6 +170,14 @@ ParameterHandler::updateParametersCallback(
         params_.rotation_scaling_factor = parameter.as_double();
       } else if (param_name == plugin_name_ + ".in_place_collision_resolution") {
         params_.in_place_collision_resolution = parameter.as_double();
+      } else if (param_name == plugin_name_ + ".footprint_scaling_linear_vel") {
+        params_.footprint_scaling_linear_vel = parameter.as_double();
+      } else if (param_name == plugin_name_ + ".footprint_scaling_factor") {
+        params_.footprint_scaling_factor = parameter.as_double();
+      } else if (param_name == plugin_name_ + ".footprint_scaling_step") {
+        params_.footprint_scaling_step = parameter.as_double();
+      } else if (param_name == plugin_name_ + ".final_rotation_search_step") {
+        params_.final_rotation_search_step = parameter.as_double();
       }
     } else if (param_type == ParameterType::PARAMETER_BOOL) {
       if (param_name == plugin_name_ + ".initial_rotation") {
@@ -170,6 +188,10 @@ ParameterHandler::updateParametersCallback(
         params_.allow_backward = parameter.as_bool();
       } else if (param_name == plugin_name_ + ".use_collision_detection") {
         params_.use_collision_detection = parameter.as_bool();
+      }
+    } else if (param_type == ParameterType::PARAMETER_INTEGER) {
+      if (param_name == plugin_name_ + ".obstacle_cost_margin") {
+        params_.obstacle_cost_margin = parameter.as_int();
       }
     }
   }

@@ -30,7 +30,6 @@
 #include "rclcpp/rclcpp.hpp"
 #include "nav2_costmap_2d/inflation_layer_interface.hpp"
 #include "nav2_costmap_2d/layered_costmap.hpp"
-#include "nav2_costmap_2d/costmap_2d_ros.hpp"
 #include "nav2_costmap_2d/distance_transform.hpp"
 
 namespace nav2_costmap_2d
@@ -58,6 +57,16 @@ public:
    * @brief Initialization process of layer on startup
    */
   void onInitialize() override;
+
+  /**
+   * @brief Deactivate the layer
+   */
+  void deactivate() override;
+
+  /**
+   * @brief Activate the layer
+   */
+  void activate() override;
 
   /**
    * @brief Update the bounds of the master costmap by this layer's update dimensions
@@ -125,26 +134,6 @@ public:
     return cost;
   }
 
-  static std::shared_ptr<nav2_costmap_2d::InflationLayer> getInflationLayer(
-    std::shared_ptr<nav2_costmap_2d::Costmap2DROS> & costmap_ros,
-    const std::string layer_name = "")
-  {
-    const auto layered_costmap = costmap_ros->getLayeredCostmap();
-    for (auto layer = layered_costmap->getPlugins()->begin();
-      layer != layered_costmap->getPlugins()->end();
-      ++layer)
-    {
-      auto inflation_layer =
-        std::dynamic_pointer_cast<nav2_costmap_2d::InflationLayer>(*layer);
-      if (inflation_layer) {
-        if (layer_name.empty() || inflation_layer->getName() == layer_name) {
-          return inflation_layer;
-        }
-      }
-    }
-    return nullptr;
-  }
-
   /**
    * @brief Get the mutex of the inflation information
    */
@@ -208,11 +197,23 @@ protected:
   int getOptimalThreadCount();
 
   /**
-   * @brief Callback executed when a parameter change is detected
-   * @param event ParameterEvent message
+   * @brief Validate incoming parameter updates before applying them.
+   * This callback is triggered when one or more parameters are about to be updated.
+   * It checks the validity of parameter values and rejects updates that would lead
+   * to invalid or inconsistent configurations
+   * @param parameters List of parameters that are being updated.
+   * @return rcl_interfaces::msg::SetParametersResult Result indicating whether the update is accepted.
    */
-  rcl_interfaces::msg::SetParametersResult
-  dynamicParametersCallback(std::vector<rclcpp::Parameter> parameters);
+  rcl_interfaces::msg::SetParametersResult validateParameterUpdatesCallback(
+    const std::vector<rclcpp::Parameter> & parameters);
+
+  /**
+   * @brief Apply parameter updates after validation
+   * This callback is executed when parameters have been successfully updated.
+   * It updates the internal configuration of the node with the new parameter values.
+   * @param parameters List of parameters that have been updated.
+   */
+  void updateParametersCallback(const std::vector<rclcpp::Parameter> & parameters);
 
   double inflation_radius_, inscribed_radius_, cost_scaling_factor_;
   bool inflate_unknown_, inflate_around_unknown_;
@@ -229,7 +230,8 @@ protected:
   bool need_reinflation_;
   mutex_t * access_;
   // Dynamic parameters handler
-  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr dyn_params_handler_;
+  rclcpp::node_interfaces::PostSetParametersCallbackHandle::SharedPtr post_set_params_handler_;
+  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr on_set_params_handler_;
 };
 
 }  // namespace nav2_costmap_2d

@@ -80,6 +80,27 @@ void Optimizer::getParams()
   auto & s = settings_;
   auto getParam = parameters_handler_->getParamGetter(name_);
   auto getParentParam = parameters_handler_->getParamGetter("");
+
+  // Reject dynamic updates to kinematic params when speed limit is active
+  auto kinematic_guard = [this](
+    const rclcpp::Parameter & param,
+    rcl_interfaces::msg::SetParametersResult & result) {
+      if (isSpeedLimitActive()) {
+        result.successful = false;
+        if (!result.reason.empty()) {
+          result.reason += "\n";
+        }
+        result.reason += "Rejected dynamic update to '" + param.get_name() +
+          "': speed limit is active. Clear the speed limit first.";
+      }
+    };
+
+  const std::vector<std::string> kinematic_params = {
+    "vx_max", "vx_min", "vy_max", "wz_max"};
+  for (const auto & p : kinematic_params) {
+    parameters_handler_->addPreCallback(name_ + "." + p, kinematic_guard);
+  }
+
   getParam(s.model_dt, "model_dt", 0.05f);
   getParam(s.time_steps, "time_steps", 56);
   getParam(s.batch_size, "batch_size", 1000);
@@ -184,6 +205,18 @@ bool Optimizer::isHolonomic() const
   return motion_model_->isHolonomic();
 }
 
+bool Optimizer::isSpeedLimitActive() const
+{
+  // Speed limit is active when current constraints differ from base constraints.
+  // This occurs when setSpeedLimit() has modified the velocity/acceleration limits.
+  const auto & base = settings_.base_constraints;
+  const auto & curr = settings_.constraints;
+  return base.vx_max != curr.vx_max ||
+         base.vx_min != curr.vx_min ||
+         base.vy != curr.vy ||
+         base.wz != curr.wz;
+}
+
 std::tuple<geometry_msgs::msg::TwistStamped, Eigen::ArrayXXf> Optimizer::evalControl(
   const geometry_msgs::msg::PoseStamped & robot_pose,
   const geometry_msgs::msg::Twist & robot_speed,
@@ -215,7 +248,6 @@ std::tuple<geometry_msgs::msg::TwistStamped, Eigen::ArrayXXf> Optimizer::evalCon
     }
   } while (fallback(critics_data_.fail_flag || !trajectory_valid));
 
-  utils::savitskyGolayFilter(control_sequence_, control_history_, settings_);
   auto control = getControlFromSequenceAsTwist(plan.header.stamp);
 
   last_command_vel_ = control.twist;
@@ -266,7 +298,7 @@ void Optimizer::prepare(
   state_.speed = settings_.open_loop ? last_command_vel_ : robot_speed;
   state_.local_path_length = nav2_util::geometry_utils::calculate_path_length(plan);
   path_ = utils::toTensor(plan);
-  costs_.setZero();
+  costs_.setZero(settings_.batch_size);
   goal_ = goal;
 
   critics_data_.fail_flag = false;
@@ -522,6 +554,8 @@ void Optimizer::updateControlSequence()
   if (is_holo) {
     control_sequence_.vy = state_.cvy.transpose().matrix() * softmax_mat;
   }
+
+  utils::savitskyGolayFilter(control_sequence_, control_history_, settings_);
 
   applyControlSequenceConstraints();
 }
