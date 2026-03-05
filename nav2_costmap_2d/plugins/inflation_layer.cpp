@@ -434,45 +434,6 @@ InflationLayer::updateParametersCallback(
         num_threads_ = new_value;
 #endif
       }
-    } else if (param_type == ParameterType::PARAMETER_INTEGER) {
-      if (param_name == name_ + "." + "num_threads" && // NOLINT
-        num_threads_ != parameter.as_int())
-      {
-        int new_value = parameter.as_int();
-#ifdef _OPENMP
-        if (new_value < -1) {
-          RCLCPP_WARN(
-            logger_,
-            "Invalid num_threads value %d, must be -1 (auto) or > 0. Ignoring.",
-            new_value);
-          result.successful = false;
-          result.reason = "num_threads must be -1 (auto) or > 0";
-          return result;
-        }
-        int available_cores = omp_get_max_threads();
-        if (new_value > available_cores) {
-          RCLCPP_WARN(
-            logger_,
-            "num_threads=%d exceeds available cores (%d). Ignoring.",
-            new_value, available_cores);
-          result.successful = false;
-          result.reason = "num_threads exceeds available cores";
-          return result;
-        }
-        num_threads_ = new_value;
-        RCLCPP_INFO(
-          logger_,
-          "Updated num_threads to %d %s",
-          num_threads_,
-          num_threads_ == -1 ? "(auto)" : "");
-#else
-        RCLCPP_WARN(
-          logger_,
-          "num_threads parameter ignored - OpenMP support not available. "
-          "Inflation layer will use single thread.");
-        num_threads_ = new_value;
-#endif
-      }
     } else if (param_type == ParameterType::PARAMETER_BOOL) {
       if (param_name == name_ + "." + "enabled" && enabled_ != parameter.as_bool()) {
         enabled_ = parameter.as_bool();
