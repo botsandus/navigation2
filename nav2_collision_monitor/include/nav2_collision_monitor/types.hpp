@@ -16,6 +16,8 @@
 #define NAV2_COLLISION_MONITOR__TYPES_HPP_
 
 #include <string>
+#include <unordered_map>
+#include <vector>
 
 namespace nav2_collision_monitor
 {
@@ -77,6 +79,9 @@ struct Action
   ActionType action_type;
   Velocity req_vel;
   std::string polygon_name;
+  /// @brief Points inside the triggering polygon, keyed by sensor source name.
+  /// Populated only when action_type != DO_NOTHING and polygon_name != "invalid source".
+  std::unordered_map<std::string, std::vector<Point>> triggering_points;
 };
 
 }  // namespace nav2_collision_monitor

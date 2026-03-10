@@ -204,15 +204,12 @@ protected:
 
   /**
    * @brief Publishes the points responsible for the current collision-monitor action.
+   * Reads action.triggering_points (populated by processStopSlowdownLimit / processApproach).
    * Emits one POINTS marker per (polygon, source) pair, colour-coded by action type.
-   * Sends DELETE markers for any (polygon, source) pairs that were active last cycle
-   * but are no longer active.
-   * @param action Current robot action (used for polygon name and action type)
-   * @param triggering_points Map from source name to the points inside the triggering polygon
+   * Sends DELETE markers for any namespaces active last cycle but no longer active.
+   * @param action Current robot action
    */
-  void publishTriggeringPoints(
-    const Action & action,
-    const std::unordered_map<std::string, std::vector<Point>> & triggering_points);
+  void publishTriggeringPoints(const Action & action);
 
   /**
    * @brief Enable/disable collision monitor service callback
