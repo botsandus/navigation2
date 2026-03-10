@@ -166,6 +166,17 @@ public:
     const std::unordered_map<std::string, std::vector<Point>> & sources_collision_points_map) const;
 
   /**
+   * @brief Gets points from each associated source that lie inside this polygon.
+   * Used for visualising which points are responsible for a STOP/SLOWDOWN/LIMIT trigger.
+   * @param sources_collision_points_map Map containing source name as key and
+   * input array of source's points as value
+   * @return Map from source name to the subset of that source's points inside the polygon
+   */
+  virtual std::unordered_map<std::string, std::vector<Point>> getTriggeringPoints(
+    const std::unordered_map<std::string, std::vector<Point>> & sources_collision_points_map)
+  const;
+
+  /**
    * @brief Obtains estimated (simulated) time before a collision.
    * Applicable for APPROACH model.
    * @param sources_collision_points_map Map containing source name as key,
@@ -177,6 +188,22 @@ public:
   double getCollisionTime(
     const std::unordered_map<std::string, std::vector<Point>> & sources_collision_points_map,
     const Velocity & velocity) const;
+
+  /**
+   * @brief Obtains estimated (simulated) time before a collision and captures the triggering
+   * points at the collision step. Applicable for APPROACH model.
+   * @param sources_collision_points_map Map containing source name as key,
+   * and input array of source's 2D obstacle points as value
+   * @param velocity Simulated robot velocity
+   * @param out_triggering_points Output map from source name to the points (in the current
+   * base frame) responsible for the detected collision
+   * @return Estimated time before a collision. If there is no collision,
+   * return value will be negative.
+   */
+  double getCollisionTime(
+    const std::unordered_map<std::string, std::vector<Point>> & sources_collision_points_map,
+    const Velocity & velocity,
+    std::unordered_map<std::string, std::vector<Point>> & out_triggering_points) const;
 
   /**
    * @brief Publishes polygon message into a its own topic

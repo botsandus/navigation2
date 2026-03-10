@@ -252,6 +252,28 @@ int Polygon::getPointsInside(const std::vector<Point> & points) const
   return num;
 }
 
+std::unordered_map<std::string, std::vector<Point>> Polygon::getTriggeringPoints(
+  const std::unordered_map<std::string, std::vector<Point>> & sources_collision_points_map) const
+{
+  std::unordered_map<std::string, std::vector<Point>> result;
+  for (const auto & source_name : sources_names_) {
+    const auto it = sources_collision_points_map.find(source_name);
+    if (it == sources_collision_points_map.end()) {
+      continue;
+    }
+    std::vector<Point> inside;
+    for (const Point & p : it->second) {
+      if (nav2_util::geometry_utils::isPointInsidePolygon(p.x, p.y, poly_)) {
+        inside.push_back(p);
+      }
+    }
+    if (!inside.empty()) {
+      result[source_name] = std::move(inside);
+    }
+  }
+  return result;
+}
+
 int Polygon::getPointsInside(
   const std::unordered_map<std::string,
   std::vector<Point>> & sources_collision_points_map) const
@@ -308,6 +330,64 @@ double Polygon::getCollisionTime(
     // If the collision occurred on this stage, return the actual time before a collision
     // as if robot was moved with given velocity
     if (getPointsInside(points_transformed) >= min_points_) {
+      return time;
+    }
+  }
+
+  // There is no collision
+  return -1.0;
+}
+
+double Polygon::getCollisionTime(
+  const std::unordered_map<std::string, std::vector<Point>> & sources_collision_points_map,
+  const Velocity & velocity,
+  std::unordered_map<std::string, std::vector<Point>> & out_triggering_points) const
+{
+  // Initial robot pose is {0,0} in base_footprint coordinates
+  Pose pose = {0.0, 0.0, 0.0};
+  Velocity vel = velocity;
+
+  // Build a flat point array while recording which source each point belongs to
+  std::vector<std::string> point_sources;
+  std::vector<Point> collision_points;
+
+  for (const auto & source_name : sources_names_) {
+    const auto it = sources_collision_points_map.find(source_name);
+    if (it != sources_collision_points_map.end()) {
+      for (const auto & p : it->second) {
+        collision_points.push_back(p);
+        point_sources.push_back(source_name);
+      }
+    }
+  }
+
+  // Collect original-frame points that are inside the polygon at a given transformed snapshot.
+  // pts_transformed holds points in the robot's future frame; the result maps each inside
+  // point back to its original (current-frame) position via collision_points[i].
+  auto collect = [&](const std::vector<Point> & pts_transformed) {
+    for (std::size_t i = 0; i < pts_transformed.size(); i++) {
+      if (nav2_util::geometry_utils::isPointInsidePolygon(
+          pts_transformed[i].x, pts_transformed[i].y, poly_))
+      {
+        out_triggering_points[point_sources[i]].push_back(collision_points[i]);
+      }
+    }
+  };
+
+  // Check static polygon (t = 0)
+  if (getPointsInside(collision_points) >= min_points_) {
+    collect(collision_points);
+    return 0.0;
+  }
+
+  // Robot movement simulation
+  std::vector<Point> points_transformed = collision_points;
+  for (double time = 0.0; time <= time_before_collision_; time += simulation_time_step_) {
+    projectState(simulation_time_step_, pose, vel);
+    points_transformed = collision_points;
+    transformPoints(pose, points_transformed);
+    if (getPointsInside(points_transformed) >= min_points_) {
+      collect(points_transformed);
       return time;
     }
   }

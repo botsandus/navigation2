@@ -203,6 +203,18 @@ protected:
   void publishPolygons() const;
 
   /**
+   * @brief Publishes the points responsible for the current collision-monitor action.
+   * Emits one POINTS marker per (polygon, source) pair, colour-coded by action type.
+   * Sends DELETE markers for any (polygon, source) pairs that were active last cycle
+   * but are no longer active.
+   * @param action Current robot action (used for polygon name and action type)
+   * @param triggering_points Map from source name to the points inside the triggering polygon
+   */
+  void publishTriggeringPoints(
+    const Action & action,
+    const std::unordered_map<std::string, std::vector<Point>> & triggering_points);
+
+  /**
    * @brief Enable/disable collision monitor service callback
    * @param request Service request
    * @param response Service response
@@ -239,6 +251,10 @@ protected:
   nav2::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr
     collision_points_marker_pub_;
 
+  /// @brief Triggering points marker publisher (points inside the active triggering zone)
+  nav2::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr
+    triggering_points_pub_;
+
   /// @brief Enable/disable collision monitor service
   nav2::ServiceServer<nav2_msgs::srv::Toggle>::SharedPtr toggle_cm_service_;
 
@@ -247,6 +263,9 @@ protected:
 
   /// @brief Whether main routine is active
   bool process_active_;
+
+  /// @brief Marker namespaces published in the previous triggering_points cycle
+  std::vector<std::string> prev_triggering_namespaces_;
 
   /// @brief Previous robot action
   Action robot_action_prev_;
