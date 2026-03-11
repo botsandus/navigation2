@@ -91,6 +91,7 @@ protected:
   float inflation_scale_factor_{0}, inflation_radius_{0};
 
   float possible_collision_cost_;
+  float inscribed_cost_{253.0f};
   float collision_margin_distance_;
   float near_goal_distance_;
   float circumscribed_cost_{0}, circumscribed_radius_{0};

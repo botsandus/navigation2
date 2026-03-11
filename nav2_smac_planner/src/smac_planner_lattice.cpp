@@ -185,7 +185,8 @@ void SmacPlannerLattice::configure(
   _collision_checker.setFootprint(
     costmap_ros->getRobotFootprint(),
     costmap_ros->getUseRadius(),
-    findCircumscribedCost(costmap_ros));
+    findCircumscribedCost(costmap_ros),
+    findInscribedCost(costmap_ros));
 
   // Initialize A* template
   _a_star = std::make_unique<AStarAlgorithm<NodeLattice>>(_motion_model, _search_info);
@@ -204,6 +205,7 @@ void SmacPlannerLattice::configure(
   if (smooth_path) {
     _smoother = std::make_unique<Smoother>(params);
     _smoother->initialize(_metadata.min_turning_radius);
+    _smoother->setInscribedCost(static_cast<float>(findInscribedCost(costmap_ros)));
   }
 
   _raw_plan_publisher = node->create_publisher<nav_msgs::msg::Path>("unsmoothed_plan");
@@ -301,7 +303,8 @@ nav_msgs::msg::Path SmacPlannerLattice::createPlan(
   _collision_checker.setFootprint(
     _costmap_ros->getRobotFootprint(),
     _costmap_ros->getUseRadius(),
-    findCircumscribedCost(_costmap_ros));
+    findCircumscribedCost(_costmap_ros),
+    findInscribedCost(_costmap_ros));
   _a_star->setCollisionChecker(&_collision_checker);
 
   // Set starting point, in A* bin search coordinates
@@ -480,6 +483,7 @@ nav_msgs::msg::Path SmacPlannerLattice::createPlan(
 
   // Smooth plan
   if (_smoother && num_iterations > 1) {
+    _smoother->setInscribedCost(static_cast<float>(findInscribedCost(_costmap_ros)));
     _smoother->smooth(plan, _costmap, time_remaining);
   }
 
@@ -727,6 +731,7 @@ SmacPlannerLattice::updateParametersCallback(const std::vector<rclcpp::Parameter
       params.get(node, _name);
       _smoother = std::make_unique<Smoother>(params);
       _smoother->initialize(_metadata.min_turning_radius);
+      _smoother->setInscribedCost(static_cast<float>(findInscribedCost(_costmap_ros)));
     }
 
     // Re-Initialize A* template
