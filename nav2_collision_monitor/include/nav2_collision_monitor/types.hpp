@@ -48,11 +48,12 @@ struct Velocity
   }
 };
 
-/// @brief 2D point
+/// @brief Point with 2D collision-check coordinates and optional height from the original sensor
 struct Point
 {
-  double x;  // x-coordinate of point
-  double y;  // y-coordinate of point
+  double x;        // x-coordinate in base frame
+  double y;        // y-coordinate in base frame
+  double z = 0.0;  // height in base frame; 0 for inherently-2D sources (scan, range)
 };
 
 /// @brief 2D Pose

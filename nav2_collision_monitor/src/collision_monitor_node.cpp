@@ -470,7 +470,7 @@ void CollisionMonitor::process(const Velocity & cmd_vel_in, const std_msgs::msg:
         geometry_msgs::msg::Point p;
         p.x = point.x;
         p.y = point.y;
-        p.z = 0.0;
+        p.z = point.z;
         marker.points.push_back(p);
       }
       marker_array->markers.push_back(marker);
@@ -713,7 +713,7 @@ void CollisionMonitor::publishTriggeringPoints(const Action & action)
       geometry_msgs::msg::Point gp;
       gp.x = p.x;
       gp.y = p.y;
-      gp.z = 0.0;
+      gp.z = p.z;
       marker.points.push_back(gp);
     }
     marker_array->markers.push_back(marker);
