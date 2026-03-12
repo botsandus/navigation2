@@ -1,0 +1,14 @@
+scenario:
+  name: diagonal_move
+  description: "Robot navigates diagonally with a heading change"
+  timeout_sec: 45.0
+
+  start:
+    x: -2.0
+    y: -0.5
+    yaw: 0.0
+
+  goal:
+    x: 0.0
+    y: 1.0
+    yaw: 1.5708  # pi/2

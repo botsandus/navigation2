@@ -1,0 +1,14 @@
+scenario:
+  name: reverse_direction
+  description: "Robot navigates backward to a pose behind its start"
+  timeout_sec: 45.0
+
+  start:
+    x: 0.0
+    y: -0.5
+    yaw: 0.0
+
+  goal:
+    x: -2.0
+    y: -0.5
+    yaw: 3.14159  # pi

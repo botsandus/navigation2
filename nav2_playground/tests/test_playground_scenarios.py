@@ -32,7 +32,8 @@ import launch.launch_description_sources
 import launch_testing
 import launch_testing.actions
 import launch_testing.markers
-from nav2_playground.test_runner import NavTestCase, run_test, TestStatus
+from nav2_nav_tester.runner import run_scenario, TestStatus
+from nav2_nav_tester.scenario import Scenario
 from nav2_simple_commander.robot_navigator import BasicNavigator
 import pytest
 import rclpy
@@ -80,36 +81,39 @@ class TestPlaygroundNavigation(unittest.TestCase):
 
     def test_straight_line(self):
         """Robot navigates in a straight line forward."""
-        tc = NavTestCase(
+        sc = Scenario(
             name='straight_line_forward',
+            description='Straight line forward',
             start_x=-2.0, start_y=-0.5, start_yaw=0.0,
             goal_x=0.0, goal_y=-0.5, goal_yaw=0.0,
             timeout_sec=30.0,
         )
-        result = run_test(self.navigator, tc)
+        result = run_scenario(self.navigator, sc)
         self.assertEqual(result.status, TestStatus.SUCCEEDED,
                          f'Navigation failed: {result.message}')
 
     def test_diagonal_move(self):
         """Robot navigates diagonally with a heading change."""
-        tc = NavTestCase(
+        sc = Scenario(
             name='diagonal_move',
+            description='Diagonal with heading change',
             start_x=-2.0, start_y=-0.5, start_yaw=0.0,
             goal_x=0.0, goal_y=1.0, goal_yaw=math.pi / 2,
             timeout_sec=45.0,
         )
-        result = run_test(self.navigator, tc)
+        result = run_scenario(self.navigator, sc)
         self.assertEqual(result.status, TestStatus.SUCCEEDED,
                          f'Navigation failed: {result.message}')
 
     def test_reverse_direction(self):
         """Robot navigates backward to a pose behind its start."""
-        tc = NavTestCase(
+        sc = Scenario(
             name='reverse_direction',
+            description='Navigate backward',
             start_x=0.0, start_y=-0.5, start_yaw=0.0,
             goal_x=-2.0, goal_y=-0.5, goal_yaw=math.pi,
             timeout_sec=45.0,
         )
-        result = run_test(self.navigator, tc)
+        result = run_scenario(self.navigator, sc)
         self.assertEqual(result.status, TestStatus.SUCCEEDED,
                          f'Navigation failed: {result.message}')

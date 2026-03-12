@@ -1,0 +1,14 @@
+scenario:
+  name: straight_line
+  description: "Robot navigates in a straight line forward"
+  timeout_sec: 30.0
+
+  start:
+    x: -2.0
+    y: -0.5
+    yaw: 0.0
+
+  goal:
+    x: 0.0
+    y: -0.5
+    yaw: 0.0
