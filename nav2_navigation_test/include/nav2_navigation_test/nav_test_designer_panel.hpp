@@ -17,6 +17,7 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include <geometry_msgs/msg/pose.hpp>
@@ -29,11 +30,15 @@
 namespace nav2_navigation_test
 {
 
+/// A single polygon is a list of [x, y] vertices.
+using Polygon2D = std::vector<std::pair<double, double>>;
+
 struct TestCaseData
 {
   std::string name;
   double start_x{0.0}, start_y{0.0}, start_yaw{0.0};
   double goal_x{0.0}, goal_y{0.0}, goal_yaw{0.0};
+  std::vector<Polygon2D> obstacles;
 };
 
 class NavTestDesignerPanel : public rviz_common::Panel
@@ -53,6 +58,11 @@ private Q_SLOTS:
   void onStartPoseSet(const geometry_msgs::msg::Pose & pose);
   void onGoalPoseSet(const geometry_msgs::msg::Pose & pose);
   void onTableCellChanged(int row, int column);
+  void startDrawingObstacle();
+  void finishObstacle();
+  void cancelObstacle();
+  void removeLastObstacle();
+  void onObstacleVertex(double x, double y);
   void saveYaml();
   void loadYaml();
 
@@ -68,11 +78,19 @@ private:
   QPushButton * remove_btn_;
   QPushButton * start_btn_;
   QPushButton * goal_btn_;
+  QPushButton * draw_obs_btn_;
+  QPushButton * finish_obs_btn_;
+  QPushButton * cancel_obs_btn_;
+  QPushButton * remove_obs_btn_;
   QPushButton * save_btn_;
   QPushButton * load_btn_;
 
   // Data
   std::vector<TestCaseData> test_cases_;
+
+  // Obstacle drawing state
+  bool drawing_obstacle_{false};
+  Polygon2D pending_polygon_;
 
   // ROS
   rclcpp::Node::SharedPtr node_;

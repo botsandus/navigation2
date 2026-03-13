@@ -8,11 +8,13 @@
 #include <QMessageBox>
 
 #include <fstream>
+#include <regex>
 #include <sstream>
 
 #include <pluginlib/class_list_macros.hpp>
 
 #include "nav2_navigation_test/goal_pose_tool.hpp"
+#include "nav2_navigation_test/obstacle_tool.hpp"
 #include "nav2_navigation_test/start_pose_tool.hpp"
 
 namespace nav2_navigation_test
@@ -61,6 +63,12 @@ void NavTestDesignerPanel::onInitialize()
         goal_tool, &GoalPoseTool::goalPoseSet,
         this, &NavTestDesignerPanel::onGoalPoseSet);
     }
+    auto * obs_tool = dynamic_cast<ObstacleTool *>(tool);
+    if (obs_tool) {
+      connect(
+        obs_tool, &ObstacleTool::vertexPlaced,
+        this, &NavTestDesignerPanel::onObstacleVertex);
+    }
   }
 }
 
@@ -98,15 +106,35 @@ void NavTestDesignerPanel::createLayout()
   row2->addWidget(goal_btn_);
   layout->addLayout(row2);
 
-  // Buttons row 3: Save / Load YAML
+  // Buttons row 3: Obstacle drawing
   auto * row3 = new QHBoxLayout;
+  draw_obs_btn_ = new QPushButton("Draw Obstacle", this);
+  finish_obs_btn_ = new QPushButton("Finish", this);
+  cancel_obs_btn_ = new QPushButton("Cancel", this);
+  remove_obs_btn_ = new QPushButton("Remove Last Obstacle", this);
+  finish_obs_btn_->setEnabled(false);
+  cancel_obs_btn_->setEnabled(false);
+  connect(draw_obs_btn_, &QPushButton::clicked, this, &NavTestDesignerPanel::startDrawingObstacle);
+  connect(finish_obs_btn_, &QPushButton::clicked, this, &NavTestDesignerPanel::finishObstacle);
+  connect(cancel_obs_btn_, &QPushButton::clicked, this, &NavTestDesignerPanel::cancelObstacle);
+  connect(
+    remove_obs_btn_, &QPushButton::clicked,
+    this, &NavTestDesignerPanel::removeLastObstacle);
+  row3->addWidget(draw_obs_btn_);
+  row3->addWidget(finish_obs_btn_);
+  row3->addWidget(cancel_obs_btn_);
+  row3->addWidget(remove_obs_btn_);
+  layout->addLayout(row3);
+
+  // Buttons row 4: Save / Load YAML
+  auto * row4 = new QHBoxLayout;
   save_btn_ = new QPushButton("Save YAML", this);
   load_btn_ = new QPushButton("Load YAML", this);
   connect(save_btn_, &QPushButton::clicked, this, &NavTestDesignerPanel::saveYaml);
   connect(load_btn_, &QPushButton::clicked, this, &NavTestDesignerPanel::loadYaml);
-  row3->addWidget(save_btn_);
-  row3->addWidget(load_btn_);
-  layout->addLayout(row3);
+  row4->addWidget(save_btn_);
+  row4->addWidget(load_btn_);
+  layout->addLayout(row4);
 
   setLayout(layout);
 }
@@ -216,6 +244,71 @@ void NavTestDesignerPanel::onTableCellChanged(int row, int /*column*/)
   updateMarkers();
 }
 
+void NavTestDesignerPanel::startDrawingObstacle()
+{
+  int row = table_->currentRow();
+  if (row < 0) {
+    QMessageBox::information(this, "Info", "Select a test case row first.");
+    return;
+  }
+  drawing_obstacle_ = true;
+  pending_polygon_.clear();
+  draw_obs_btn_->setEnabled(false);
+  finish_obs_btn_->setEnabled(true);
+  cancel_obs_btn_->setEnabled(true);
+
+  // Activate the obstacle tool
+  auto * tool_manager = getDisplayContext()->getToolManager();
+  for (int i = 0; i < tool_manager->numTools(); ++i) {
+    if (dynamic_cast<ObstacleTool *>(tool_manager->getTool(i))) {
+      tool_manager->setCurrentTool(tool_manager->getTool(i));
+      break;
+    }
+  }
+}
+
+void NavTestDesignerPanel::finishObstacle()
+{
+  int row = table_->currentRow();
+  if (row >= 0 && row < static_cast<int>(test_cases_.size()) &&
+    pending_polygon_.size() >= 3)
+  {
+    test_cases_[row].obstacles.push_back(pending_polygon_);
+  }
+  pending_polygon_.clear();
+  drawing_obstacle_ = false;
+  draw_obs_btn_->setEnabled(true);
+  finish_obs_btn_->setEnabled(false);
+  cancel_obs_btn_->setEnabled(false);
+  updateMarkers();
+}
+
+void NavTestDesignerPanel::cancelObstacle()
+{
+  pending_polygon_.clear();
+  drawing_obstacle_ = false;
+  draw_obs_btn_->setEnabled(true);
+  finish_obs_btn_->setEnabled(false);
+  cancel_obs_btn_->setEnabled(false);
+  updateMarkers();
+}
+
+void NavTestDesignerPanel::removeLastObstacle()
+{
+  int row = table_->currentRow();
+  if (row < 0 || row >= static_cast<int>(test_cases_.size())) {return;}
+  if (test_cases_[row].obstacles.empty()) {return;}
+  test_cases_[row].obstacles.pop_back();
+  updateMarkers();
+}
+
+void NavTestDesignerPanel::onObstacleVertex(double x, double y)
+{
+  if (!drawing_obstacle_) {return;}
+  pending_polygon_.emplace_back(x, y);
+  updateMarkers();
+}
+
 void NavTestDesignerPanel::saveYaml()
 {
   QString path = QFileDialog::getSaveFileName(
@@ -238,6 +331,17 @@ void NavTestDesignerPanel::saveYaml()
         << ", y: " << tc.goal_y
         << ", yaw: " << tc.goal_yaw << "}\n";
     ofs << "    timeout: 90.0\n";
+    if (!tc.obstacles.empty()) {
+      ofs << "    obstacles:\n";
+      for (const auto & poly : tc.obstacles) {
+        ofs << "      - [";
+        for (size_t p = 0; p < poly.size(); ++p) {
+          if (p > 0) {ofs << ", ";}
+          ofs << "[" << poly[p].first << ", " << poly[p].second << "]";
+        }
+        ofs << "]\n";
+      }
+    }
   }
   ofs.close();
 }
@@ -304,6 +408,20 @@ void NavTestDesignerPanel::loadYaml()
       if (!x_str.empty()) {current.goal_x = std::stod(x_str);}
       if (!y_str.empty()) {current.goal_y = std::stod(y_str);}
       if (!yaw_str.empty()) {current.goal_yaw = std::stod(yaw_str);}
+    } else if (trimmed.rfind("- [", 0) == 0 || trimmed.rfind("- [[", 0) == 0) {
+      // Parse obstacle polygon line: - [[x1, y1], [x2, y2], ...]
+      Polygon2D poly;
+      std::regex coord_re(R"(\[\s*([\d.e+-]+)\s*,\s*([\d.e+-]+)\s*\])");
+      auto it = std::sregex_iterator(trimmed.begin(), trimmed.end(), coord_re);
+      auto end_it = std::sregex_iterator();
+      for (; it != end_it; ++it) {
+        double px = std::stod((*it)[1].str());
+        double py = std::stod((*it)[2].str());
+        poly.emplace_back(px, py);
+      }
+      if (poly.size() >= 3) {
+        current.obstacles.push_back(poly);
+      }
     }
   }
   if (in_case) {
@@ -454,6 +572,83 @@ void NavTestDesignerPanel::updateMarkers()
     text.color.a = 1.0f;
     text.text = tc.name;
     markers.markers.push_back(text);
+
+    // Obstacle polygons as LINE_STRIP outlines
+    for (const auto & poly : tc.obstacles) {
+      if (poly.size() < 3) {continue;}
+      visualization_msgs::msg::Marker outline;
+      outline.header.frame_id = "map";
+      outline.header.stamp = node_->now();
+      outline.ns = "obstacles";
+      outline.id = id++;
+      outline.type = visualization_msgs::msg::Marker::LINE_STRIP;
+      outline.action = visualization_msgs::msg::Marker::ADD;
+      outline.pose.orientation.w = 1.0;
+      outline.scale.x = 0.03;  // line width
+      outline.color.r = rgb[0];
+      outline.color.g = rgb[1];
+      outline.color.b = rgb[2];
+      outline.color.a = 0.9f;
+      for (const auto & pt : poly) {
+        geometry_msgs::msg::Point p;
+        p.x = pt.first;  p.y = pt.second;  p.z = 0.06;
+        outline.points.push_back(p);
+      }
+      // Close the polygon
+      geometry_msgs::msg::Point p_close;
+      p_close.x = poly[0].first;  p_close.y = poly[0].second;  p_close.z = 0.06;
+      outline.points.push_back(p_close);
+      markers.markers.push_back(outline);
+    }
+  }
+
+  // Show in-progress polygon being drawn (pending vertices)
+  if (!pending_polygon_.empty()) {
+    // Dots at each placed vertex
+    for (size_t v = 0; v < pending_polygon_.size(); ++v) {
+      visualization_msgs::msg::Marker dot;
+      dot.header.frame_id = "map";
+      dot.header.stamp = node_->now();
+      dot.ns = "pending_vertices";
+      dot.id = id++;
+      dot.type = visualization_msgs::msg::Marker::SPHERE;
+      dot.action = visualization_msgs::msg::Marker::ADD;
+      dot.pose.position.x = pending_polygon_[v].first;
+      dot.pose.position.y = pending_polygon_[v].second;
+      dot.pose.position.z = 0.08;
+      dot.pose.orientation.w = 1.0;
+      dot.scale.x = 0.1;
+      dot.scale.y = 0.1;
+      dot.scale.z = 0.1;
+      dot.color.r = 1.0f;
+      dot.color.g = 0.3f;
+      dot.color.b = 0.3f;
+      dot.color.a = 1.0f;
+      markers.markers.push_back(dot);
+    }
+
+    // Lines connecting placed vertices so far
+    if (pending_polygon_.size() >= 2) {
+      visualization_msgs::msg::Marker line;
+      line.header.frame_id = "map";
+      line.header.stamp = node_->now();
+      line.ns = "pending_outline";
+      line.id = id++;
+      line.type = visualization_msgs::msg::Marker::LINE_STRIP;
+      line.action = visualization_msgs::msg::Marker::ADD;
+      line.pose.orientation.w = 1.0;
+      line.scale.x = 0.04;
+      line.color.r = 1.0f;
+      line.color.g = 0.3f;
+      line.color.b = 0.3f;
+      line.color.a = 0.8f;
+      for (const auto & pt : pending_polygon_) {
+        geometry_msgs::msg::Point p;
+        p.x = pt.first;  p.y = pt.second;  p.z = 0.07;
+        line.points.push_back(p);
+      }
+      markers.markers.push_back(line);
+    }
   }
 
   marker_pub_->publish(markers);

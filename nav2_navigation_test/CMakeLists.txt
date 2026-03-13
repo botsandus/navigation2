@@ -23,9 +23,11 @@ add_library(${rviz_lib} SHARED
   src/nav_test_designer_panel.cpp
   src/start_pose_tool.cpp
   src/goal_pose_tool.cpp
+  src/obstacle_tool.cpp
   include/nav2_navigation_test/nav_test_designer_panel.hpp
   include/nav2_navigation_test/start_pose_tool.hpp
   include/nav2_navigation_test/goal_pose_tool.hpp
+  include/nav2_navigation_test/obstacle_tool.hpp
 )
 
 target_include_directories(${rviz_lib} PUBLIC

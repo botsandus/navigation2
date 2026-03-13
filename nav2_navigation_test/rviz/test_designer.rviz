@@ -61,6 +61,7 @@ Visualization Manager:
     - Class: rviz_default_plugins/MoveCamera
     - Class: nav2_navigation_test/StartPoseTool
     - Class: nav2_navigation_test/GoalPoseTool
+    - Class: nav2_navigation_test/ObstacleTool
     - Class: rviz_default_plugins/Measure
   Value: true
   Views:
