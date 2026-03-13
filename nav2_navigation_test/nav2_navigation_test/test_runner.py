@@ -271,6 +271,7 @@ class TestCase:
     initial_pose: Pose
     goal_pose: Pose
     timeout: float = 60.0
+    obstacles: list = None
 
 
 def load_test_cases(yaml_path: str) -> List[TestCase]:
@@ -284,6 +285,8 @@ def load_test_cases(yaml_path: str) -> List[TestCase]:
             initial_pose: {x: 9.0, y: 10.5, yaw: 0.0}
             goal_pose: {x: 10.0, y: 10.5, yaw: 0.0}
             timeout: 90.0
+            obstacles:  # optional
+              - [[9.5, 10.3], [9.5, 10.7], [9.7, 10.7], [9.7, 10.3]]
     """
     with open(yaml_path, 'r') as f:
         data = yaml.safe_load(f)
@@ -297,6 +300,7 @@ def load_test_cases(yaml_path: str) -> List[TestCase]:
             initial_pose=make_pose(ip['x'], ip['y'], yaw=ip.get('yaw', 0.0)),
             goal_pose=make_pose(gp['x'], gp['y'], yaw=gp.get('yaw', 0.0)),
             timeout=tc.get('timeout', 60.0),
+            obstacles=tc.get('obstacles'),
         ))
     return cases
 
