@@ -382,13 +382,28 @@ void NavTestDesignerPanel::updateMarkers()
   del.action = visualization_msgs::msg::Marker::DELETEALL;
   markers.markers.push_back(del);
 
+  // Distinct color palette for cycling per test case
+  static const float palette[][3] = {
+    {0.12f, 0.47f, 0.71f},   // blue
+    {1.00f, 0.50f, 0.05f},   // orange
+    {0.17f, 0.63f, 0.17f},   // green
+    {0.84f, 0.15f, 0.16f},   // red
+    {0.58f, 0.40f, 0.74f},   // purple
+    {0.55f, 0.34f, 0.29f},   // brown
+    {0.89f, 0.47f, 0.76f},   // pink
+    {0.74f, 0.74f, 0.13f},   // olive
+    {0.09f, 0.75f, 0.81f},   // cyan
+  };
+  static const size_t palette_size = sizeof(palette) / sizeof(palette[0]);
+
   int id = 0;
   for (size_t i = 0; i < test_cases_.size(); ++i) {
     const auto & tc = test_cases_[i];
+    const float * rgb = palette[i % palette_size];
 
     auto make_arrow = [&](
       double x, double y, double yaw,
-      float r, float g, float b, const std::string & ns) {
+      float alpha, const std::string & ns) {
         visualization_msgs::msg::Marker m;
         m.header.frame_id = "map";
         m.header.stamp = node_->now();
@@ -410,19 +425,18 @@ void NavTestDesignerPanel::updateMarkers()
         m.scale.x = 0.8;  // arrow length
         m.scale.y = 0.15;  // arrow width
         m.scale.z = 0.15;  // arrow height
-        m.color.r = r;
-        m.color.g = g;
-        m.color.b = b;
-        m.color.a = 0.9f;
+        m.color.r = rgb[0];
+        m.color.g = rgb[1];
+        m.color.b = rgb[2];
+        m.color.a = alpha;
         markers.markers.push_back(m);
       };
 
-    // Green arrow for start pose
-    make_arrow(tc.start_x, tc.start_y, tc.start_yaw, 0.0f, 0.8f, 0.0f, "start");
-    // Red arrow for goal pose
-    make_arrow(tc.goal_x, tc.goal_y, tc.goal_yaw, 0.8f, 0.0f, 0.0f, "goal");
+    // Faded arrow for start, solid arrow for goal — same color per test
+    make_arrow(tc.start_x, tc.start_y, tc.start_yaw, 0.45f, "start");
+    make_arrow(tc.goal_x, tc.goal_y, tc.goal_yaw, 0.9f, "goal");
 
-    // Text label
+    // Text label in the same test color
     visualization_msgs::msg::Marker text;
     text.header.frame_id = "map";
     text.header.stamp = node_->now();
@@ -434,9 +448,9 @@ void NavTestDesignerPanel::updateMarkers()
     text.pose.position.y = (tc.start_y + tc.goal_y) / 2.0;
     text.pose.position.z = 0.5;
     text.scale.z = 0.3;
-    text.color.r = 1.0f;
-    text.color.g = 1.0f;
-    text.color.b = 1.0f;
+    text.color.r = rgb[0];
+    text.color.g = rgb[1];
+    text.color.b = rgb[2];
     text.color.a = 1.0f;
     text.text = tc.name;
     markers.markers.push_back(text);
