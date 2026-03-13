@@ -418,10 +418,13 @@ class LoopbackSimulator(Node):
 def main() -> None:
     rclpy.init()
     loopback_simulator = LoopbackSimulator()
-    rclpy.spin(loopback_simulator)
-    loopback_simulator.destroy_node()
-    rclpy.shutdown()
-    exit(0)
+    try:
+        rclpy.spin(loopback_simulator)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        loopback_simulator.destroy_node()
+        rclpy.try_shutdown()
 
 
 if __name__ == '__main__':
