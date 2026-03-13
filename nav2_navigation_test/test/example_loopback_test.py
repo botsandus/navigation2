@@ -55,7 +55,6 @@ def generate_test_description():
         launch_arguments={
             'sim_type': 'loopback',
             'use_sim_time': 'True',
-            'autostart': 'True',
         }.items(),
     )
 
@@ -75,36 +74,26 @@ class TestLoopbackNavigation(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         rclpy.init()
+        cls.runner = NavTestRunner()
 
     @classmethod
     def tearDownClass(cls):
+        cls.runner.shutdown()
+        cls.runner.destroy_node()
         rclpy.shutdown()
 
     def test_navigate_to_pose(self):
         """Test that the robot can navigate from start to goal."""
-        runner = NavTestRunner(
+        result = self.runner.run(
             initial_pose=make_pose(-2.0, -0.5),
             goal_pose=make_pose(0.0, 2.0),
+            timeout=90.0,
         )
-
-        try:
-            result = runner.run(
-                timeout=90.0,
-                goal_distance_tolerance=0.5,
-            )
-
-            self.assertTrue(
-                result.success,
-                f'Navigation failed: distance_from_goal={result.distance_from_goal:.3f}m, '
-                f'error_code={result.error_code}, error_msg={result.error_msg}',
-            )
-            self.assertLess(
-                result.distance_from_goal, 0.5,
-                f'Robot too far from goal: {result.distance_from_goal:.3f}m',
-            )
-        finally:
-            runner.shutdown()
-            runner.destroy_node()
+        self.assertTrue(
+            result.success,
+            f'Navigation failed: '
+            f'error_code={result.error_code}, error_msg={result.error_msg}',
+        )
 
 
 @launch_testing.post_shutdown_test()

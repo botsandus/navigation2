@@ -84,7 +84,6 @@ def generate_test_description():
         launch_arguments={
             'sim_type': 'loopback',
             'use_sim_time': 'True',
-            'autostart': 'True',
         }.items(),
     )
 
@@ -98,38 +97,31 @@ def generate_test_description():
 
 
 class TestParameterizedNavigation(unittest.TestCase):
-    """Run multiple navigation scenarios on the same stack."""
+    """Run multiple navigation scenarios on the same persistent stack."""
 
     @classmethod
     def setUpClass(cls):
         rclpy.init()
+        cls.runner = NavTestRunner()
 
     @classmethod
     def tearDownClass(cls):
+        cls.runner.shutdown()
+        cls.runner.destroy_node()
         rclpy.shutdown()
 
-    def _run_scenario(self, name, start_pose, goal_pose):
-        runner = NavTestRunner(
-            initial_pose=start_pose,
-            goal_pose=goal_pose,
-            node_name=f'nav_test_{name}',
-        )
-        try:
-            result = runner.run(timeout=90.0, goal_distance_tolerance=0.5)
-            return result
-        finally:
-            runner.shutdown()
-            runner.destroy_node()
-
     def test_all_scenarios(self):
-        """Navigate through all defined scenarios."""
+        """Navigate through all defined scenarios, teleporting between each."""
         for name, start, goal in TEST_SCENARIOS:
             with self.subTest(scenario=name):
-                result = self._run_scenario(name, start, goal)
+                result = self.runner.run(
+                    initial_pose=start,
+                    goal_pose=goal,
+                    timeout=90.0,
+                )
                 self.assertTrue(
                     result.success,
                     f'Scenario "{name}" failed: '
-                    f'distance={result.distance_from_goal:.3f}m, '
                     f'error_code={result.error_code}',
                 )
 

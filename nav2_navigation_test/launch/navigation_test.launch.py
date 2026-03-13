@@ -73,10 +73,6 @@ def generate_launch_description() -> LaunchDescription:
 
     # Default paths
     default_params = os.path.join(pkg_dir, 'config', 'default_test_params.yaml')
-    default_bt = os.path.join(
-        get_package_share_directory('nav2_bt_navigator'),
-        'behavior_trees', 'navigate_to_pose_w_replanning_and_recovery.xml',
-    )
     default_world = os.path.join(sim_dir, 'worlds', 'tb3_sandbox.sdf.xacro')
     default_robot_sdf = os.path.join(sim_dir, 'urdf', 'gz_waffle.sdf.xacro')
     default_urdf = os.path.join(sim_dir, 'urdf', 'turtlebot3_waffle.urdf')
@@ -89,10 +85,6 @@ def generate_launch_description() -> LaunchDescription:
     declare_params_file = DeclareLaunchArgument(
         'params_file', default_value=default_params,
         description='Full path to the ROS2 parameters file',
-    )
-    declare_bt_xml = DeclareLaunchArgument(
-        'bt_xml_file', default_value=default_bt,
-        description='Full path to the BT XML file',
     )
     declare_use_sim_time = DeclareLaunchArgument(
         'use_sim_time', default_value='true',
@@ -265,7 +257,7 @@ def generate_launch_description() -> LaunchDescription:
 
     # Declare all arguments
     for decl in [
-        declare_sim_type, declare_params_file, declare_bt_xml,
+        declare_sim_type, declare_params_file,
         declare_use_sim_time, declare_namespace, declare_log_level,
         declare_world, declare_robot_sdf, declare_urdf,
         declare_x_pose, declare_y_pose, declare_z_pose, declare_yaw,
