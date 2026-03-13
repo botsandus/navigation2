@@ -13,6 +13,7 @@
 #include <QPushButton>
 #include <QTableWidget>
 #include <QVBoxLayout>
+#include <yaml-cpp/yaml.h>
 
 #include <memory>
 #include <string>
@@ -39,6 +40,8 @@ struct TestCaseData
   double start_x{0.0}, start_y{0.0}, start_yaw{0.0};
   double goal_x{0.0}, goal_y{0.0}, goal_yaw{0.0};
   std::vector<Polygon2D> obstacles;
+  /// Full original YAML node — preserves unknown fields for round-tripping.
+  YAML::Node yaml_node;
 };
 
 class NavTestDesignerPanel : public rviz_common::Panel

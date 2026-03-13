@@ -326,12 +326,12 @@ class NavTestRunner(Node):
 def make_pose(x: float, y: float, z: float = 0.01, yaw: float = 0.0) -> Pose:
     """Create a Pose message from x, y, z, yaw."""
     pose = Pose()
-    pose.position.x = x
-    pose.position.y = y
-    pose.position.z = z
+    pose.position.x = float(x)
+    pose.position.y = float(y)
+    pose.position.z = float(z)
     # Convert yaw to quaternion (rotation around Z axis)
-    pose.orientation.z = math.sin(yaw / 2.0)
-    pose.orientation.w = math.cos(yaw / 2.0)
+    pose.orientation.z = math.sin(float(yaw) / 2.0)
+    pose.orientation.w = math.cos(float(yaw) / 2.0)
     return pose
 
 

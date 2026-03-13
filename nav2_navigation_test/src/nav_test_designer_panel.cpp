@@ -8,7 +8,6 @@
 #include <QMessageBox>
 
 #include <fstream>
-#include <regex>
 #include <sstream>
 
 #include <pluginlib/class_list_macros.hpp>
@@ -315,34 +314,79 @@ void NavTestDesignerPanel::saveYaml()
     this, "Save Test Cases", "", "YAML files (*.yaml *.yml)");
   if (path.isEmpty()) {return;}
 
+  YAML::Node root;
+  YAML::Node seq(YAML::NodeType::Sequence);
+
+  // Format a double as a clean YAML scalar (avoids IEEE 754 noise like 44.700000000000003).
+  // Workaround for yaml-cpp 0.8: SetDoublePrecision doesn't apply when emitting from
+  // YAML::Node. Fixed upstream in https://github.com/jbeder/yaml-cpp/pull/1407.
+  auto yaml_num = [](double v) -> YAML::Node {
+      std::ostringstream ss;
+      ss << std::fixed;
+      // Use enough decimals to preserve precision, then trim trailing zeros
+      ss.precision(6);
+      ss << v;
+      std::string s = ss.str();
+      auto dot = s.find('.');
+      if (dot != std::string::npos) {
+        auto last = s.find_last_not_of('0');
+        if (last == dot) {last++;}  // keep at least one digit after dot
+        s.erase(last + 1);
+      }
+      return YAML::Load(s);
+    };
+
+  for (auto & tc : test_cases_) {
+    // Start from the original node (preserves unknown fields), or create new
+    YAML::Node node = tc.yaml_node.IsDefined() ? YAML::Clone(tc.yaml_node) : YAML::Node();
+
+    node["name"] = tc.name;
+
+    node["initial_pose"]["x"] = yaml_num(tc.start_x);
+    node["initial_pose"]["y"] = yaml_num(tc.start_y);
+    node["initial_pose"]["yaw"] = yaml_num(tc.start_yaw);
+    node["initial_pose"].SetStyle(YAML::EmitterStyle::Flow);
+
+    node["goal_pose"]["x"] = yaml_num(tc.goal_x);
+    node["goal_pose"]["y"] = yaml_num(tc.goal_y);
+    node["goal_pose"]["yaw"] = yaml_num(tc.goal_yaw);
+    node["goal_pose"].SetStyle(YAML::EmitterStyle::Flow);
+
+    // Write obstacles
+    if (!tc.obstacles.empty()) {
+      YAML::Node obs_seq(YAML::NodeType::Sequence);
+      for (const auto & poly : tc.obstacles) {
+        YAML::Node poly_node(YAML::NodeType::Sequence);
+        for (const auto & pt : poly) {
+          YAML::Node coord(YAML::NodeType::Sequence);
+          coord.push_back(yaml_num(pt.first));
+          coord.push_back(yaml_num(pt.second));
+          coord.SetStyle(YAML::EmitterStyle::Flow);
+          poly_node.push_back(coord);
+        }
+        poly_node.SetStyle(YAML::EmitterStyle::Flow);
+        obs_seq.push_back(poly_node);
+      }
+      node["obstacles"] = obs_seq;
+    } else {
+      node.remove("obstacles");
+    }
+
+    seq.push_back(node);
+  }
+
+  root["test_cases"] = seq;
+
   std::ofstream ofs(path.toStdString());
   if (!ofs.is_open()) {
     QMessageBox::warning(this, "Error", "Cannot open file for writing.");
     return;
   }
-
-  ofs << "test_cases:\n";
-  for (const auto & tc : test_cases_) {
-    ofs << "  - name: " << tc.name << "\n";
-    ofs << "    initial_pose: {x: " << tc.start_x
-        << ", y: " << tc.start_y
-        << ", yaw: " << tc.start_yaw << "}\n";
-    ofs << "    goal_pose: {x: " << tc.goal_x
-        << ", y: " << tc.goal_y
-        << ", yaw: " << tc.goal_yaw << "}\n";
-    ofs << "    timeout: 90.0\n";
-    if (!tc.obstacles.empty()) {
-      ofs << "    obstacles:\n";
-      for (const auto & poly : tc.obstacles) {
-        ofs << "      - [";
-        for (size_t p = 0; p < poly.size(); ++p) {
-          if (p > 0) {ofs << ", ";}
-          ofs << "[" << poly[p].first << ", " << poly[p].second << "]";
-        }
-        ofs << "]\n";
-      }
-    }
-  }
+  YAML::Emitter emitter;
+  emitter.SetDoublePrecision(6);
+  emitter.SetNullFormat(YAML::LowerNull);
+  emitter << root;
+  ofs << emitter.c_str() << "\n";
   ofs.close();
 }
 
@@ -352,80 +396,54 @@ void NavTestDesignerPanel::loadYaml()
     this, "Load Test Cases", "", "YAML files (*.yaml *.yml)");
   if (path.isEmpty()) {return;}
 
-  // Minimal YAML parser — reads the specific format we write
-  std::ifstream ifs(path.toStdString());
-  if (!ifs.is_open()) {
-    QMessageBox::warning(this, "Error", "Cannot open file.");
+  YAML::Node root;
+  try {
+    root = YAML::LoadFile(path.toStdString());
+  } catch (const YAML::Exception & e) {
+    QMessageBox::warning(this, "Error",
+      QString("Failed to parse YAML: %1").arg(e.what()));
     return;
   }
 
   test_cases_.clear();
   table_->setRowCount(0);
 
-  std::string line;
-  TestCaseData current;
-  bool in_case = false;
+  if (!root["test_cases"] || !root["test_cases"].IsSequence()) {return;}
 
-  auto parse_value = [](const std::string & s, const std::string & key) -> std::string {
-      auto pos = s.find(key);
-      if (pos == std::string::npos) {return "";}
-      pos += key.size();
-      // skip whitespace
-      while (pos < s.size() && (s[pos] == ' ' || s[pos] == ':')) {pos++;}
-      auto end = s.find_first_of(",}", pos);
-      if (end == std::string::npos) {end = s.size();}
-      return s.substr(pos, end - pos);
-    };
+  for (const auto & node : root["test_cases"]) {
+    TestCaseData tc;
+    tc.yaml_node = YAML::Clone(node);
 
-  while (std::getline(ifs, line)) {
-    // Trim leading whitespace
-    auto start = line.find_first_not_of(" \t");
-    if (start == std::string::npos) {continue;}
-    std::string trimmed = line.substr(start);
+    tc.name = node["name"].as<std::string>("test");
 
-    if (trimmed.rfind("- name:", 0) == 0) {
-      if (in_case) {
-        test_cases_.push_back(current);
-      }
-      current = TestCaseData();
-      current.name = trimmed.substr(8);  // after "- name: "
-      // Trim trailing whitespace
-      while (!current.name.empty() && current.name.back() == ' ') {
-        current.name.pop_back();
-      }
-      in_case = true;
-    } else if (trimmed.rfind("initial_pose:", 0) == 0) {
-      auto x_str = parse_value(trimmed, "x:");
-      auto y_str = parse_value(trimmed, "y:");
-      auto yaw_str = parse_value(trimmed, "yaw:");
-      if (!x_str.empty()) {current.start_x = std::stod(x_str);}
-      if (!y_str.empty()) {current.start_y = std::stod(y_str);}
-      if (!yaw_str.empty()) {current.start_yaw = std::stod(yaw_str);}
-    } else if (trimmed.rfind("goal_pose:", 0) == 0) {
-      auto x_str = parse_value(trimmed, "x:");
-      auto y_str = parse_value(trimmed, "y:");
-      auto yaw_str = parse_value(trimmed, "yaw:");
-      if (!x_str.empty()) {current.goal_x = std::stod(x_str);}
-      if (!y_str.empty()) {current.goal_y = std::stod(y_str);}
-      if (!yaw_str.empty()) {current.goal_yaw = std::stod(yaw_str);}
-    } else if (trimmed.rfind("- [", 0) == 0 || trimmed.rfind("- [[", 0) == 0) {
-      // Parse obstacle polygon line: - [[x1, y1], [x2, y2], ...]
-      Polygon2D poly;
-      std::regex coord_re(R"(\[\s*([\d.e+-]+)\s*,\s*([\d.e+-]+)\s*\])");
-      auto it = std::sregex_iterator(trimmed.begin(), trimmed.end(), coord_re);
-      auto end_it = std::sregex_iterator();
-      for (; it != end_it; ++it) {
-        double px = std::stod((*it)[1].str());
-        double py = std::stod((*it)[2].str());
-        poly.emplace_back(px, py);
-      }
-      if (poly.size() >= 3) {
-        current.obstacles.push_back(poly);
+    if (node["initial_pose"]) {
+      tc.start_x = node["initial_pose"]["x"].as<double>(0.0);
+      tc.start_y = node["initial_pose"]["y"].as<double>(0.0);
+      tc.start_yaw = node["initial_pose"]["yaw"].as<double>(0.0);
+    }
+    if (node["goal_pose"]) {
+      tc.goal_x = node["goal_pose"]["x"].as<double>(0.0);
+      tc.goal_y = node["goal_pose"]["y"].as<double>(0.0);
+      tc.goal_yaw = node["goal_pose"]["yaw"].as<double>(0.0);
+    }
+
+    // Parse obstacles
+    if (node["obstacles"] && node["obstacles"].IsSequence()) {
+      for (const auto & poly_node : node["obstacles"]) {
+        if (!poly_node.IsSequence()) {continue;}
+        Polygon2D poly;
+        for (const auto & pt_node : poly_node) {
+          if (pt_node.IsSequence() && pt_node.size() >= 2) {
+            poly.emplace_back(pt_node[0].as<double>(), pt_node[1].as<double>());
+          }
+        }
+        if (poly.size() >= 3) {
+          tc.obstacles.push_back(poly);
+        }
       }
     }
-  }
-  if (in_case) {
-    test_cases_.push_back(current);
+
+    test_cases_.push_back(tc);
   }
 
   // Populate table

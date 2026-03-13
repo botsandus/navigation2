@@ -15,6 +15,7 @@ find_package(rviz_default_plugins REQUIRED)
 find_package(rviz_rendering REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(visualization_msgs REQUIRED)
+find_package(yaml-cpp REQUIRED)
 
 # ── C++ RViz plugin library ────────────────────────────────────────────
 set(rviz_lib nav2_navigation_test_rviz)
@@ -44,6 +45,7 @@ target_link_libraries(${rviz_lib} PUBLIC
   ${visualization_msgs_TARGETS}
   tf2::tf2
   Qt5::Widgets
+  yaml-cpp::yaml-cpp
 )
 
 install(
