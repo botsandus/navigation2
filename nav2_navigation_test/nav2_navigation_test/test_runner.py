@@ -49,6 +49,7 @@ from dataclasses import dataclass
 import math
 import sys
 import time
+from typing import List
 
 from action_msgs.msg import GoalStatus
 from geometry_msgs.msg import Pose, PoseStamped, PoseWithCovarianceStamped
@@ -58,6 +59,7 @@ from nav2_msgs.srv import ManageLifecycleNodes
 import rclpy
 from rclpy.action import ActionClient
 from rclpy.node import Node
+import yaml
 
 
 @dataclass
@@ -243,7 +245,7 @@ class NavTestRunner(Node):
         return True, 0, ''
 
 
-# ── CLI entry point ────────────────────────────────────────────────────
+# ── Helpers ─────────────────────────────────────────────────────────────
 
 
 def make_pose(x: float, y: float, z: float = 0.01, yaw: float = 0.0) -> Pose:
@@ -256,6 +258,50 @@ def make_pose(x: float, y: float, z: float = 0.01, yaw: float = 0.0) -> Pose:
     pose.orientation.z = math.sin(yaw / 2.0)
     pose.orientation.w = math.cos(yaw / 2.0)
     return pose
+
+
+# ── Test case data ─────────────────────────────────────────────────────
+
+
+@dataclass
+class TestCase:
+    """A single navigation test case loaded from YAML."""
+
+    name: str
+    initial_pose: Pose
+    goal_pose: Pose
+    timeout: float = 60.0
+
+
+def load_test_cases(yaml_path: str) -> List[TestCase]:
+    """
+    Load test cases from a YAML file.
+
+    Expected format::
+
+        test_cases:
+          - name: short_forward
+            initial_pose: {x: 9.0, y: 10.5, yaw: 0.0}
+            goal_pose: {x: 10.0, y: 10.5, yaw: 0.0}
+            timeout: 90.0
+    """
+    with open(yaml_path, 'r') as f:
+        data = yaml.safe_load(f)
+
+    cases = []
+    for tc in data.get('test_cases', []):
+        ip = tc['initial_pose']
+        gp = tc['goal_pose']
+        cases.append(TestCase(
+            name=tc['name'],
+            initial_pose=make_pose(ip['x'], ip['y'], yaw=ip.get('yaw', 0.0)),
+            goal_pose=make_pose(gp['x'], gp['y'], yaw=gp.get('yaw', 0.0)),
+            timeout=tc.get('timeout', 60.0),
+        ))
+    return cases
+
+
+# ── CLI entry point ─────────────────────────────────────────────────────
 
 
 def main(argv: list[str] = sys.argv[1:]) -> int:
