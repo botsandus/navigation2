@@ -237,6 +237,10 @@ class NavTestRunner(Node):
         from rclpy.qos import qos_profile_sensor_data
         from rosidl_runtime_py.utilities import get_message
 
+        # Let collectors set up service clients, timers, etc.
+        for collector in self._collectors:
+            collector.setup(self)
+
         # Discover message types by introspecting the ROS graph
         topic_types = dict(self.get_topic_names_and_types())
 
