@@ -13,44 +13,24 @@
 # limitations under the License.
 
 """
-Example: Parameterized navigation test with different configurations.
+Example parameterized test using YAML-defined test cases.
 
-Demonstrates how to test the same navigation scenario with different
-planner/controller tunings using the CMake helper (Option B).
+Loads test cases from a YAML file and runs each as a subTest, collecting
+metrics and checking limits. This pattern scales well for large test suites.
 
-To register multiple tests from a downstream package's CMakeLists.txt:
+Usage from CMakeLists.txt:
+    # Using the nav2_scenario_add_test macro:
+    find_package(nav2_scenario_tester REQUIRED)
 
-  find_package(nav2_scenario_tester REQUIRED)
+    nav2_scenario_add_test(nav_default_loopback
+      SIM_TYPE loopback
+      START_POSE "-2.0;-0.5;0.0"
+      GOAL_POSE "0.0;2.0;0.0"
+      TIMEOUT 120
+    )
 
-  # Test with NavfnPlanner + DWB (default config)
-  nav2_scenario_add_test(nav_default_loopback
-    SIM_TYPE loopback
-    START_POSE "-2.0;-0.5;0.0"
-    GOAL_POSE "0.0;2.0;0.0"
-    TIMEOUT 120
-  )
-
-  # Test with custom MPPI config
-  nav2_scenario_add_test(nav_mppi_loopback
-    SIM_TYPE loopback
-    PARAMS_FILE ${CMAKE_CURRENT_SOURCE_DIR}/config/mppi_params.yaml
-    START_POSE "-2.0;-0.5;0.0"
-    GOAL_POSE "0.0;2.0;0.0"
-    TIMEOUT 120
-  )
-
-  # Test with a custom map
-  nav2_scenario_add_test(nav_custom_map
-    SIM_TYPE loopback
-    PARAMS_FILE ${CMAKE_CURRENT_SOURCE_DIR}/config/my_params.yaml
-    MAP ${CMAKE_CURRENT_SOURCE_DIR}/maps/warehouse.yaml
-    START_POSE "1.0;1.0;0.0"
-    GOAL_POSE "5.0;3.0;1.57"
-    TIMEOUT 180
-  )
-
-This file is a standalone launch_testing example that runs two navigation
-scenarios sequentially within the same test to compare results.
+    # Or directly as a launch test:
+    add_launch_test(test/example_parameterized_test.py TIMEOUT 180)
 """
 
 import os
@@ -62,29 +42,30 @@ from launch.actions import IncludeLaunchDescription, TimerAction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 import launch_testing
 import launch_testing.actions
-from nav2_scenario_tester import NavTestRunner
-from nav2_scenario_tester.test_runner import make_pose
+from nav2_scenario_tester import (CostmapMetrics, load_test_suite, NavTestRunner, OdometryMetrics,
+                                  PlanMetrics)
 import rclpy
 
-# Define test scenarios as (name, start_pose, goal_pose) tuples
-TEST_SCENARIOS = [
-    ('short_forward', make_pose(-2.0, -0.5), make_pose(0.0, 2.0)),
-    ('diagonal', make_pose(-2.0, -0.5), make_pose(2.0, 0.5)),
-]
+TEST_YAML = os.path.join(os.path.dirname(__file__), 'example_test_cases.yaml')
+TEST_SUITE = load_test_suite(TEST_YAML)
 
 
 def generate_test_description():
-    """Set up nav2 stack with loopback simulation."""
+    """Set up the nav2 stack with loopback simulation."""
     nav_test_dir = get_package_share_directory('nav2_scenario_tester')
+
+    launch_args = {
+        'sim_type': 'loopback',
+        'use_sim_time': 'True',
+    }
+    if TEST_SUITE.map_yaml:
+        launch_args['map'] = TEST_SUITE.map_yaml
 
     nav_stack = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(nav_test_dir, 'launch', 'navigation_test.launch.py')
         ),
-        launch_arguments={
-            'sim_type': 'loopback',
-            'use_sim_time': 'True',
-        }.items(),
+        launch_arguments=launch_args.items(),
     )
 
     return launch.LaunchDescription([
@@ -97,12 +78,18 @@ def generate_test_description():
 
 
 class TestParameterizedNavigation(unittest.TestCase):
-    """Run multiple navigation scenarios on the same persistent stack."""
+    """Run all YAML-defined test cases with metrics and limit checking."""
 
     @classmethod
     def setUpClass(cls):
         rclpy.init()
-        cls.runner = NavTestRunner()
+        cls.runner = NavTestRunner(
+            metrics_collectors=[
+                OdometryMetrics(),
+                PlanMetrics(),
+                CostmapMetrics(),
+            ],
+        )
 
     @classmethod
     def tearDownClass(cls):
@@ -110,24 +97,47 @@ class TestParameterizedNavigation(unittest.TestCase):
         cls.runner.destroy_node()
         rclpy.shutdown()
 
-    def test_all_scenarios(self):
-        """Navigate through all defined scenarios, teleporting between each."""
-        for name, start, goal in TEST_SCENARIOS:
-            with self.subTest(scenario=name):
+    def test_all_cases(self):
+        """Run each test case from the YAML file as a subTest."""
+        for tc in TEST_SUITE.cases:
+            with self.subTest(name=tc.name):
                 result = self.runner.run(
-                    initial_pose=start,
-                    goal_pose=goal,
-                    timeout=90.0,
+                    initial_pose=tc.initial_pose,
+                    goal_pose=tc.goal_pose,
+                    timeout=tc.timeout,
+                    limits=tc.limits,
                 )
+
+                # Log metrics
+                if result.metrics:
+                    self.runner.get_logger().info(
+                        f'[{tc.name}] metrics: ' + ', '.join(
+                            f'{k}={v:.3f}' for k, v in result.metrics.items()
+                            if isinstance(v, (int, float))
+                        )
+                    )
+
+                # Assert navigation succeeded
                 self.assertTrue(
                     result.success,
-                    f'Scenario "{name}" failed: '
-                    f'error_code={result.error_code}',
+                    f'{tc.name} failed: error_code={result.error_code}, '
+                    f'error_msg={result.error_msg}',
                 )
 
-
-@launch_testing.post_shutdown_test()
-class TestShutdown(unittest.TestCase):
-
-    def test_exit_codes(self, proc_info):
-        launch_testing.asserts.assertExitCodes(proc_info)
+                # Assert metric limits
+                if tc.limits and result.metrics:
+                    for metric, bounds in tc.limits.items():
+                        value = result.metrics.get(metric)
+                        if value is None:
+                            continue
+                        lo, hi = bounds
+                        if lo is not None:
+                            self.assertGreaterEqual(
+                                value, lo,
+                                f'{tc.name}: {metric}={value:.3f} below min {lo}',
+                            )
+                        if hi is not None:
+                            self.assertLessEqual(
+                                value, hi,
+                                f'{tc.name}: {metric}={value:.3f} exceeds max {hi}',
+                            )

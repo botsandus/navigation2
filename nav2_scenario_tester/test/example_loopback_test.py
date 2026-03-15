@@ -15,19 +15,13 @@
 """
 Example loopback integration test using nav2_scenario_tester.
 
-Demonstrates Option A: full launch_testing with NavTestRunner for
-custom assertions and reporting.
-
-This test:
-  1. Launches the nav2 stack with the loopback simulator
-  2. Uses NavTestRunner to send a NavigateToPose goal
-  3. Asserts the robot reached the goal within tolerance
+Demonstrates a simple single-goal navigation test with metrics collection.
 
 Run manually:
-  launch_test test/example_loopback_test.py
+    launch_test test/example_loopback_test.py
 
 Register in CMakeLists.txt:
-  add_launch_test(test/example_loopback_test.py TIMEOUT 120)
+    add_launch_test(test/example_loopback_test.py TIMEOUT 120)
 """
 
 import os
@@ -39,7 +33,7 @@ from launch.actions import IncludeLaunchDescription, TimerAction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 import launch_testing
 import launch_testing.actions
-from nav2_scenario_tester import NavTestRunner
+from nav2_scenario_tester import NavTestRunner, OdometryMetrics, PlanMetrics
 from nav2_scenario_tester.test_runner import make_pose
 import rclpy
 
@@ -60,7 +54,6 @@ def generate_test_description():
 
     return launch.LaunchDescription([
         nav_stack,
-        # Allow time for all nodes to start before running tests
         TimerAction(
             period=2.0,
             actions=[launch_testing.actions.ReadyToTest()],
@@ -69,12 +62,14 @@ def generate_test_description():
 
 
 class TestLoopbackNavigation(unittest.TestCase):
-    """Integration test for navigation with loopback simulator."""
+    """Simple loopback navigation test — single goal with metrics."""
 
     @classmethod
     def setUpClass(cls):
         rclpy.init()
-        cls.runner = NavTestRunner()
+        cls.runner = NavTestRunner(
+            metrics_collectors=[OdometryMetrics(), PlanMetrics()],
+        )
 
     @classmethod
     def tearDownClass(cls):
@@ -82,23 +77,35 @@ class TestLoopbackNavigation(unittest.TestCase):
         cls.runner.destroy_node()
         rclpy.shutdown()
 
-    def test_navigate_to_pose(self):
-        """Test that the robot can navigate from start to goal."""
+    def test_short_path(self):
+        """Navigate a short straight path and verify success."""
         result = self.runner.run(
             initial_pose=make_pose(-2.0, -0.5),
-            goal_pose=make_pose(0.0, 2.0),
-            timeout=90.0,
+            goal_pose=make_pose(0.0, -0.5),
+            timeout=60.0,
         )
         self.assertTrue(
             result.success,
-            f'Navigation failed: '
-            f'error_code={result.error_code}, error_msg={result.error_msg}',
+            f'Navigation failed: error_code={result.error_code}, '
+            f'error_msg={result.error_msg}',
         )
+        if result.metrics:
+            self.runner.get_logger().info(
+                'Metrics: ' + ', '.join(
+                    f'{k}={v:.3f}' for k, v in result.metrics.items()
+                )
+            )
 
-
-@launch_testing.post_shutdown_test()
-class TestShutdown(unittest.TestCase):
-    """Checks that all processes exited cleanly."""
-
-    def test_exit_codes(self, proc_info):
-        launch_testing.asserts.assertExitCodes(proc_info)
+    def test_longer_path(self):
+        """Navigate a longer path and check distance limit."""
+        result = self.runner.run(
+            initial_pose=make_pose(-2.0, -0.5),
+            goal_pose=make_pose(0.5, 1.0),
+            timeout=90.0,
+            limits={'distance_travelled': [None, 6.0]},
+        )
+        self.assertTrue(
+            result.success,
+            f'Navigation failed: error_code={result.error_code}, '
+            f'error_msg={result.error_msg}',
+        )

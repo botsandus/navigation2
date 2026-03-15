@@ -10,6 +10,7 @@
 #include <fstream>
 #include <sstream>
 
+#include <ament_index_cpp/get_package_share_directory.hpp>
 #include <pluginlib/class_list_macros.hpp>
 
 #include "nav2_scenario_tester/goal_pose_tool.hpp"
@@ -31,6 +32,7 @@ NavTestDesignerPanel::~NavTestDesignerPanel()
   if (spin_thread_.joinable()) {
     spin_thread_.join();
   }
+  load_map_client_.reset();
   marker_pub_.reset();
   node_.reset();
 }
@@ -40,6 +42,8 @@ void NavTestDesignerPanel::onInitialize()
   node_ = std::make_shared<rclcpp::Node>("nav_test_designer");
   marker_pub_ = node_->create_publisher<visualization_msgs::msg::MarkerArray>(
     "/nav_test_designer/markers", 10);
+  load_map_client_ = node_->create_client<nav2_msgs::srv::LoadMap>(
+    "/map_server/load_map");
 
   spin_thread_ = std::thread([this]() {
         executor_.add_node(node_);
@@ -376,6 +380,9 @@ void NavTestDesignerPanel::saveYaml()
   }
 
   root["test_cases"] = seq;
+  if (!map_yaml_value_.empty()) {
+    root["map"] = map_yaml_value_;
+  }
 
   std::ofstream ofs(path.toStdString());
   if (!ofs.is_open()) {
@@ -395,14 +402,42 @@ void NavTestDesignerPanel::loadYaml()
   QString path = QFileDialog::getOpenFileName(
     this, "Load Test Cases", "", "YAML files (*.yaml *.yml)");
   if (path.isEmpty()) {return;}
+  loadYamlFromPath(path.toStdString());
+}
 
+void NavTestDesignerPanel::loadYamlFromPath(const std::string & path)
+{
   YAML::Node root;
   try {
-    root = YAML::LoadFile(path.toStdString());
+    root = YAML::LoadFile(path);
   } catch (const YAML::Exception & e) {
     QMessageBox::warning(this, "Error",
       QString("Failed to parse YAML: %1").arg(e.what()));
     return;
+  }
+
+  // Load map if specified
+  if (root["map"]) {
+    map_yaml_value_ = root["map"].as<std::string>();
+    auto yaml_dir = std::filesystem::path(path).parent_path().string();
+    auto map_path = resolveMapPath(map_yaml_value_, yaml_dir);
+    if (!map_path.empty() && map_path != current_map_) {
+      if (load_map_client_->wait_for_service(std::chrono::seconds(2))) {
+        auto request = std::make_shared<nav2_msgs::srv::LoadMap::Request>();
+        request->map_url = map_path;
+        auto future = load_map_client_->async_send_request(request);
+        if (future.wait_for(std::chrono::seconds(5)) == std::future_status::ready) {
+          auto result = future.get();
+          if (result->result == result->RESULT_SUCCESS) {
+            current_map_ = map_path;
+          } else {
+            RCLCPP_WARN(node_->get_logger(), "LoadMap failed (code %d)", result->result);
+          }
+        }
+      } else {
+        RCLCPP_WARN(node_->get_logger(), "map_server/load_map service not available");
+      }
+    }
   }
 
   test_cases_.clear();
@@ -454,6 +489,28 @@ void NavTestDesignerPanel::loadYaml()
   }
   table_->blockSignals(false);
   updateMarkers();
+}
+
+std::string NavTestDesignerPanel::resolveMapPath(
+  const std::string & map_value, const std::string & yaml_dir)
+{
+  namespace fs = std::filesystem;
+  // Absolute path — use directly
+  if (fs::path(map_value).is_absolute()) {
+    return fs::exists(map_value) ? map_value : std::string();
+  }
+  // Relative to the YAML file's directory
+  auto candidate = fs::path(yaml_dir) / map_value;
+  if (fs::exists(candidate)) {
+    return fs::canonical(candidate).string();
+  }
+  // Relative to the package's maps/ directory
+  candidate = fs::path(ament_index_cpp::get_package_share_directory(
+    "nav2_scenario_tester")) / "maps" / map_value;
+  if (fs::exists(candidate)) {
+    return fs::canonical(candidate).string();
+  }
+  return std::string();
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────

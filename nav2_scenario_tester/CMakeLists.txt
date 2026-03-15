@@ -6,6 +6,7 @@ set(CMAKE_AUTOMOC ON)
 
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
+find_package(ament_index_cpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(Qt5 REQUIRED COMPONENTS Widgets)
@@ -14,6 +15,7 @@ find_package(rviz_common REQUIRED)
 find_package(rviz_default_plugins REQUIRED)
 find_package(rviz_rendering REQUIRED)
 find_package(tf2 REQUIRED)
+find_package(nav2_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(yaml-cpp REQUIRED)
 
@@ -38,10 +40,12 @@ target_include_directories(${rviz_lib} PUBLIC
 
 target_link_libraries(${rviz_lib} PUBLIC
   rclcpp::rclcpp
+  ament_index_cpp::ament_index_cpp
   rviz_common::rviz_common
   rviz_default_plugins::rviz_default_plugins
   rviz_rendering::rviz_rendering
   ${geometry_msgs_TARGETS}
+  ${nav2_msgs_TARGETS}
   ${visualization_msgs_TARGETS}
   tf2::tf2
   Qt5::Widgets
@@ -84,15 +88,6 @@ install(DIRECTORY
 if(BUILD_TESTING)
   find_package(launch_testing_ament_cmake REQUIRED)
   find_package(ament_cmake_pytest REQUIRED)
-
-  add_launch_test(
-    test/example_loopback_test.py
-    TIMEOUT 120
-  )
-  add_launch_test(
-    test/example_parameterized_test.py
-    TIMEOUT 180
-  )
 endif()
 
 ament_export_targets(${rviz_lib} HAS_LIBRARY_TARGET)

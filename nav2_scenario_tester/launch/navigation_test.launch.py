@@ -55,6 +55,7 @@ def generate_launch_description() -> LaunchDescription:
     # Launch configurations
     sim_type = LaunchConfiguration('sim_type')
     params_file = LaunchConfiguration('params_file')
+    map_yaml = LaunchConfiguration('map')
     use_sim_time = LaunchConfigAsBool('use_sim_time')
     namespace = LaunchConfiguration('namespace')
     log_level = LaunchConfiguration('log_level')
@@ -73,6 +74,7 @@ def generate_launch_description() -> LaunchDescription:
 
     # Default paths
     default_params = os.path.join(pkg_dir, 'config', 'default_test_params.yaml')
+    default_map = os.path.join(pkg_dir, 'maps', 'empty.yaml')
     default_world = os.path.join(sim_dir, 'worlds', 'tb3_sandbox.sdf.xacro')
     default_robot_sdf = os.path.join(sim_dir, 'urdf', 'gz_waffle.sdf.xacro')
     default_urdf = os.path.join(sim_dir, 'urdf', 'turtlebot3_waffle.urdf')
@@ -85,6 +87,10 @@ def generate_launch_description() -> LaunchDescription:
     declare_params_file = DeclareLaunchArgument(
         'params_file', default_value=default_params,
         description='Full path to the ROS2 parameters file',
+    )
+    declare_map = DeclareLaunchArgument(
+        'map', default_value=default_map,
+        description='Full path to the map YAML file',
     )
     declare_use_sim_time = DeclareLaunchArgument(
         'use_sim_time', default_value='true',
@@ -146,7 +152,7 @@ def generate_launch_description() -> LaunchDescription:
                 executable='map_server',
                 name='map_server',
                 output='screen',
-                parameters=[params_file],
+                parameters=[params_file, {'yaml_filename': map_yaml}],
             ),
             # Lifecycle manager for map_server (loopback doesn't need AMCL)
             Node(
@@ -220,7 +226,7 @@ def generate_launch_description() -> LaunchDescription:
                 executable='map_server',
                 name='map_server',
                 output='screen',
-                parameters=[params_file],
+                parameters=[params_file, {'yaml_filename': map_yaml}],
             ),
             # Lifecycle manager for map_server
             Node(
@@ -257,7 +263,7 @@ def generate_launch_description() -> LaunchDescription:
 
     # Declare all arguments
     for decl in [
-        declare_sim_type, declare_params_file,
+        declare_sim_type, declare_params_file, declare_map,
         declare_use_sim_time, declare_namespace, declare_log_level,
         declare_world, declare_robot_sdf, declare_urdf,
         declare_x_pose, declare_y_pose, declare_z_pose, declare_yaw,

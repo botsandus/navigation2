@@ -7,34 +7,21 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 
 def generate_launch_description():
     pkg_dir = get_package_share_directory('nav2_scenario_tester')
 
-    map_yaml = LaunchConfiguration('map')
-    rviz_config = LaunchConfiguration('rviz_config')
-
-    declare_map = DeclareLaunchArgument(
-        'map',
-        default_value='/home/ubuntu/maps/active_map/map.yaml',
-        description='Full path to map YAML file',
-    )
-    declare_rviz_config = DeclareLaunchArgument(
-        'rviz_config',
-        default_value=os.path.join(pkg_dir, 'rviz', 'test_designer.rviz'),
-        description='Full path to RViz config file',
-    )
+    default_map = os.path.join(pkg_dir, 'maps', 'empty.yaml')
+    default_rviz = os.path.join(pkg_dir, 'rviz', 'test_designer.rviz')
 
     map_server = Node(
         package='nav2_map_server',
         executable='map_server',
         name='map_server',
         output='screen',
-        parameters=[{'yaml_filename': map_yaml}],
+        parameters=[{'yaml_filename': default_map}],
     )
 
     lifecycle_manager = Node(
@@ -53,12 +40,10 @@ def generate_launch_description():
         executable='rviz2',
         name='rviz2',
         output='screen',
-        arguments=['-d', rviz_config],
+        arguments=['-d', default_rviz],
     )
 
     ld = LaunchDescription()
-    ld.add_action(declare_map)
-    ld.add_action(declare_rviz_config)
     ld.add_action(map_server)
     ld.add_action(lifecycle_manager)
     ld.add_action(rviz)

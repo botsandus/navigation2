@@ -47,6 +47,7 @@ Or as a CLI tool::
 import argparse
 from dataclasses import dataclass
 import math
+import os
 import sys
 import time
 from typing import List
@@ -354,6 +355,82 @@ class TestCase:
     limits: dict = None
 
 
+@dataclass
+class TestSuite:
+    """A collection of test cases with shared configuration."""
+
+    cases: List[TestCase]
+    map_yaml: str = None
+
+
+def _parse_cases(data: dict) -> List[TestCase]:
+    """Parse test_cases list from YAML data."""
+    cases = []
+    for tc in data.get('test_cases', []):
+        ip = tc['initial_pose']
+        gp = tc['goal_pose']
+        cases.append(TestCase(
+            name=tc['name'],
+            initial_pose=make_pose(ip['x'], ip['y'], yaw=ip.get('yaw', 0.0)),
+            goal_pose=make_pose(gp['x'], gp['y'], yaw=gp.get('yaw', 0.0)),
+            timeout=tc.get('timeout', 60.0),
+            obstacles=tc.get('obstacles'),
+            limits=tc.get('limits'),
+        ))
+    return cases
+
+
+def load_test_suite(yaml_path: str) -> TestSuite:
+    """
+    Load a test suite (map + test cases) from a YAML file.
+
+    If the ``map`` value is a relative path, it is resolved relative to the
+    directory containing the YAML file first, then relative to the package's
+    installed ``maps/`` directory.
+
+    Expected format::
+
+        map: warehouse.yaml     # relative to YAML dir or package maps/
+        map: /absolute/path.yaml  # absolute path used as-is
+
+        test_cases:
+          - name: short_forward
+            initial_pose: {x: 9.0, y: 10.5, yaw: 0.0}
+            goal_pose: {x: 10.0, y: 10.5, yaw: 0.0}
+            timeout: 90.0
+
+    Returns
+    -------
+    TestSuite
+        With ``map`` (str or None) and ``cases`` (list of TestCase).
+
+    """
+    with open(yaml_path, 'r') as f:
+        data = yaml.safe_load(f)
+
+    map_path = data.get('map')
+    if map_path and not os.path.isabs(map_path):
+        # Try relative to the YAML file's directory first
+        yaml_dir = os.path.dirname(os.path.abspath(yaml_path))
+        candidate = os.path.join(yaml_dir, map_path)
+        if os.path.isfile(candidate):
+            map_path = candidate
+        else:
+            # Fall back to the package's maps/ directory
+            from ament_index_python.packages import get_package_share_directory
+            pkg_maps = os.path.join(
+                get_package_share_directory('nav2_scenario_tester'), 'maps',
+            )
+            candidate = os.path.join(pkg_maps, map_path)
+            if os.path.isfile(candidate):
+                map_path = candidate
+
+    return TestSuite(
+        map_yaml=map_path,
+        cases=_parse_cases(data),
+    )
+
+
 def load_test_cases(yaml_path: str) -> List[TestCase]:
     """
     Load test cases from a YAML file.
@@ -371,22 +448,7 @@ def load_test_cases(yaml_path: str) -> List[TestCase]:
               distance_travelled: [null, 2.0]
               avg_speed: [0.1, null]
     """
-    with open(yaml_path, 'r') as f:
-        data = yaml.safe_load(f)
-
-    cases = []
-    for tc in data.get('test_cases', []):
-        ip = tc['initial_pose']
-        gp = tc['goal_pose']
-        cases.append(TestCase(
-            name=tc['name'],
-            initial_pose=make_pose(ip['x'], ip['y'], yaw=ip.get('yaw', 0.0)),
-            goal_pose=make_pose(gp['x'], gp['y'], yaw=gp.get('yaw', 0.0)),
-            timeout=tc.get('timeout', 60.0),
-            obstacles=tc.get('obstacles'),
-            limits=tc.get('limits'),
-        ))
-    return cases
+    return load_test_suite(yaml_path).cases
 
 
 # ── CLI entry point ─────────────────────────────────────────────────────

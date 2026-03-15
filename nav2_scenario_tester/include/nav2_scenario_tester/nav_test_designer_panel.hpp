@@ -21,7 +21,10 @@
 #include <utility>
 #include <vector>
 
+#include <filesystem>
+
 #include <geometry_msgs/msg/pose.hpp>
+#include <nav2_msgs/srv/load_map.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <rviz_common/display_context.hpp>
 #include <rviz_common/panel.hpp>
@@ -74,6 +77,8 @@ private:
   void updateMarkers();
   void updateRowFromData(int row);
   TestCaseData readRowData(int row) const;
+  void loadYamlFromPath(const std::string & path);
+  std::string resolveMapPath(const std::string & map_value, const std::string & yaml_dir);
 
   // Qt widgets
   QTableWidget * table_;
@@ -100,6 +105,9 @@ private:
   rclcpp::executors::SingleThreadedExecutor executor_;
   std::thread spin_thread_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr marker_pub_;
+  rclcpp::Client<nav2_msgs::srv::LoadMap>::SharedPtr load_map_client_;
+  std::string current_map_;
+  std::string map_yaml_value_;
 
   // Column indices
   static constexpr int COL_NAME = 0;

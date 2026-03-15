@@ -1,0 +1,9 @@
+test_cases:
+  - name: short_backward
+    initial_pose: {x: 3.332615, y: 8.131844, yaw: -0.156178}
+    goal_pose: {x: 8.762956, y: 7.482882, yaw: -0.658627}
+    timeout: 60.0
+    limits:
+      distance_travelled: [null, 4.0]
+      avg_speed: [0.05, null]
+map: depot_keepout.yaml
