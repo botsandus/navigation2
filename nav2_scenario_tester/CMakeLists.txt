@@ -76,7 +76,7 @@ ament_python_install_package(${PROJECT_NAME}
 
 # Install launch files, config, maps, and rviz configs
 install(DIRECTORY
-  launch config maps rviz
+  launch maps rviz
   DESTINATION share/${PROJECT_NAME}/
 )
 
