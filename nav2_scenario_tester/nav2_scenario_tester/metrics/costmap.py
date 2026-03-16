@@ -1,6 +1,12 @@
 """Track max footprint cost via the GetCosts service during navigation."""
 
+import logging
+
+from geometry_msgs.msg import PoseStamped
+from nav2_msgs.srv import GetCosts
 from nav2_scenario_tester.metrics._base import MetricsCollector
+
+logger = logging.getLogger(__name__)
 
 
 class CostmapMetrics(MetricsCollector):
@@ -25,7 +31,6 @@ class CostmapMetrics(MetricsCollector):
 
     def setup(self, node) -> None:
         """Create the GetCosts service client and polling timer."""
-        from nav2_msgs.srv import GetCosts
         self._node = node
         self._client = node.create_client(GetCosts, self._service_name)
         self._timer = node.create_timer(self._poll_period, self._poll_cost)
@@ -37,9 +42,6 @@ class CostmapMetrics(MetricsCollector):
         """Timer callback: send an async GetCosts request for the robot pose."""
         if self._client is None or not self._client.service_is_ready():
             return
-
-        from geometry_msgs.msg import PoseStamped
-        from nav2_msgs.srv import GetCosts
 
         pose = PoseStamped()
         pose.header.frame_id = 'base_link'
@@ -57,6 +59,7 @@ class CostmapMetrics(MetricsCollector):
         try:
             result = future.result()
         except Exception:
+            logger.debug('GetCosts service call failed', exc_info=True)
             return
         if not result.success or not result.costs:
             return
@@ -68,10 +71,14 @@ class CostmapMetrics(MetricsCollector):
     def check(self, limits: dict) -> str:
         """Check max footprint cost against limits."""
         if 'max_footprint_cost' in limits:
-            _, hi = limits['max_footprint_cost']
+            lo, hi = limits['max_footprint_cost']
             if hi is not None and self._max_cost > hi:
                 return (
                     f'max_footprint_cost={self._max_cost:.0f} exceeds max {hi}'
+                )
+            if lo is not None and self._max_cost < lo:
+                return (
+                    f'max_footprint_cost={self._max_cost:.0f} below min {lo}'
                 )
         return None
 
@@ -90,3 +97,5 @@ class CostmapMetrics(MetricsCollector):
         """Clear buffered data."""
         self._max_cost = 0.0
         self._costs.clear()
+        if self._timer is not None:
+            self._timer.cancel()

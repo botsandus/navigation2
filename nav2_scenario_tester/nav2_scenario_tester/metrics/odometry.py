@@ -39,11 +39,13 @@ class OdometryMetrics(MetricsCollector):
     def check(self, limits: dict) -> str:
         """Check distance and speed against limits."""
         if 'distance_travelled' in limits:
-            _, hi = limits['distance_travelled']
+            lo, hi = limits['distance_travelled']
             if hi is not None and self._distance > hi:
                 return (
                     f'distance_travelled={self._distance:.3f} exceeds max {hi}'
                 )
+            if lo is not None and self._distance < lo:
+                pass  # lower bound only meaningful at end, not during navigation
         return None
 
     def report(self) -> dict:

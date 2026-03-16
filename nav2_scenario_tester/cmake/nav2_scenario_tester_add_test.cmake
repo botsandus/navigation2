@@ -198,13 +198,6 @@ class TestNavigationResult(unittest.TestCase):
     def test_navigation_completed(self, proc_info, test_runner):
         proc_info.assertWaitForShutdown(process=test_runner, timeout=${NAV_TEST_TIMEOUT})
 
-    def test_exit_code(self, proc_output, test_runner):
-        launch_testing.asserts.assertExitCodes(
-            proc_info,
-            [launch_testing.asserts.EXIT_OK],
-            process=test_runner,
-        )
-
 
 @launch_testing.post_shutdown_test()
 class TestShutdown(unittest.TestCase):

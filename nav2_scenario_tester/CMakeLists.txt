@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.8)
 project(nav2_scenario_tester)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 
 find_package(ament_cmake REQUIRED)
@@ -93,6 +94,7 @@ endif()
 ament_export_targets(${rviz_lib} HAS_LIBRARY_TARGET)
 ament_export_dependencies(
   geometry_msgs
+  nav2_msgs
   pluginlib
   rclcpp
   rviz_common
@@ -100,6 +102,7 @@ ament_export_dependencies(
   rviz_rendering
   tf2
   visualization_msgs
+  yaml-cpp
 )
 
 ament_package(

@@ -1,6 +1,7 @@
 """Base class for live metrics collection."""
 
 from abc import ABC, abstractmethod
+from typing import Optional
 
 
 class MetricsCollector(ABC):
@@ -19,7 +20,7 @@ class MetricsCollector(ABC):
     def on_message(self, topic: str, msg) -> None:
         """Process an incoming message (called from subscription callback)."""
 
-    def check(self, limits: dict) -> str:
+    def check(self, limits: dict) -> Optional[str]:
         """
         Check live data against limits.
 

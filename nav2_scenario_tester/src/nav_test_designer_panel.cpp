@@ -8,6 +8,7 @@
 #include <QMessageBox>
 
 #include <fstream>
+#include <filesystem>
 #include <sstream>
 
 #include <ament_index_cpp/get_package_share_directory.hpp>
@@ -243,7 +244,15 @@ void NavTestDesignerPanel::onGoalPoseSet(const geometry_msgs::msg::Pose & pose)
 void NavTestDesignerPanel::onTableCellChanged(int row, int /*column*/)
 {
   if (row < 0 || row >= static_cast<int>(test_cases_.size())) {return;}
-  test_cases_[row] = readRowData(row);
+  auto & tc = test_cases_[row];
+  auto updated = readRowData(row);
+  tc.name = updated.name;
+  tc.start_x = updated.start_x;
+  tc.start_y = updated.start_y;
+  tc.start_yaw = updated.start_yaw;
+  tc.goal_x = updated.goal_x;
+  tc.goal_y = updated.goal_y;
+  tc.goal_yaw = updated.goal_yaw;
   updateMarkers();
 }
 
@@ -422,21 +431,19 @@ void NavTestDesignerPanel::loadYamlFromPath(const std::string & path)
     auto yaml_dir = std::filesystem::path(path).parent_path().string();
     auto map_path = resolveMapPath(map_yaml_value_, yaml_dir);
     if (!map_path.empty() && map_path != current_map_) {
-      if (load_map_client_->wait_for_service(std::chrono::seconds(2))) {
-        auto request = std::make_shared<nav2_msgs::srv::LoadMap::Request>();
-        request->map_url = map_path;
-        auto future = load_map_client_->async_send_request(request);
-        if (future.wait_for(std::chrono::seconds(5)) == std::future_status::ready) {
+      auto request = std::make_shared<nav2_msgs::srv::LoadMap::Request>();
+      request->map_url = map_path;
+      auto captured_path = map_path;
+      load_map_client_->async_send_request(
+        request,
+        [this, captured_path](rclcpp::Client<nav2_msgs::srv::LoadMap>::SharedFuture future) {
           auto result = future.get();
           if (result->result == result->RESULT_SUCCESS) {
-            current_map_ = map_path;
+            current_map_ = captured_path;
           } else {
             RCLCPP_WARN(node_->get_logger(), "LoadMap failed (code %d)", result->result);
           }
-        }
-      } else {
-        RCLCPP_WARN(node_->get_logger(), "map_server/load_map service not available");
-      }
+        });
     }
   }
 

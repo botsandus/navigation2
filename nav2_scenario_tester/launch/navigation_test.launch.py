@@ -114,10 +114,6 @@ def generate_launch_description() -> LaunchDescription:
     declare_x_pose = DeclareLaunchArgument(
         'x_pose', default_value='-2.0', description='Robot spawn X',
     )
-    declare_urdf = DeclareLaunchArgument(
-        'urdf', default_value=default_urdf,
-        description='Full path to robot URDF for robot_state_publisher',
-    )
     declare_y_pose = DeclareLaunchArgument(
         'y_pose', default_value='-0.5', description='Robot spawn Y',
     )
@@ -249,7 +245,7 @@ def generate_launch_description() -> LaunchDescription:
         ),
         launch_arguments={
             'namespace': namespace,
-            'use_sim_time': 'true',
+            'use_sim_time': LaunchConfiguration('use_sim_time'),
             'params_file': params_file,
             'log_level': log_level,
         }.items(),
@@ -265,7 +261,7 @@ def generate_launch_description() -> LaunchDescription:
     for decl in [
         declare_sim_type, declare_params_file, declare_map,
         declare_use_sim_time, declare_namespace, declare_log_level,
-        declare_world, declare_robot_sdf, declare_urdf,
+        declare_world, declare_robot_sdf,
         declare_x_pose, declare_y_pose, declare_z_pose, declare_yaw,
     ]:
         ld.add_action(decl)

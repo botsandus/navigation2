@@ -179,6 +179,7 @@ class NavTestRunner(Node):
         msg = PoseWithCovarianceStamped()
         msg.pose.pose = pose
         msg.header.frame_id = 'map'
+        msg.header.stamp = self.get_clock().now().to_msg()
         self.get_logger().info(
             f'Publishing initial pose: '
             f'({pose.position.x:.2f}, {pose.position.y:.2f})'
@@ -467,14 +468,11 @@ def main(argv: list[str] = sys.argv[1:]) -> int:
     parser.add_argument('--timeout', type=float, default=60.0)
     parser.add_argument('--namespace', type=str, default='')
 
-    args, _ = parser.parse_known_args(argv)
+    args = parser.parse_args(argv)
 
     rclpy.init()
 
     runner = NavTestRunner(namespace=args.namespace)
-
-    # Allow time for the full stack to come up
-    time.sleep(10)
 
     result = runner.run(
         initial_pose=make_pose(args.start_x, args.start_y, yaw=args.start_yaw),
@@ -493,6 +491,7 @@ def main(argv: list[str] = sys.argv[1:]) -> int:
         )
 
     runner.shutdown()
+    runner.destroy_node()
     rclpy.shutdown()
 
     return 0 if result.success else 1
