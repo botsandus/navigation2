@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Open Navigation LLC
+// Copyright (c) 2026, Dexory (Tony Najjar)
 // Licensed under the Apache License, Version 2.0
 
 #ifndef NAV2_SCENARIO_TESTER__NAV_TEST_DESIGNER_PANEL_HPP_
