@@ -159,17 +159,17 @@ Visualization Manager:
   Value: true
   Views:
     Current:
-      Class: rviz_default_plugins/Orbit
-      Distance: 20
+      Class: rviz_default_plugins/ThirdPersonFollower
+      Distance: 15
       Focal Point:
         X: 0
         Y: 0
         Z: 0
       Name: Current View
       Near Clip Distance: 0.01
-      Pitch: 1.5708
-      Target Frame: <Fixed Frame>
-      Value: Orbit (rviz)
+      Pitch: 1.0472
+      Target Frame: base_link
+      Value: ThirdPersonFollower (rviz)
       Yaw: 0
 Window Geometry:
   Displays:
