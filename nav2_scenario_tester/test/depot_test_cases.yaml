@@ -5,5 +5,4 @@ test_cases:
     timeout: 60.0
     limits:
       distance_travelled: [null, 4.0]
-      avg_speed: [0.05, null]
 map: depot_keepout.yaml

@@ -18,7 +18,6 @@ test_cases:
     timeout: 60.0
     limits:
       distance_travelled: [null, 4.0]
-      avg_speed: [0.05, null]
 ```
 
 Write a `launch_testing` test in Python:
@@ -71,7 +70,6 @@ test_cases:
       - [[9.5, 10.3], [9.5, 10.7], [9.7, 10.7], [9.7, 10.3]]
     limits:                                 # optional, [min, max] per metric
       distance_travelled: [null, 4.0]       # null = no bound
-      avg_speed: [0.05, null]
       plan_length: [2.0, 6.0]
       max_footprint_cost: [null, 252]
 ```
@@ -80,7 +78,7 @@ test_cases:
 
 | Collector | Source | Metrics |
 |---|---|---|
-| `OdometryMetrics` | `/odom` topic | `distance_travelled`, `elapsed_time`, `avg_speed`, `max_speed` |
+| `OdometryMetrics` | `/odom` topic | `distance_travelled`, `elapsed_time`, `max_speed` |
 | `PlanMetrics` | `/plan` topic | `plan_length`, `plan_waypoints`, `plan_count` |
 | `CostmapMetrics` | `/local_costmap/get_costs` service | `max_footprint_cost`, `avg_footprint_cost`, `samples` |
 

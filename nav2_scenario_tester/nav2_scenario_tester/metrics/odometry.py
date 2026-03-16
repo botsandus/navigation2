@@ -54,7 +54,6 @@ class OdometryMetrics(MetricsCollector):
             return {
                 'distance_travelled': 0.0,
                 'elapsed_time': 0.0,
-                'avg_speed': 0.0,
                 'max_speed': 0.0,
             }
 
@@ -62,7 +61,6 @@ class OdometryMetrics(MetricsCollector):
         return {
             'distance_travelled': self._distance,
             'elapsed_time': elapsed,
-            'avg_speed': self._distance / elapsed if elapsed > 0 else 0.0,
             'max_speed': max(self._speeds) if self._speeds else 0.0,
         }
 

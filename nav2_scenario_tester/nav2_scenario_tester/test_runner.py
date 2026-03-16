@@ -462,7 +462,6 @@ def load_test_cases(yaml_path: str) -> List[TestCase]:
               - [[9.5, 10.3], [9.5, 10.7], [9.7, 10.7], [9.7, 10.3]]
             limits:  # optional, [min, max] per metric (null = no bound)
               distance_travelled: [null, 2.0]
-              avg_speed: [0.1, null]
     """
     return load_test_suite(yaml_path).cases
 
