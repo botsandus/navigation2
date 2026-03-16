@@ -1,28 +1,3 @@
-# Copyright (c) 2026, Dexory (Tony Najjar)
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-"""
-Example parameterized test using YAML-defined test cases.
-
-Loads test cases from a YAML file and runs each as a subTest, collecting
-metrics and checking limits. This pattern scales well for large test suites.
-
-Usage from CMakeLists.txt:
-    find_package(launch_testing_ament_cmake REQUIRED)
-    add_launch_test(test/example_parameterized_test.py TIMEOUT 180)
-"""
-
 import os
 import unittest
 
@@ -36,8 +11,12 @@ from nav2_scenario_tester import (CostmapMetrics, load_test_suite, NavTestRunner
                                   PlanMetrics)
 import rclpy
 
-TEST_YAML = os.path.join(os.path.dirname(__file__), 'warehouse_test_cases.yaml')
+TEST_YAML = os.path.join(os.path.dirname(__file__), 'test_cases.yaml')
 TEST_SUITE = load_test_suite(TEST_YAML)
+BT_XML = os.path.join(
+    get_package_share_directory('nav2_bt_navigator'),
+    'behavior_trees', 'navigate_to_pose_simple.xml',
+)
 
 
 def generate_test_description():
@@ -46,8 +25,8 @@ def generate_test_description():
 
     launch_args = {
         'use_sim_time': 'True',
-        'params_file': os.path.join(nav_test_dir, 'config', 'default_test_params.yaml'),
-        'rviz': 'false',
+        'params_file': os.path.join(os.path.dirname(__file__), 'params.yaml'),
+        'rviz': 'true',
     }
     if TEST_SUITE.map_yaml:
         launch_args['map'] = TEST_SUITE.map_yaml
@@ -97,6 +76,7 @@ class TestParameterizedNavigation(unittest.TestCase):
                     goal_pose=tc.goal_pose,
                     timeout=tc.timeout,
                     limits=tc.limits,
+                    behavior_tree=BT_XML,
                 )
 
                 # Log metrics

@@ -118,6 +118,7 @@ class NavTestRunner(Node):
         settle_time: float = 2.0,
         limits: dict = None,
         fail_fast: bool = False,
+        behavior_tree: str = '',
     ) -> NavTestResult:
         """
         Execute a navigation test: teleport to initial pose, navigate to goal.
@@ -160,7 +161,7 @@ class NavTestRunner(Node):
 
         # Send navigation goal via action
         nav_success, error_code, error_msg = self._navigate_to_pose(
-            goal_pose, timeout, limits or {}, fail_fast,
+            goal_pose, timeout, limits or {}, fail_fast, behavior_tree,
         )
 
         elapsed = time.time() - start_time
@@ -276,7 +277,7 @@ class NavTestRunner(Node):
 
     def _navigate_to_pose(
         self, goal_pose: Pose, timeout: float, limits: dict,
-        fail_fast: bool = True,
+        fail_fast: bool = True, behavior_tree: str = '',
     ) -> tuple[bool, int, str]:
         """Send NavigateToPose action and wait for result with live checks."""
         self.get_logger().info("Waiting for 'NavigateToPose' action server")
@@ -287,6 +288,7 @@ class NavTestRunner(Node):
         goal_msg.pose = PoseStamped()
         goal_msg.pose.header.frame_id = 'map'
         goal_msg.pose.pose = goal_pose
+        goal_msg.behavior_tree = behavior_tree
 
         self.get_logger().info(
             f'Sending goal: ({goal_pose.position.x:.2f}, {goal_pose.position.y:.2f})'
