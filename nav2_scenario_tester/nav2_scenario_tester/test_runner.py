@@ -51,15 +51,18 @@ import os
 import sys
 import time
 from typing import List
+import uuid as uuid_module
 
 from action_msgs.msg import GoalStatus
-from geometry_msgs.msg import Pose, PoseStamped, PoseWithCovarianceStamped
+from geometry_msgs.msg import Point32, Pose, PoseStamped, PoseWithCovarianceStamped
 from lifecycle_msgs.srv import GetState
 from nav2_msgs.action import NavigateToPose
-from nav2_msgs.srv import ManageLifecycleNodes
+from nav2_msgs.msg import PolygonObject
+from nav2_msgs.srv import AddShapes, ManageLifecycleNodes, RemoveShapes
 import rclpy
 from rclpy.action import ActionClient
 from rclpy.node import Node
+from unique_identifier_msgs.msg import UUID as UUIDMsg
 import yaml
 
 
@@ -97,6 +100,13 @@ class NavTestRunner(Node):
 
         self.action_client = ActionClient(self, NavigateToPose, 'navigate_to_pose')
 
+        self._add_shapes_client = self.create_client(
+            AddShapes, '/vector_object_server/add_shapes',
+        )
+        self._remove_shapes_client = self.create_client(
+            RemoveShapes, '/vector_object_server/remove_shapes',
+        )
+
         self._stack_ready = False
         self._collectors = metrics_collectors or []
 
@@ -119,6 +129,7 @@ class NavTestRunner(Node):
         limits: dict = None,
         fail_fast: bool = False,
         behavior_tree: str = '',
+        obstacles: list = None,
     ) -> NavTestResult:
         """
         Execute a navigation test: teleport to initial pose, navigate to goal.
@@ -153,6 +164,10 @@ class NavTestRunner(Node):
         for c in self._collectors:
             c.reset()
 
+        # Inject obstacles via VectorObjectServer
+        if obstacles:
+            self._add_obstacles(obstacles)
+
         # Teleport: publish initial pose and let the sim settle
         self.set_initial_pose(initial_pose)
         time.sleep(settle_time)
@@ -170,6 +185,10 @@ class NavTestRunner(Node):
         metrics = {}
         for c in self._collectors:
             metrics.update(c.report())
+
+        # Remove obstacles after navigation
+        if obstacles:
+            self._remove_obstacles()
 
         return NavTestResult(
             success=nav_success,
@@ -272,6 +291,46 @@ class NavTestRunner(Node):
                 qos_profile_sensor_data,
             )
             self.get_logger().info(f'Subscribed to {topic} for metrics')
+
+    def _add_obstacles(self, obstacles: list) -> None:
+        """Add polygon obstacles to the VectorObjectServer."""
+        if not self._add_shapes_client.wait_for_service(timeout_sec=5.0):
+            self.get_logger().error('add_shapes service not available')
+            return
+
+        req = AddShapes.Request()
+        for polygon_pts in obstacles:
+            poly = PolygonObject()
+            poly.uuid = UUIDMsg(uuid=list(uuid_module.uuid4().bytes))
+            poly.closed = True
+            poly.value = 100  # lethal cost
+            poly.points = [
+                Point32(x=float(pt[0]), y=float(pt[1]), z=0.0)
+                for pt in polygon_pts
+            ]
+            req.polygons.append(poly)
+
+        future = self._add_shapes_client.call_async(req)
+        rclpy.spin_until_future_complete(self, future)
+        if future.result() and future.result().success:
+            self.get_logger().info(f'Added {len(obstacles)} obstacle(s)')
+        else:
+            self.get_logger().error('Failed to add obstacles')
+
+    def _remove_obstacles(self) -> None:
+        """Remove all obstacles from the VectorObjectServer."""
+        if not self._remove_shapes_client.wait_for_service(timeout_sec=5.0):
+            self.get_logger().error('remove_shapes service not available')
+            return
+
+        req = RemoveShapes.Request()
+        req.all_objects = True
+        future = self._remove_shapes_client.call_async(req)
+        rclpy.spin_until_future_complete(self, future)
+        if future.result() and future.result().success:
+            self.get_logger().info('Removed all obstacles')
+        else:
+            self.get_logger().error('Failed to remove obstacles')
 
     # ── Private helpers ────────────────────────────────────────────────
 

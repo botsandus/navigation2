@@ -181,11 +181,16 @@ local_costmap:
       footprint_padding: 0.12
       plugins:
         - "static_layer"
+        - "obstacle_layer"
         - "inflation_layer_local"
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
         map_subscribe_transient_local: true
         map_topic: "/map"
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        map_subscribe_transient_local: true
+        map_topic: "/vo_map"
       inflation_layer_local:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
@@ -215,3 +220,11 @@ global_costmap:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
         inflation_radius: 2.0
+
+vector_object_server:
+  ros__parameters:
+    map_topic: "vo_map"
+    global_frame_id: "map"
+    resolution: 0.05
+    default_value: 0
+    update_frequency: 1.0

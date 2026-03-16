@@ -77,6 +77,7 @@ class TestParameterizedNavigation(unittest.TestCase):
                     timeout=tc.timeout,
                     limits=tc.limits,
                     behavior_tree=BT_XML,
+                    obstacles=tc.obstacles,
                 )
 
                 # Log metrics

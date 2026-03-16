@@ -111,6 +111,14 @@ def generate_launch_description() -> LaunchDescription:
         parameters=[params_file, {'yaml_filename': map_yaml}],
     )
 
+    vector_object_server = Node(
+        package='nav2_map_server',
+        executable='vector_object_server',
+        name='vector_object_server',
+        output='screen',
+        parameters=[params_file],
+    )
+
     lifecycle_manager = Node(
         package='nav2_lifecycle_manager',
         executable='lifecycle_manager',
@@ -118,7 +126,7 @@ def generate_launch_description() -> LaunchDescription:
         output='screen',
         parameters=[{
             'autostart': True,
-            'node_names': ['map_server'],
+            'node_names': ['map_server', 'vector_object_server'],
         }],
     )
 
@@ -161,6 +169,7 @@ def generate_launch_description() -> LaunchDescription:
     ld.add_action(set_sim_time)
     ld.add_action(loopback_simulator)
     ld.add_action(map_server)
+    ld.add_action(vector_object_server)
     ld.add_action(lifecycle_manager)
     ld.add_action(nav_nodes)
     ld.add_action(rviz)
