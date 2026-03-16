@@ -19,17 +19,7 @@ Loads test cases from a YAML file and runs each as a subTest, collecting
 metrics and checking limits. This pattern scales well for large test suites.
 
 Usage from CMakeLists.txt:
-    # Using the nav2_scenario_add_test macro:
-    find_package(nav2_scenario_tester REQUIRED)
-
-    nav2_scenario_add_test(nav_default_loopback
-      SIM_TYPE loopback
-      START_POSE "-2.0;-0.5;0.0"
-      GOAL_POSE "0.0;2.0;0.0"
-      TIMEOUT 120
-    )
-
-    # Or directly as a launch test:
+    find_package(launch_testing_ament_cmake REQUIRED)
     add_launch_test(test/example_parameterized_test.py TIMEOUT 180)
 """
 
@@ -46,7 +36,7 @@ from nav2_scenario_tester import (CostmapMetrics, load_test_suite, NavTestRunner
                                   PlanMetrics)
 import rclpy
 
-TEST_YAML = os.path.join(os.path.dirname(__file__), 'example_test_cases.yaml')
+TEST_YAML = os.path.join(os.path.dirname(__file__), 'warehouse_test_cases.yaml')
 TEST_SUITE = load_test_suite(TEST_YAML)
 
 

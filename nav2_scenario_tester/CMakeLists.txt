@@ -80,12 +80,6 @@ install(DIRECTORY
   DESTINATION share/${PROJECT_NAME}/
 )
 
-# Install cmake helpers
-install(DIRECTORY
-  cmake
-  DESTINATION share/${PROJECT_NAME}/
-)
-
 if(BUILD_TESTING)
   find_package(launch_testing_ament_cmake REQUIRED)
   find_package(ament_cmake_pytest REQUIRED)
@@ -105,6 +99,4 @@ ament_export_dependencies(
   yaml-cpp
 )
 
-ament_package(
-  CONFIG_EXTRAS "nav2_scenario_tester-extras.cmake"
-)
+ament_package()
