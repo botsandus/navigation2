@@ -2,10 +2,6 @@
 # Users should provide their own params_file to override plugin selection and tuning.
 # This file provides sensible defaults using NavfnPlanner + DWB for basic testing.
 
-map_server:
-  ros__parameters:
-    yaml_filename: ""
-
 bt_navigator:
   ros__parameters:
     global_frame: map
