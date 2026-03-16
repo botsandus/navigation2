@@ -117,6 +117,7 @@ class NavTestRunner(Node):
         timeout: float = 60.0,
         settle_time: float = 2.0,
         limits: dict = None,
+        fail_fast: bool = False,
     ) -> NavTestResult:
         """
         Execute a navigation test: teleport to initial pose, navigate to goal.
@@ -129,8 +130,11 @@ class NavTestRunner(Node):
             timeout: Maximum seconds to wait for navigation to complete.
             settle_time: Seconds to wait after setting initial pose for the
                          sim to process the teleport.
-            limits: Optional dict of ``{metric: [min, max]}`` for fail-fast
+            limits: Optional dict of ``{metric: [min, max]}`` for live
                     checks during navigation.
+            fail_fast: If True, cancel navigation on the first
+                       limit breach. If False (default), log violations
+                       but let navigation complete.
 
         Returns
         -------
@@ -156,7 +160,7 @@ class NavTestRunner(Node):
 
         # Send navigation goal via action
         nav_success, error_code, error_msg = self._navigate_to_pose(
-            goal_pose, timeout, limits or {},
+            goal_pose, timeout, limits or {}, fail_fast,
         )
 
         elapsed = time.time() - start_time
@@ -272,6 +276,7 @@ class NavTestRunner(Node):
 
     def _navigate_to_pose(
         self, goal_pose: Pose, timeout: float, limits: dict,
+        fail_fast: bool = True,
     ) -> tuple[bool, int, str]:
         """Send NavigateToPose action and wait for result with live checks."""
         self.get_logger().info("Waiting for 'NavigateToPose' action server")
@@ -297,6 +302,7 @@ class NavTestRunner(Node):
         get_result_future = goal_handle.get_result_async()
 
         # Spin loop: process callbacks (collectors) and check limits
+        violations = []
         start = time.time()
         while not get_result_future.done():
             rclpy.spin_once(self, timeout_sec=0.1)
@@ -311,16 +317,25 @@ class NavTestRunner(Node):
                 for c in self._collectors:
                     violation = c.check(limits)
                     if violation:
-                        self.get_logger().error(
-                            f'Limit breached: {violation} — cancelling goal'
-                        )
-                        goal_handle.cancel_goal_async()
-                        return False, -2, f'Limit breached: {violation}'
+                        if fail_fast:
+                            self.get_logger().error(
+                                f'Limit breached: {violation} — cancelling goal'
+                            )
+                            goal_handle.cancel_goal_async()
+                            return False, -2, f'Limit breached: {violation}'
+                        if violation not in violations:
+                            self.get_logger().warning(
+                                f'Limit breached: {violation}'
+                            )
+                            violations.append(violation)
 
         status = get_result_future.result().status
         if status != GoalStatus.STATUS_SUCCEEDED:
             result = get_result_future.result().result
             return False, result.error_code, result.error_msg
+
+        if violations:
+            return False, -2, '; '.join(violations)
 
         self.get_logger().info('Goal succeeded')
         return True, 0, ''
