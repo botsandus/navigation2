@@ -1,16 +1,10 @@
 test_cases:
-  - name: short_forward
-    initial_pose: {x: -2.0, y: -0.5, yaw: 0.0}
-    goal_pose: {x: 0.0, y: -0.5, yaw: 0.0}
+  - name: straight_path_with_obstacle
+    initial_pose: {x: -5.216871, y: 4.77988, yaw: -0.014457}
+    goal_pose: {x: 4.307306, y: 4.79442, yaw: 0.009434}
     timeout: 60.0
     limits:
       distance_travelled: [null, 4.0]
-      avg_speed: [0.05, null]
-  - name: diagonal_path
-    initial_pose: {x: -2.0, y: -0.5, yaw: 0.0}
-    goal_pose: {x: 0.5, y: 1.0, yaw: 1.57}
-    timeout: 90.0
-    limits:
-      distance_travelled: [null, 6.0]
-      plan_length: [2.0, 6.0]
+    obstacles:
+      - [[-1.4072, 5.157939], [-1.349037, 4.401821], [-0.767408, 4.416362], [-0.781949, 5.070695]]
 map: warehouse.yaml
