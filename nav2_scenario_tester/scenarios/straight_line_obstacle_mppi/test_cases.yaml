@@ -1,10 +1,14 @@
 test_cases:
   - name: straight_path_with_obstacle
-    initial_pose: {x: -5.216871, y: 4.77988, yaw: -0.014457}
-    goal_pose: {x: 4.307306, y: 4.79442, yaw: 0.009434}
+    initial_pose: {x: 22.302568, y: 44.420254, yaw: 0.007143}
+    goal_pose: {x: 39.914085, y: 44.420254, yaw: 0.013274}
     timeout: 60.0
     limits:
       distance_travelled: [null, 4.0]
     obstacles:
       - [[-1.4072, 5.157939], [-1.349037, 4.401821], [-0.767408, 4.416362], [-0.781949, 5.070695]]
-map: warehouse.yaml
+      - [[30.620054, 44.992714], [30.519032, 43.982494], [31.360884, 43.948818], [31.596603, 44.992714]]
+  - name: test_2
+    initial_pose: {x: 79.716797, y: 35.260918, yaw: 3.131066}
+    goal_pose: {x: 79.649445, y: 35.227242, yaw: 0.0}
+map: warehouse_aisles.yaml
