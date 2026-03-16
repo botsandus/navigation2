@@ -57,6 +57,7 @@ def generate_test_description():
     launch_args = {
         'sim_type': 'loopback',
         'use_sim_time': 'True',
+        'params_file': os.path.join(nav_test_dir, 'config', 'default_test_params.yaml'),
     }
     if TEST_SUITE.map_yaml:
         launch_args['map'] = TEST_SUITE.map_yaml
