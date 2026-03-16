@@ -45,16 +45,16 @@ def generate_test_description():
     nav_test_dir = get_package_share_directory('nav2_scenario_tester')
 
     launch_args = {
-        'sim_type': 'loopback',
         'use_sim_time': 'True',
         'params_file': os.path.join(nav_test_dir, 'config', 'default_test_params.yaml'),
+        'rviz': 'false',
     }
     if TEST_SUITE.map_yaml:
         launch_args['map'] = TEST_SUITE.map_yaml
 
     nav_stack = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            os.path.join(nav_test_dir, 'launch', 'navigation_test.launch.py')
+            os.path.join(nav_test_dir, 'launch', 'loopback_test.launch.py')
         ),
         launch_arguments=launch_args.items(),
     )
