@@ -71,10 +71,13 @@ protected:
     switch (static_cast<unsigned char>(score_cost)) {
       case (nav2_costmap_2d::LETHAL_OBSTACLE):
         return true;
-      case (nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE):
-        return consider_footprint_ ? false : true;
       case (nav2_costmap_2d::NO_INFORMATION):
         return is_tracking_unknown_ ? false : true;
+    }
+
+    // For circular robots, cost >= inscribed cost means guaranteed collision
+    if (!consider_footprint_ && score_cost >= inscribed_cost_) {
+      return true;
     }
 
     return false;
@@ -126,6 +129,7 @@ protected:
   nav2_costmap_2d::FootprintCollisionChecker<nav2_costmap_2d::Costmap2D *>
   collision_checker_{nullptr};
   float possible_collision_cost_;
+  float inscribed_cost_{253.0f};
 
   bool consider_footprint_{true};
   bool is_tracking_unknown_{true};

@@ -209,7 +209,8 @@ void SmacPlannerHybrid::configure(
   _collision_checker.setFootprint(
     _costmap_ros->getRobotFootprint(),
     _costmap_ros->getUseRadius(),
-    findCircumscribedCost(_costmap_ros));
+    findCircumscribedCost(_costmap_ros),
+    findInscribedCost(_costmap_ros));
 
   // Initialize A* template
   _a_star = std::make_unique<AStarAlgorithm<NodeHybrid>>(_motion_model, _search_info);
@@ -228,6 +229,7 @@ void SmacPlannerHybrid::configure(
   if (smooth_path) {
     _smoother = std::make_unique<Smoother>(params);
     _smoother->initialize(_minimum_turning_radius_global_coords);
+    _smoother->setInscribedCost(static_cast<float>(findInscribedCost(_costmap_ros)));
   }
 
   // Initialize costmap downsampler
@@ -357,7 +359,8 @@ nav_msgs::msg::Path SmacPlannerHybrid::createPlan(
   _collision_checker.setFootprint(
     _costmap_ros->getRobotFootprint(),
     _costmap_ros->getUseRadius(),
-    findCircumscribedCost(_costmap_ros));
+    findCircumscribedCost(_costmap_ros),
+    findInscribedCost(_costmap_ros));
   _a_star->setCollisionChecker(&_collision_checker);
 
   // Set starting point, in A* bin search coordinates
@@ -539,6 +542,7 @@ nav_msgs::msg::Path SmacPlannerHybrid::createPlan(
 
   // Smooth plan
   if (_smoother && num_iterations > 1) {
+    _smoother->setInscribedCost(static_cast<float>(findInscribedCost(_costmap_ros)));
     _smoother->smooth(plan, costmap, time_remaining);
   }
 
@@ -866,7 +870,8 @@ SmacPlannerHybrid::updateParametersCallback(const std::vector<rclcpp::Parameter>
       _collision_checker.setFootprint(
         _costmap_ros->getRobotFootprint(),
         _costmap_ros->getUseRadius(),
-        findCircumscribedCost(_costmap_ros));
+        findCircumscribedCost(_costmap_ros),
+        findInscribedCost(_costmap_ros));
     }
 
     // Re-Initialize smoother
@@ -875,6 +880,7 @@ SmacPlannerHybrid::updateParametersCallback(const std::vector<rclcpp::Parameter>
       params.get(node, _name);
       _smoother = std::make_unique<Smoother>(params);
       _smoother->initialize(_minimum_turning_radius_global_coords);
+      _smoother->setInscribedCost(static_cast<float>(findInscribedCost(_costmap_ros)));
     }
   }
 }

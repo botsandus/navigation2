@@ -51,9 +51,11 @@ GridCollisionChecker::GridCollisionChecker(
 void GridCollisionChecker::setFootprint(
   const nav2_costmap_2d::Footprint & footprint,
   const bool & radius,
-  const double & possible_collision_cost)
+  const double & possible_collision_cost,
+  const double & inscribed_cost)
 {
   possible_collision_cost_ = static_cast<float>(possible_collision_cost);
+  inscribed_cost_ = static_cast<float>(inscribed_cost);
   if (possible_collision_cost_ <= 0.0f) {
     RCLCPP_ERROR_THROTTLE(
       logger_, *clock_, 1000,
@@ -131,7 +133,7 @@ bool GridCollisionChecker::inCollision(
       return true;
     }
 
-    if (center_cost_ == INSCRIBED_COST || center_cost_ == OCCUPIED_COST) {
+    if (center_cost_ >= inscribed_cost_ && center_cost_ != UNKNOWN_COST) {
       return true;
     }
 
@@ -165,7 +167,7 @@ bool GridCollisionChecker::inCollision(
     }
 
     // if occupied or unknown and not to traverse unknown space
-    return center_cost_ >= INSCRIBED_COST;
+    return center_cost_ >= inscribed_cost_;
   }
 }
 
@@ -179,7 +181,7 @@ bool GridCollisionChecker::inCollision(
   }
 
   // if occupied or unknown and not to traverse unknown space
-  return center_cost_ >= INSCRIBED_COST;
+  return center_cost_ >= inscribed_cost_;
 }
 
 float GridCollisionChecker::getCost()

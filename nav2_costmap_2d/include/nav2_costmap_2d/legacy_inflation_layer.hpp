@@ -151,13 +151,11 @@ public:
     unsigned char cost = 0;
     if (distance == 0) {
       cost = LETHAL_OBSTACLE;
-    } else if (distance * resolution_ <= inscribed_radius_) {
-      cost = INSCRIBED_INFLATED_OBSTACLE;
     } else {
-      // make sure cost falls off by Euclidean distance
+      // Smooth exponential decay from distance 0, no flat inscribed plateau
       double factor =
-        exp(-1.0 * cost_scaling_factor_ * (distance * resolution_ - inscribed_radius_));
-      cost = static_cast<unsigned char>((INSCRIBED_INFLATED_OBSTACLE - 1) * factor);
+        exp(-1.0 * cost_scaling_factor_ * distance * resolution_);
+      cost = static_cast<unsigned char>(INSCRIBED_INFLATED_OBSTACLE * factor);
     }
     return cost;
   }

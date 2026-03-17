@@ -28,6 +28,8 @@ void ObstacleHeuristic::resetObstacleHeuristic(
   // erosion of path quality after even modest smoothing. The error would be no more
   // than 0.05 * normalized cost. Since this is just a search prior, there's no loss in generality
   costmap_ros = costmap_ros_i;
+  inscribed_cost_ = static_cast<float>(
+    nav2_costmap_2d::InflationLayerInterface::computeInscribedCost(costmap_ros));
   auto costmap = costmap_ros->getCostmap();
 
   // Clear lookup table
@@ -182,7 +184,7 @@ float ObstacleHeuristic::getObstacleHeuristic(
           cost = static_cast<float>(costmap->getCost(new_idx));
         }
 
-        if (cost >= INSCRIBED_COST) {
+        if (cost >= inscribed_cost_) {
           continue;
         }
 
