@@ -37,6 +37,7 @@ void MPPIController::configure(
   // Get high-level controller parameters
   auto getParam = parameters_handler_->getParamGetter(name_);
   getParam(visualize_, "visualize", false);
+  getParam(visualize_cost_layer_, "visualize_cost_layer", 0);
 
   getParam(publish_optimal_trajectory_, "publish_optimal_trajectory", false);
 
@@ -101,6 +102,7 @@ geometry_msgs::msg::TwistStamped MPPIController::computeVelocityCommands(
 
   std::lock_guard<std::mutex> param_lock(*parameters_handler_->getLock());
 
+  // Enable per-critic cost storage only when visualization has active subscribers
   nav2_costmap_2d::Costmap2D * costmap = costmap_ros_->getCostmap();
   std::unique_lock<nav2_costmap_2d::Costmap2D::mutex_t> costmap_lock(*(costmap->getMutex()));
 
@@ -138,7 +140,28 @@ void MPPIController::visualize(
   const builtin_interfaces::msg::Time & cmd_stamp,
   const Eigen::ArrayXXf & optimal_trajectory)
 {
-  trajectory_visualizer_.add(optimizer_.getGeneratedTrajectories(), "Candidate Trajectories");
+  const auto & per_critic = optimizer_.getPerCriticCosts();
+  const int layer = visualize_cost_layer_;
+
+  if (layer == 0 || layer > static_cast<int>(per_critic.size())) {
+    // Total cost (default)
+    trajectory_visualizer_.add(
+      optimizer_.getGeneratedTrajectories(),
+      optimizer_.getCosts(),
+      optimizer_.getCollisionFlags(),
+      true, cmd_stamp);
+  } else {
+    // Individual critic (1-indexed)
+    const auto & [name, costs] = per_critic[layer - 1];
+    bool is_collision_critic =
+      (name == "CostCritic" || name == "ObstaclesCritic");
+    trajectory_visualizer_.add(
+      optimizer_.getGeneratedTrajectories(),
+      costs,
+      optimizer_.getCollisionFlags(),
+      is_collision_critic, cmd_stamp);
+  }
+
   trajectory_visualizer_.add(optimal_trajectory, "Optimal Trajectory", cmd_stamp);
   trajectory_visualizer_.visualize();
 }
