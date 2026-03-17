@@ -6,7 +6,7 @@ live metrics collection, and an RViz visual test designer.
 
 ## Quick start
 
-### 1. YAML-driven launch test (recommended)
+### YAML-driven launch test
 
 Define test cases in YAML:
 
@@ -48,15 +48,6 @@ for tc in TEST_SUITE.cases:
 
 See [test/example_parameterized_test.py](test/example_parameterized_test.py)
 for a complete working example.
-
-### 2. CLI
-
-```bash
-ros2 run nav2_scenario_tester test_runner \
-    --start-x -2.0 --start-y -0.5 --start-yaw 0.0 \
-    --goal-x 2.0 --goal-y 0.5 --goal-yaw 0.0 \
-    --timeout 60
-```
 
 ## YAML test case format
 
