@@ -111,6 +111,10 @@ class LoopbackSimulator(Node):
         self.use_inf = \
             self.get_parameter('scan_use_inf').get_parameter_value().bool_value
 
+        self.declare_parameter('publish_scan', True)
+        self.publish_scan = \
+            self.get_parameter('publish_scan').get_parameter_value().bool_value
+
         self.t_map_to_odom = TransformStamped()
         self.t_map_to_odom.header.frame_id = self.map_frame_id
         self.t_map_to_odom.child_frame_id = self.odom_frame_id
@@ -140,7 +144,8 @@ class LoopbackSimulator(Node):
             reliability=ReliabilityPolicy.BEST_EFFORT,
             durability=DurabilityPolicy.VOLATILE,
             depth=10)
-        self.scan_pub = self.create_publisher(LaserScan, 'scan', sensor_qos)
+        if self.publish_scan:
+            self.scan_pub = self.create_publisher(LaserScan, 'scan', sensor_qos)
 
         if self.publish_clock:
             self.clock_timer = self.create_timer(0.1, self.clockTimerCallback)
@@ -148,13 +153,14 @@ class LoopbackSimulator(Node):
 
         self.setupTimer = self.create_timer(0.1, self.setupTimerCallback)
 
-        self.map_client: Client[GetMap.Request, GetMap.Response] = \
-            self.create_client(GetMap, '/map_server/map')
+        if self.publish_scan:
+            self.map_client: Client[GetMap.Request, GetMap.Response] = \
+                self.create_client(GetMap, '/map_server/map')
 
-        self.tf_buffer = Buffer()
-        self.tf_listener = TransformListener(self.tf_buffer, self)
+            self.tf_buffer = Buffer()
+            self.tf_listener = TransformListener(self.tf_buffer, self)
 
-        self.getMap()
+            self.getMap()
 
         self.info('Loopback simulator initialized')
 
@@ -170,8 +176,13 @@ class LoopbackSimulator(Node):
 
     def setupTimerCallback(self) -> None:
         # Publish initial identity odom transform & laser scan to warm up system
+        # Also publish map->odom so the nav stack can find the map frame during startup
+        if self.publish_map_odom_tf:
+            self.t_map_to_odom.header.stamp = self.get_clock().now().to_msg()
+            self.tf_broadcaster.sendTransform(self.t_map_to_odom)
+        self.t_odom_to_base_link.header.stamp = self.get_clock().now().to_msg()
         self.tf_broadcaster.sendTransform(self.t_odom_to_base_link)
-        if self.mat_base_to_laser is None:
+        if self.publish_scan and self.mat_base_to_laser is None:
             self.getBaseToLaserTf()
 
     def clockTimerCallback(self) -> None:
@@ -214,7 +225,9 @@ class LoopbackSimulator(Node):
                 self.setupTimer.destroy()
                 self.setupTimer = None
             self.timer = self.create_timer(self.update_dur, self.timerCallback)
-            self.timer_laser = self.create_timer(self.scan_publish_dur, self.publishLaserScan)
+            if self.publish_scan:
+                self.timer_laser = self.create_timer(
+                    self.scan_publish_dur, self.publishLaserScan)
             return
 
         self.initial_pose = msg.pose.pose
@@ -239,6 +252,7 @@ class LoopbackSimulator(Node):
         one_sec = Duration(seconds=1)
         if self.curr_cmd_vel is None or self.get_clock().now() - self.curr_cmd_vel_time > one_sec:
             self.publishTransforms(self.t_map_to_odom, self.t_odom_to_base_link)
+            self.publishOdometry(self.t_odom_to_base_link)
             self.curr_cmd_vel = None
             return
 
@@ -404,10 +418,13 @@ class LoopbackSimulator(Node):
 def main() -> None:
     rclpy.init()
     loopback_simulator = LoopbackSimulator()
-    rclpy.spin(loopback_simulator)
-    loopback_simulator.destroy_node()
-    rclpy.shutdown()
-    exit(0)
+    try:
+        rclpy.spin(loopback_simulator)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        loopback_simulator.destroy_node()
+        rclpy.try_shutdown()
 
 
 if __name__ == '__main__':
