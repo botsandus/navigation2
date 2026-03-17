@@ -36,19 +36,11 @@ Usage from a launch_testing test file::
             )
             self.assertTrue(result.success)
 
-Or as a CLI tool::
-
-    ros2 run nav2_scenario_tester test_runner \\
-        --start-x -2.0 --start-y -0.5 \\
-        --goal-x 2.0 --goal-y 0.5 \\
-        --timeout 60
 """
 
-import argparse
 from dataclasses import dataclass
 import math
 import os
-import sys
 import time
 from typing import List
 import uuid as uuid_module
@@ -525,52 +517,3 @@ def load_test_cases(yaml_path: str) -> List[TestCase]:
               distance_travelled: [null, 2.0]
     """
     return load_test_suite(yaml_path).cases
-
-
-# ── CLI entry point ─────────────────────────────────────────────────────
-
-
-def main(argv: list[str] = sys.argv[1:]) -> int:
-    parser = argparse.ArgumentParser(
-        description='Nav2 navigation test runner CLI',
-    )
-    parser.add_argument('--start-x', type=float, default=-2.0)
-    parser.add_argument('--start-y', type=float, default=-0.5)
-    parser.add_argument('--start-yaw', type=float, default=0.0)
-    parser.add_argument('--goal-x', type=float, default=0.0)
-    parser.add_argument('--goal-y', type=float, default=2.0)
-    parser.add_argument('--goal-yaw', type=float, default=0.0)
-    parser.add_argument('--timeout', type=float, default=60.0)
-    parser.add_argument('--namespace', type=str, default='')
-
-    args = parser.parse_args(argv)
-
-    rclpy.init()
-
-    runner = NavTestRunner(namespace=args.namespace)
-
-    result = runner.run(
-        initial_pose=make_pose(args.start_x, args.start_y, yaw=args.start_yaw),
-        goal_pose=make_pose(args.goal_x, args.goal_y, yaw=args.goal_yaw),
-        timeout=args.timeout,
-    )
-
-    if result.success:
-        runner.get_logger().info(
-            f'TEST PASSED — reached goal in {result.elapsed_time:.1f}s'
-        )
-    else:
-        runner.get_logger().error(
-            f'TEST FAILED — '
-            f'error_code: {result.error_code} error_msg: {result.error_msg}'
-        )
-
-    runner.shutdown()
-    runner.destroy_node()
-    rclpy.shutdown()
-
-    return 0 if result.success else 1
-
-
-if __name__ == '__main__':
-    sys.exit(main())
