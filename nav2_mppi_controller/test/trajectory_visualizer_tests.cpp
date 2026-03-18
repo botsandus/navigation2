@@ -122,14 +122,13 @@ TEST(TrajectoryVisualizerTests, VisCandidateTrajectories)
   candidate_trajectories.yaws = Eigen::ArrayXXf::Ones(200, 12);
 
   Eigen::ArrayXf costs = Eigen::ArrayXf::LinSpaced(200, 0.0f, 1.0f);
-  std::vector<std::pair<std::string, Eigen::ArrayXf>> critic_costs;
-  builtin_interfaces::msg::Time stamp;
+  builtin_interfaces::msg::Time stamp{};
   stamp.sec = 1;
 
   TrajectoryVisualizer vis;
   vis.on_configure(node, "my_name", "fkmap", parameters_handler.get());
   vis.on_activate();
-  vis.add(candidate_trajectories, costs, {}, false, stamp);
+  vis.add(candidate_trajectories, costs, {}, stamp);
   vis.visualize();
 
   executor.spin_some();

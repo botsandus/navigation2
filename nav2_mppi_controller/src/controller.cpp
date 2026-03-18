@@ -102,7 +102,6 @@ geometry_msgs::msg::TwistStamped MPPIController::computeVelocityCommands(
 
   std::lock_guard<std::mutex> param_lock(*parameters_handler_->getLock());
 
-  // Enable per-critic cost storage only when visualization has active subscribers
   nav2_costmap_2d::Costmap2D * costmap = costmap_ros_->getCostmap();
   std::unique_lock<nav2_costmap_2d::Costmap2D::mutex_t> costmap_lock(*(costmap->getMutex()));
 
@@ -140,26 +139,24 @@ void MPPIController::visualize(
   const builtin_interfaces::msg::Time & cmd_stamp,
   const Eigen::ArrayXXf & optimal_trajectory)
 {
-  const auto & per_critic = optimizer_.getPerCriticCosts();
+  const auto & critic_costs = optimizer_.getCriticCosts();
   const int layer = visualize_cost_layer_;
 
-  if (layer == 0 || layer > static_cast<int>(per_critic.size())) {
+  if (layer <= 0 || layer > static_cast<int>(critic_costs.size())) {
     // Total cost (default)
     trajectory_visualizer_.add(
       optimizer_.getGeneratedTrajectories(),
       optimizer_.getCosts(),
       optimizer_.getCollisionFlags(),
-      true, cmd_stamp);
+      cmd_stamp);
   } else {
     // Individual critic (1-indexed)
-    const auto & [name, costs] = per_critic[layer - 1];
-    bool is_collision_critic =
-      (name == "CostCritic" || name == "ObstaclesCritic");
+    const auto & costs = critic_costs[layer - 1].second;
     trajectory_visualizer_.add(
       optimizer_.getGeneratedTrajectories(),
       costs,
       optimizer_.getCollisionFlags(),
-      is_collision_critic, cmd_stamp);
+      cmd_stamp);
   }
 
   trajectory_visualizer_.add(optimal_trajectory, "Optimal Trajectory", cmd_stamp);
