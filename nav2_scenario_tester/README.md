@@ -49,6 +49,15 @@ for tc in TEST_SUITE.cases:
 See [test/example_parameterized_test.py](test/example_parameterized_test.py)
 for a complete working example.
 
+### Launching a test
+
+Tests use the `launch_test` runner from `launch_testing`. Run a scenario
+directly from the command line:
+
+```bash
+launch_test path/to/test.py
+```
+
 ## YAML test case format
 
 ```yaml
@@ -96,36 +105,10 @@ class MyMetrics(MetricsCollector):
         return {'my_metric': self._value}
 ```
 
-## Launch files
 
-### `loopback_test.launch.py`
 
-Spins up a loopback simulator, map_server, and Nav2 stack for testing.
-Intended for use via `IncludeLaunchDescription` in user test files.
+## RViz test designer
 
-| Argument | Default | Description |
-|---|---|---|
-| `params_file` | built-in | Nav2 parameters YAML |
-| `map` | built-in empty map | Map YAML |
-| `use_sim_time` | `true` | Use simulation clock |
-| `namespace` | `''` | Top-level namespace |
-| `log_level` | `info` | ROS log level |
-
-### `gazebo_test.launch.py`
-
-Spins up Gazebo, spawns a robot, starts map_server, and Nav2 stack for testing.
-
-| Argument | Default | Description |
-|---|---|---|
-| `params_file` | built-in | Nav2 parameters YAML |
-| `map` | built-in empty map | Map YAML |
-| `use_sim_time` | `true` | Use simulation clock |
-| `namespace` | `''` | Top-level namespace |
-| `log_level` | `info` | ROS log level |
-| `world` | built-in | Gazebo world SDF/xacro |
-| `robot_sdf` | built-in | Robot SDF for Gazebo spawn |
-| `x_pose`, `y_pose`, `z_pose`, `yaw` | `-2.0`, `-0.5`, `0.01`, `0.0` | Robot spawn pose |
-| `headless` | `true` | Run Gazebo in server-only mode |
 
 ### `test_designer.launch.py`
 
@@ -136,16 +119,21 @@ and tools for visually creating and editing test cases.
 ros2 launch nav2_scenario_tester test_designer.launch.py
 ```
 
-## RViz test designer
+### Using the panel
 
-The package provides four RViz plugins:
+1. **Add / remove test cases** — Click **Add Test Case** to create a new row.
+   Select a row and click **Remove Selected** to delete it.
+   Edit the name and pose values directly in the table cells.
 
-| Plugin | Type | Description |
-|---|---|---|
-| `NavTestDesignerPanel` | Panel | Table of test cases with save/load YAML |
-| `StartPoseTool` | Tool | Click the map to set a test's start pose |
-| `GoalPoseTool` | Tool | Click the map to set a test's goal pose |
-| `ObstacleTool` | Tool | Click to place obstacle polygon vertices |
+2. **Set poses from the map** — Select a row, then click **Set Start** or
+   **Set Goal**. Click and drag on the map to place the pose (drag direction
+   sets the yaw). The table updates automatically.
 
-Loading a YAML with a `map:` field will hot-swap the map via the
-`/map_server/load_map` service.
+3. **Draw obstacles** — Select a row and click **Draw Obstacle**. Left-click
+   on the map to place vertices. Click **Finish** to close the polygon
+   (minimum 3 vertices) or **Cancel** to discard it. Use **Remove Last
+   Obstacle** to delete the most recent polygon from the selected test case.
+
+4. **Save / Load** — Click **Save YAML** or **Load YAML** to export or import
+   test cases via a file dialog Each test case is visualised with coloured arrows and obstacle
+   outlines on the `/nav_test_designer/markers` topic.
