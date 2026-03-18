@@ -37,7 +37,7 @@ void MPPIController::configure(
   // Get high-level controller parameters
   auto getParam = parameters_handler_->getParamGetter(name_);
   getParam(visualize_, "visualize", false);
-  getParam(visualize_cost_layer_, "visualize_cost_layer", 0);
+  getParam(critic_index_to_visualize_, "critic_index_to_visualize", 0);
 
   getParam(publish_optimal_trajectory_, "publish_optimal_trajectory", false);
 
@@ -140,24 +140,17 @@ void MPPIController::visualize(
   const Eigen::ArrayXXf & optimal_trajectory)
 {
   const auto & critic_costs = optimizer_.getCriticCosts();
-  const int layer = visualize_cost_layer_;
+  const Eigen::ArrayXf & costs =
+    (critic_index_to_visualize_ <= 0 ||
+    critic_index_to_visualize_ > static_cast<int>(critic_costs.size())) ?
+    optimizer_.getCosts() :
+    critic_costs[critic_index_to_visualize_ - 1].second;
 
-  if (layer <= 0 || layer > static_cast<int>(critic_costs.size())) {
-    // Total cost (default)
-    trajectory_visualizer_.add(
-      optimizer_.getGeneratedTrajectories(),
-      optimizer_.getCosts(),
-      optimizer_.getCollisionFlags(),
-      cmd_stamp);
-  } else {
-    // Individual critic (1-indexed)
-    const auto & costs = critic_costs[layer - 1].second;
-    trajectory_visualizer_.add(
-      optimizer_.getGeneratedTrajectories(),
-      costs,
-      optimizer_.getCollisionFlags(),
-      cmd_stamp);
-  }
+  trajectory_visualizer_.add(
+    optimizer_.getGeneratedTrajectories(),
+    costs,
+    optimizer_.getCollisionFlags(),
+    cmd_stamp);
 
   trajectory_visualizer_.add(optimal_trajectory, "Optimal Trajectory", cmd_stamp);
   trajectory_visualizer_.visualize();
