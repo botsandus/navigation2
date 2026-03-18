@@ -130,8 +130,13 @@ protected:
    */
   bool use_global_height_;
 
+  std::string getLastTimingBreakdown() const override {return last_timing_breakdown_;}
+
   /// @brief Latest data obtained from pointcloud
   sensor_msgs::msg::PointCloud2::ConstSharedPtr data_;
+
+  /// @brief Timing breakdown string from the last getData() call
+  std::string last_timing_breakdown_;
 };  // class PointCloud
 
 }  // namespace nav2_collision_monitor

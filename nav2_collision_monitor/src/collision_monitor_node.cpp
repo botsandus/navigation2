@@ -15,6 +15,7 @@
 #include "nav2_collision_monitor/collision_monitor_node.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <exception>
 #include <utility>
 #include <functional>
@@ -431,15 +432,30 @@ void CollisionMonitor::process(const Velocity & cmd_vel_in, const std_msgs::msg:
   std::shared_ptr<Polygon> action_polygon;
 
   // Fill collision points array from different data sources
+  std::string perf_sources_log;
   auto marker_array = std::make_unique<visualization_msgs::msg::MarkerArray>();
   for (std::shared_ptr<Source> source : sources_) {
     auto iter = sources_collision_points_map.insert(
       {source->getSourceName(), std::vector<Point>()});
 
     if (source->getEnabled()) {
-      if (!source->getData(curr_time, iter.first->second) &&
-        source->getSourceTimeout().seconds() != 0.0)
+      auto t_get_data_start = std::chrono::steady_clock::now();
+      bool data_ok = source->getData(curr_time, iter.first->second);
+      auto t_get_data_end = std::chrono::steady_clock::now();
+      auto get_data_ms = std::chrono::duration_cast<std::chrono::microseconds>(
+        t_get_data_end - t_get_data_start).count() / 1000.0;
+      std::string breakdown = source->getLastTimingBreakdown();
+      perf_sources_log += source->getSourceName() + "(" +
+        std::to_string(iter.first->second.size()) + "pts, " +
+        (breakdown.empty() ?
+          std::to_string(get_data_ms).substr(0, std::to_string(get_data_ms).find('.') + 4) + "ms" :
+          breakdown) +
+        ", " + (data_ok ? "ok" : "FAIL") + ") ";
+      if (!data_ok && source->getSourceTimeout().seconds() != 0.0)
       {
+        RCLCPP_WARN(
+          get_logger(), "Data from source '%s' is not valid. Robot to stop due to invalid source.",
+          source->getSourceName().c_str());
         action_polygon = nullptr;
         robot_action.polygon_name = "invalid source";
         robot_action.action_type = STOP;
@@ -481,18 +497,27 @@ void CollisionMonitor::process(const Velocity & cmd_vel_in, const std_msgs::msg:
     collision_points_marker_pub_->publish(std::move(marker_array));
   }
 
+  std::size_t total_collision_points = 0;
+  for (const auto & kv : sources_collision_points_map) {
+    total_collision_points += kv.second.size();
+  }
+
+  std::string perf_polygons_log;
+  double total_polygon_ms = 0.0;
   for (std::shared_ptr<Polygon> polygon : polygons_) {
     if (!polygon->getEnabled() || !enabled_) {
       continue;
     }
     if (robot_action.action_type == STOP) {
       // If robot already should stop, do nothing
+      perf_polygons_log += polygon->getName() + "(STOP-early) ";
       break;
     }
 
     // Update polygon coordinates
     polygon->updatePolygon(cmd_vel_in);
 
+    auto t_poly_start = std::chrono::steady_clock::now();
     const ActionType at = polygon->getActionType();
     if (at == STOP || at == SLOWDOWN || at == LIMIT) {
       // Process STOP/SLOWDOWN for the selected polygon
@@ -507,7 +532,18 @@ void CollisionMonitor::process(const Velocity & cmd_vel_in, const std_msgs::msg:
         action_polygon = polygon;
       }
     }
+    auto poly_ms = std::chrono::duration_cast<std::chrono::microseconds>(
+      std::chrono::steady_clock::now() - t_poly_start).count() / 1000.0;
+    total_polygon_ms += poly_ms;
+    perf_polygons_log += polygon->getName() + "(" +
+      std::to_string(poly_ms).substr(0, std::to_string(poly_ms).find('.') + 4) + "ms) ";
   }
+
+  RCLCPP_INFO(
+    get_logger(),
+    "[perf] total_pts=%zu | sources: %s| polygons(total=%.3fms): %s",
+    total_collision_points, perf_sources_log.c_str(),
+    total_polygon_ms, perf_polygons_log.c_str());
 
   publishTriggeringPoints(robot_action);
 

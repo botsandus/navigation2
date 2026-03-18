@@ -14,6 +14,7 @@
 
 #include "nav2_collision_monitor/pointcloud.hpp"
 
+#include <chrono>
 #include <functional>
 
 #include "sensor_msgs/point_cloud2_iterator.hpp"
@@ -113,10 +114,13 @@ bool PointCloud::getData(
     return false;
   }
 
+  auto t_tf_start = std::chrono::steady_clock::now();
   tf2::Transform tf_transform;
   if (!getTransform(curr_time, data_->header, tf_transform)) {
     return false;
   }
+  auto tf_ms = std::chrono::duration_cast<std::chrono::microseconds>(
+    std::chrono::steady_clock::now() - t_tf_start).count() / 1000.0;
 
   sensor_msgs::PointCloud2ConstIterator<float> iter_x(*data_, "x");
   sensor_msgs::PointCloud2ConstIterator<float> iter_y(*data_, "y");
@@ -141,6 +145,7 @@ bool PointCloud::getData(
   }
   sensor_msgs::PointCloud2ConstIterator<float> iter_height(*data_, height_field);
 
+  auto t_iter_start = std::chrono::steady_clock::now();
   // Refill data array with PointCloud points in base frame
   for (; iter_x != iter_x.end(); ++iter_x, ++iter_y, ++iter_z) {
     // Transform point coordinates from source frame -> to base frame
@@ -170,6 +175,12 @@ bool PointCloud::getData(
       data.push_back({p_v3_b.x(), p_v3_b.y(), p_v3_b.z()});
     }
   }
+  auto iter_ms = std::chrono::duration_cast<std::chrono::microseconds>(
+    std::chrono::steady_clock::now() - t_iter_start).count() / 1000.0;
+  last_timing_breakdown_ =
+    "tf=" + std::to_string(tf_ms).substr(0, std::to_string(tf_ms).find('.') + 4) + "ms " +
+    "iter=" + std::to_string(iter_ms).substr(0, std::to_string(iter_ms).find('.') + 4) + "ms " +
+    "raw=" + std::to_string(data_->width * data_->height);
   return true;
 }
 
