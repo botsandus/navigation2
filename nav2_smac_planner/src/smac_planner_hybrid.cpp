@@ -110,6 +110,8 @@ void SmacPlannerHybrid::configure(
     node->declare_or_get_parameter(name + ".use_quadratic_cost_penalty", false);
   _search_info.downsample_obstacle_heuristic =
     node->declare_or_get_parameter(name + ".downsample_obstacle_heuristic", true);
+  _search_info.orientation_penalty =
+    node->declare_or_get_parameter(name + ".orientation_penalty", 0.0);
 
   analytic_expansion_max_length_m =
     node->declare_or_get_parameter(name + ".analytic_expansion_max_length", 3.0);
@@ -719,6 +721,9 @@ SmacPlannerHybrid::updateParametersCallback(const std::vector<rclcpp::Parameter>
       } else if (param_name == _name + ".analytic_expansion_max_cost") {
         reinit_a_star = true;
         _search_info.analytic_expansion_max_cost = static_cast<float>(parameter.as_double());
+      } else if (param_name == _name + ".orientation_penalty") {
+        reinit_a_star = true;
+        _search_info.orientation_penalty = static_cast<float>(parameter.as_double());
       } else if (param_name == "resolution") {
         // Special case: When the costmap's resolution changes, need to reinitialize
         // the controller to have new resolution information

@@ -55,6 +55,7 @@ void HybridMotionTable::initDubin(
   cost_penalty = search_info.cost_penalty;
   reverse_penalty = search_info.reverse_penalty;
   travel_distance_reward = 1.0f - search_info.retrospective_penalty;
+  orientation_penalty = search_info.orientation_penalty;
   downsample_obstacle_heuristic = search_info.downsample_obstacle_heuristic;
   use_quadratic_cost_penalty = search_info.use_quadratic_cost_penalty;
 
@@ -184,6 +185,7 @@ void HybridMotionTable::initReedsShepp(
   cost_penalty = search_info.cost_penalty;
   reverse_penalty = search_info.reverse_penalty;
   travel_distance_reward = 1.0f - search_info.retrospective_penalty;
+  orientation_penalty = search_info.orientation_penalty;
   downsample_obstacle_heuristic = search_info.downsample_obstacle_heuristic;
   use_quadratic_cost_penalty = search_info.use_quadratic_cost_penalty;
 
@@ -380,6 +382,9 @@ bool NodeHybrid::isNodeValid(
   _is_node_valid = !collision_checker->inCollision(
     this->pose.x, this->pose.y, this->pose.theta /*bin number*/, traverse_unknown);
   _cell_cost = collision_checker->getCost();
+  if (_is_node_valid) {
+    _orientation_penalty = collision_checker->getOrientationPenalty();
+  }
   return _is_node_valid;
 }
 
@@ -428,6 +433,13 @@ float NodeHybrid::getTraversalCost(const NodePtr & child)
   {
     // reverse direction
     travel_cost *= _ctx->motion_table.reverse_penalty;
+  }
+
+  // Additive orientation penalty: nudges the planner to prefer orientations
+  // where the footprint corners are further from obstacles.
+  // This is independent of cost_penalty and does not affect the heuristic.
+  if (_ctx->motion_table.orientation_penalty > 0.0f) {
+    travel_cost += _ctx->motion_table.orientation_penalty * child->getOrientationPenalty();
   }
 
   return travel_cost;

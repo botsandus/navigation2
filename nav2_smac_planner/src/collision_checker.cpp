@@ -78,9 +78,12 @@ void GridCollisionChecker::setFootprint(
 
   oriented_footprints_.clear();
   oriented_footprints_.reserve(angles_.size());
+  oriented_corner_offsets_.clear();
+  oriented_corner_offsets_.reserve(angles_.size());
   double sin_th, cos_th;
   geometry_msgs::msg::Point new_pt;
   const unsigned int footprint_size = footprint.size();
+  const double resolution = costmap_ ? costmap_->getResolution() : 0.05;
 
   // Precompute the orientation bins for checking to use
   for (unsigned int i = 0; i != angles_.size(); i++) {
@@ -88,14 +91,20 @@ void GridCollisionChecker::setFootprint(
     cos_th = cos(angles_[i]);
     nav2_costmap_2d::Footprint oriented_footprint;
     oriented_footprint.reserve(footprint_size);
+    std::vector<std::pair<float, float>> corner_offsets;
+    corner_offsets.reserve(footprint_size);
 
     for (unsigned int j = 0; j < footprint_size; j++) {
       new_pt.x = footprint[j].x * cos_th - footprint[j].y * sin_th;
       new_pt.y = footprint[j].x * sin_th + footprint[j].y * cos_th;
       oriented_footprint.push_back(new_pt);
+      corner_offsets.emplace_back(
+        static_cast<float>(new_pt.x / resolution),
+        static_cast<float>(new_pt.y / resolution));
     }
 
     oriented_footprints_.push_back(oriented_footprint);
+    oriented_corner_offsets_.push_back(corner_offsets);
   }
 
   unoriented_footprint_ = footprint;
@@ -117,6 +126,9 @@ bool GridCollisionChecker::inCollision(
   // Assumes setFootprint already set
   center_cost_ = static_cast<float>(costmap_->getCost(
       static_cast<unsigned int>(x + 0.5f), static_cast<unsigned int>(y + 0.5f)));
+  last_x_ = x;
+  last_y_ = y;
+  last_angle_bin_ = angle_bin;
 
   if (!footprint_is_radius_) {
     // if footprint, then we check for the footprint's points, but first see
@@ -186,6 +198,33 @@ float GridCollisionChecker::getCost()
 {
   // Assumes inCollision called prior
   return static_cast<float>(center_cost_);
+}
+
+float GridCollisionChecker::getOrientationPenalty()
+{
+  // For circular footprints, orientation doesn't matter
+  if (footprint_is_radius_ || oriented_corner_offsets_.empty()) {
+    return 0.0f;
+  }
+
+  const auto & corner_offsets = oriented_corner_offsets_[
+    static_cast<unsigned int>(last_angle_bin_)];
+  float max_corner_cost = center_cost_;
+
+  for (unsigned int i = 0; i < corner_offsets.size(); ++i) {
+    float cx = last_x_ + corner_offsets[i].first;
+    float cy = last_y_ + corner_offsets[i].second;
+    if (outsideRange(costmap_->getSizeInCellsX(), cx) ||
+      outsideRange(costmap_->getSizeInCellsY(), cy))
+    {
+      return 1.0f;  // corner out of bounds, maximum penalty
+    }
+    float corner_cost = static_cast<float>(costmap_->getCost(
+        static_cast<unsigned int>(cx + 0.5f), static_cast<unsigned int>(cy + 0.5f)));
+    max_corner_cost = std::max(max_corner_cost, corner_cost);
+  }
+
+  return (max_corner_cost - center_cost_) / 252.0f;
 }
 
 bool GridCollisionChecker::outsideRange(const unsigned int & max, const float & value)

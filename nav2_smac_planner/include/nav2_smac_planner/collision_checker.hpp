@@ -14,6 +14,7 @@
 
 #include <memory>
 #include <vector>
+#include <utility>
 
 #include "nav2_costmap_2d/footprint_collision_checker.hpp"
 #include "nav2_costmap_2d/costmap_2d_ros.hpp"
@@ -99,6 +100,15 @@ public:
   float getCost();
 
   /**
+   * @brief Get the orientation-dependent cost penalty.
+   * Returns the normalized difference between the max corner cost and center
+   * cost, in range [0, 1]. Only meaningful for non-circular footprints;
+   * returns 0 for circular. Must be called after inCollision().
+   * @return orientation penalty in [0, 1]
+   */
+  float getOrientationPenalty();
+
+  /**
    * @brief Get the angles of the precomputed footprint orientations
    * @return the ordered vector of angles corresponding to footprints
    */
@@ -125,8 +135,12 @@ public:
 protected:
   std::shared_ptr<nav2_costmap_2d::Costmap2DROS> costmap_ros_;
   std::vector<nav2_costmap_2d::Footprint> oriented_footprints_;
+  std::vector<std::vector<std::pair<float, float>>> oriented_corner_offsets_;
   nav2_costmap_2d::Footprint unoriented_footprint_;
   float center_cost_;
+  float last_x_{0.0f};
+  float last_y_{0.0f};
+  float last_angle_bin_{0.0f};
   bool footprint_is_radius_{false};
   std::vector<float> angles_;
   float possible_collision_cost_{-1};

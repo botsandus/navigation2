@@ -114,6 +114,7 @@ struct HybridMotionTable
   float cost_penalty;
   float reverse_penalty;
   float travel_distance_reward;
+  float orientation_penalty;
   bool downsample_obstacle_heuristic;
   bool use_quadratic_cost_penalty;
   bool allow_primitive_interpolation;
@@ -239,6 +240,15 @@ public:
   inline float getCost()
   {
     return _cell_cost;
+  }
+
+  /**
+   * @brief Gets the orientation penalty for this node
+   * @return orientation penalty in [0, 1]
+   */
+  inline float getOrientationPenalty()
+  {
+    return _orientation_penalty;
   }
 
   /**
@@ -372,6 +382,7 @@ public:
 
 private:
   float _cell_cost;
+  float _orientation_penalty{0.0f};
   float _accumulated_cost;
   uint64_t _index;
   bool _was_visited;
