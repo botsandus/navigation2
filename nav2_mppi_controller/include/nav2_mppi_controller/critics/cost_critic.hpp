@@ -49,42 +49,37 @@ public:
 
 protected:
   /**
-    * @brief Get the cost at a pose using footprint if enabled, otherwise center-point
+    * @brief Checks if cost represents a collision
+    * @param cost Point cost at pose center
     * @param x X of pose
     * @param y Y of pose
     * @param theta theta of pose
-    * @return float cost at the pose
+    * @return bool if in collision
     */
-  inline float footprintCost(float x, float y, float theta)
+  inline bool inCollision(float cost, float x, float y, float theta)
   {
-    if (consider_footprint_) {
-      return static_cast<float>(collision_checker_.footprintCostAtPose(
+    // If consider_footprint_ check footprint scort for collision
+    float score_cost = cost;
+    if (consider_footprint_ &&
+      (cost >= possible_collision_cost_ || possible_collision_cost_ < 1.0f))
+    {
+      score_cost = static_cast<float>(collision_checker_.footprintCostAtPose(
           static_cast<double>(x), static_cast<double>(y), static_cast<double>(theta),
           costmap_ros_->getRobotFootprint()));
     }
-    unsigned int mx = 0u, my = 0u;
-    if (!worldToMapFloat(x, y, mx, my)) {
-      return 255.0f;
-    }
-    return static_cast<float>(collision_checker_.getCostmap()->getCost(getIndex(mx, my)));
-  }
 
-  /**
-    * @brief Checks if a cost value represents a collision
-    * @param cost Cost at pose
-    * @return bool if in collision
-    */
-  inline bool inCollision(float cost)
-  {
-    switch (static_cast<unsigned char>(cost)) {
+    switch (static_cast<unsigned char>(score_cost)) {
       case (nav2_costmap_2d::LETHAL_OBSTACLE):
         return true;
       case (nav2_costmap_2d::NO_INFORMATION):
         return is_tracking_unknown_ ? false : true;
     }
-    if (!consider_footprint_ && cost >= inscribed_cost_) {
+
+    // For circular robots, cost >= inscribed cost means guaranteed collision
+    if (!consider_footprint_ && score_cost >= inscribed_cost_) {
       return true;
     }
+
     return false;
   }
 

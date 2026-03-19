@@ -14,7 +14,7 @@ class CostmapMetrics(MetricsCollector):
 
     def __init__(
         self,
-        service_name: str = '/local_costmap/get_cost_local_costmap',
+        service_name: str = '/local_costmap/get_costs',
         poll_period: float = 0.5,
     ):
         self._service_name = service_name
@@ -94,8 +94,8 @@ class CostmapMetrics(MetricsCollector):
         }
 
     def reset(self) -> None:
-        """Clear buffered data and restart the polling timer."""
+        """Clear buffered data."""
         self._max_cost = 0.0
         self._costs.clear()
         if self._timer is not None:
-            self._timer.reset()
+            self._timer.cancel()

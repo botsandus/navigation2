@@ -193,14 +193,21 @@ void CostCritic::score(CriticData & data)
     for (int j = 0; j < strided_traj_cols; j++) {
       float Tx = traj_x(i, j);
       float Ty = traj_y(i, j);
+      unsigned int x_i = 0u, y_i = 0u;
 
-      pose_cost = footprintCost(Tx, Ty, traj_yaw(i, j));
-
-      if (pose_cost < 1.0f) {
-        continue;  // In free space
+      // The getCost doesn't use orientation
+      // The footprintCostAtPose will always return "INSCRIBED" if footprint is over it
+      // So the center point has more information than the footprint
+      if (!worldToMapFloat(Tx, Ty, x_i, y_i)) {
+        pose_cost = 255.0f;  // NO_INFORMATION in float
+      } else {
+        pose_cost = static_cast<float>(costmap->getCost(getIndex(x_i, y_i)));
+        if (pose_cost < 1.0f) {
+          continue;  // In free space
+        }
       }
 
-      if (inCollision(pose_cost)) {
+      if (inCollision(pose_cost, Tx, Ty, traj_yaw(i, j))) {
         traj_cost = collision_cost_;
         trajectory_collide = true;
         if (track_collisions) {collisions[i] = true;}
@@ -208,6 +215,8 @@ void CostCritic::score(CriticData & data)
       }
 
       // Let near-collision trajectory points be punished severely
+      // Note that we collision check based on the footprint actual,
+      // but score based on the center-point cost regardless
       if (pose_cost >= static_cast<float>(near_collision_cost_)) {
         traj_cost += critical_cost_;
       } else if (!near_goal) {  // Generally prefer trajectories further from obstacles
