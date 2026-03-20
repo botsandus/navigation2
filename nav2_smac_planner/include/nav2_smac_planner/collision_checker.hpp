@@ -66,8 +66,7 @@ public:
   void setFootprint(
     const nav2_costmap_2d::Footprint & footprint,
     const bool & radius,
-    const double & possible_collision_cost,
-    const double & inscribed_cost = 253.0);
+    const double & possible_collision_cost);
 
   /**
    * @brief Check if in collision with costmap and footprint at pose
@@ -131,7 +130,6 @@ protected:
   bool footprint_is_radius_{false};
   std::vector<float> angles_;
   float possible_collision_cost_{-1};
-  float inscribed_cost_{253.0f};
   rclcpp::Logger logger_{rclcpp::get_logger("SmacPlannerCollisionChecker")};
   rclcpp::Clock::SharedPtr clock_;
 };

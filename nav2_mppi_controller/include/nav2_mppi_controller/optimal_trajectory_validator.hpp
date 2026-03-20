@@ -146,7 +146,9 @@ public:
           continue;  // Out of bounds, skip this point
         }
         unsigned char cost = costmap->getCost(x_i, y_i);
-        if (cost == nav2_costmap_2d::LETHAL_OBSTACLE) {
+        if (cost == nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE ||
+          cost == nav2_costmap_2d::LETHAL_OBSTACLE)
+        {
           return ValidationResult::SOFT_RESET;
         }
       }

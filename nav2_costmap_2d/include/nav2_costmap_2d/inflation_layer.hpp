@@ -123,11 +123,13 @@ public:
     unsigned char cost = 0;
     if (distance == 0) {
       cost = LETHAL_OBSTACLE;
+    } else if (distance * resolution_ <= inscribed_radius_) {
+      cost = INSCRIBED_INFLATED_OBSTACLE;
     } else {
-      // Smooth exponential decay from distance 0, no flat inscribed plateau
+      // make sure cost falls off by Euclidean distance
       double factor =
-        exp(-1.0 * cost_scaling_factor_ * distance * resolution_);
-      cost = static_cast<unsigned char>(INSCRIBED_INFLATED_OBSTACLE * factor);
+        exp(-1.0 * cost_scaling_factor_ * (distance * resolution_ - inscribed_radius_));
+      cost = static_cast<unsigned char>((INSCRIBED_INFLATED_OBSTACLE - 1) * factor);
     }
     return cost;
   }
@@ -216,7 +218,6 @@ protected:
   double inflation_radius_, inscribed_radius_, cost_scaling_factor_;
   bool inflate_unknown_, inflate_around_unknown_;
   unsigned int cell_inflation_radius_;
-  unsigned char inscribed_cost_;  // Cost at inscribed radius distance
   int num_threads_;  // Number of OpenMP threads (-1 = auto)
   double resolution_;
 

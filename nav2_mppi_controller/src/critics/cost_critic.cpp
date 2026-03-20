@@ -71,11 +71,7 @@ void CostCritic::initialize()
   }
 
   if (near_collision_cost_ > 253) {
-    RCLCPP_WARN(
-      logger_,
-      "Near collision cost is set higher than the legacy INSCRIBED_INFLATED_OBSTACLE value (253). "
-      "With the smooth inflation gradient, consider using a value based on your "
-      "cost_scaling_factor and inscribed radius.");
+    RCLCPP_WARN(logger_, "Near collision cost is set higher than INSCRIBED_INFLATED_OBSTACLE");
   }
 
   RCLCPP_INFO(
@@ -116,9 +112,6 @@ float CostCritic::findCircumscribedCost(
       return result;
     }
     result = inflation_layer->computeCost(circum_radius / resolution);
-    double inscribed_radius = costmap->getLayeredCostmap()->getInscribedRadius();
-    inscribed_cost_ = static_cast<float>(
-      inflation_layer->computeCost(inscribed_radius / resolution));
   } else {
     RCLCPP_WARN(
       logger_,

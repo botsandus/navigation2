@@ -46,7 +46,6 @@
 #include "nav2_mppi_controller/models/path.hpp"
 #include "builtin_interfaces/msg/time.hpp"
 #include "nav2_mppi_controller/critic_data.hpp"
-#include "nav2_costmap_2d/inflation_layer_interface.hpp"
 
 #define M_PIF 3.141592653589793238462643383279502884e+00F
 #define M_PIF_2 1.5707963267948966e+00F
@@ -343,22 +342,22 @@ inline void findPathCosts(
   const size_t path_segments_count = data.path.x.size() - 1;
   data.path_pts_valid = std::vector<bool>(path_segments_count, false);
   const bool tracking_unknown = costmap_ros->getLayeredCostmap()->isTrackingUnknown();
-  const unsigned char inscribed_cost =
-    nav2_costmap_2d::InflationLayerInterface::computeInscribedCost(costmap_ros);
   for (unsigned int idx = 0; idx < path_segments_count; idx++) {
     if (!costmap->worldToMap(data.path.x(idx), data.path.y(idx), map_x, map_y)) {
       (*data.path_pts_valid)[idx] = false;
       continue;
     }
 
-    unsigned char cost = costmap->getCost(map_x, map_y);
-    if (cost == nav2_costmap_2d::LETHAL_OBSTACLE || cost >= inscribed_cost) {
-      (*data.path_pts_valid)[idx] = false;
-      continue;
-    }
-    if (cost == nav2_costmap_2d::NO_INFORMATION) {
-      (*data.path_pts_valid)[idx] = tracking_unknown ? true : false;
-      continue;
+    switch (costmap->getCost(map_x, map_y)) {
+      case (nav2_costmap_2d::LETHAL_OBSTACLE):
+        (*data.path_pts_valid)[idx] = false;
+        continue;
+      case (nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE):
+        (*data.path_pts_valid)[idx] = false;
+        continue;
+      case (nav2_costmap_2d::NO_INFORMATION):
+        (*data.path_pts_valid)[idx] = tracking_unknown ? true : false;
+        continue;
     }
 
     (*data.path_pts_valid)[idx] = true;

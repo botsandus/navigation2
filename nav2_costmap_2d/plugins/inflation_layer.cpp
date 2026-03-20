@@ -247,7 +247,7 @@ InflationLayer::applyInflation(
       const unsigned char cost = lut_data[d_scaled];
 
       if (old_cost == NO_INFORMATION &&
-        (inflate_unk ? (cost > FREE_SPACE) : (cost >= inscribed_cost_)))
+        (inflate_unk ? (cost > FREE_SPACE) : (cost >= INSCRIBED_INFLATED_OBSTACLE)))
       {
         master_array[index] = cost;
       } else {
@@ -340,13 +340,6 @@ InflationLayer::computeCaches()
   for (unsigned int d_scaled = 0; d_scaled <= max_dist_scaled; ++d_scaled) {
     const double distance = static_cast<double>(d_scaled) / COST_LUT_PRECISION;
     cost_lut_[d_scaled] = computeCost(distance);
-  }
-
-  // Precompute cost at inscribed radius for NO_INFORMATION handling
-  if (inscribed_radius_ > 0.0 && resolution_ > 0.0) {
-    inscribed_cost_ = computeCost(inscribed_radius_ / resolution_);
-  } else {
-    inscribed_cost_ = INSCRIBED_INFLATED_OBSTACLE;
   }
 }
 

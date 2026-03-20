@@ -99,12 +99,6 @@ public:
     const nav2_costmap_2d::Costmap2D * costmap,
     const double & max_time);
 
-  /**
-   * @brief Set the inscribed cost threshold for collision checking
-   * @param cost The cost value at inscribed radius
-   */
-  void setInscribedCost(float cost) {inscribed_cost_ = cost;}
-
 protected:
   /**
    * @brief Smoother method - does the smoothing on a segment
@@ -205,7 +199,6 @@ protected:
   double min_turning_rad_, tolerance_, data_w_, smooth_w_;
   int max_its_, refinement_ctr_, refinement_num_;
   bool is_holonomic_, do_refinement_;
-  float inscribed_cost_{INSCRIBED_COST};
   MotionModel motion_model_;
   ompl::base::StateSpacePtr state_space_;
 };

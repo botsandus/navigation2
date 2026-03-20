@@ -110,18 +110,6 @@ inline double findCircumscribedCost(std::shared_ptr<nav2_costmap_2d::Costmap2DRO
 }
 
 /**
-* @brief Find the cost at the inscribed radius distance from the inflation layer.
-* Above this cost, the robot center is guaranteed to be in collision.
-* @param costmap Costmap2DROS to query inflation layer
-* @return double inscribed cost threshold
-*/
-inline double findInscribedCost(std::shared_ptr<nav2_costmap_2d::Costmap2DROS> costmap)
-{
-  return static_cast<double>(
-    nav2_costmap_2d::InflationLayerInterface::computeInscribedCost(costmap));
-}
-
-/**
  * @brief convert json to lattice metadata
  * @param[in] json json object
  * @param[out] lattice meta data

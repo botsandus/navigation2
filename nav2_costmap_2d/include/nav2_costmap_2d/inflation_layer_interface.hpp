@@ -70,28 +70,6 @@ public:
    * @param layer_name Optional name of the specific layer to find
    * @return Shared pointer to the inflation layer interface, or nullptr if not found
    */
-  /**
-   * @brief Compute the cost value at the inscribed radius distance.
-   * This is the threshold above which the robot center is guaranteed to be in collision.
-   * @param costmap_ros The costmap ROS wrapper
-   * @param layer_name Optional name of the specific inflation layer
-   * @return Cost at inscribed radius, or INSCRIBED_INFLATED_OBSTACLE as legacy fallback
-   */
-  static inline unsigned char computeInscribedCost(
-    std::shared_ptr<nav2_costmap_2d::Costmap2DROS> & costmap_ros,
-    const std::string layer_name = "")
-  {
-    const auto inflation_layer = getInflationLayer(costmap_ros, layer_name);
-    if (inflation_layer != nullptr) {
-      double inscribed_radius = costmap_ros->getLayeredCostmap()->getInscribedRadius();
-      double resolution = costmap_ros->getCostmap()->getResolution();
-      if (resolution > 0.0 && inscribed_radius > 0.0) {
-        return inflation_layer->computeCost(inscribed_radius / resolution);
-      }
-    }
-    return INSCRIBED_INFLATED_OBSTACLE;
-  }
-
   static inline std::shared_ptr<InflationLayerInterface> getInflationLayer(
     std::shared_ptr<nav2_costmap_2d::Costmap2DROS> & costmap_ros,
     const std::string layer_name = "")

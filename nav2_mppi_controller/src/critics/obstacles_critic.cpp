@@ -86,9 +86,6 @@ float ObstaclesCritic::findCircumscribedCost(
     result = inflation_layer->computeCost(circum_radius / resolution);
     inflation_scale_factor_ = static_cast<float>(inflation_layer->getCostScalingFactor());
     inflation_radius_ = static_cast<float>(inflation_layer->getInflationRadius());
-    double inscribed_radius = costmap->getLayeredCostmap()->getInscribedRadius();
-    inscribed_cost_ = static_cast<float>(
-      inflation_layer->computeCost(inscribed_radius / resolution));
   } else {
     RCLCPP_WARN(
       logger_,
@@ -109,8 +106,7 @@ float ObstaclesCritic::distanceToObstacle(const CollisionCost & cost)
 {
   const float scale_factor = inflation_scale_factor_;
   const float min_radius = costmap_ros_->getLayeredCostmap()->getInscribedRadius();
-  // Inverse of cost = 253 * exp(-K * d_meters)
-  float dist_to_obj = (log(253.0f) - log(cost.cost)) / scale_factor;
+  float dist_to_obj = (scale_factor * min_radius - log(cost.cost) + log(253.0f)) / scale_factor;
 
   // If not footprint collision checking, the cost is using the center point cost and
   // needs the radius subtracted to obtain the closest distance to the object
@@ -213,16 +209,15 @@ bool ObstaclesCritic::inCollision(float cost) const
     costmap_ros_->getLayeredCostmap()->isTrackingUnknown();
 
   using namespace nav2_costmap_2d; // NOLINT
-  if (static_cast<unsigned char>(cost) == LETHAL_OBSTACLE) {
-    return true;
+  switch (static_cast<unsigned char>(cost)) {
+    case (LETHAL_OBSTACLE):
+      return true;
+    case (INSCRIBED_INFLATED_OBSTACLE):
+      return consider_footprint_ ? false : true;
+    case (NO_INFORMATION):
+      return is_tracking_unknown ? false : true;
   }
-  if (static_cast<unsigned char>(cost) == NO_INFORMATION) {
-    return is_tracking_unknown ? false : true;
-  }
-  // For circular robots, cost >= inscribed cost means guaranteed collision
-  if (!consider_footprint_ && cost >= inscribed_cost_) {
-    return true;
-  }
+
   return false;
 }
 

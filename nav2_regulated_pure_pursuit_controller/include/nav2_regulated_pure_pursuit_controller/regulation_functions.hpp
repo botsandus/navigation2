@@ -61,7 +61,7 @@ inline double curvatureConstraint(
 inline double costConstraint(
   const double raw_linear_vel,
   const double pose_cost,
-  std::shared_ptr<nav2_costmap_2d::Costmap2DROS>/*costmap_ros*/,
+  std::shared_ptr<nav2_costmap_2d::Costmap2DROS> costmap_ros,
   Parameters * params)
 {
   using namespace nav2_costmap_2d;  // NOLINT
@@ -69,9 +69,11 @@ inline double costConstraint(
   if (pose_cost != static_cast<double>(NO_INFORMATION) &&
     pose_cost != static_cast<double>(FREE_SPACE))
   {
-    // Inverse of cost = 253 * exp(-K * d_meters)
+    const double & inscribed_radius = costmap_ros->getLayeredCostmap()->getInscribedRadius();
+
     const double min_distance_to_obstacle =
-      (log(253.0) - log(pose_cost)) / params->inflation_cost_scaling_factor;
+      (params->inflation_cost_scaling_factor * inscribed_radius - log(pose_cost) + log(253.0f)) /
+      params->inflation_cost_scaling_factor;
 
     if (min_distance_to_obstacle < params->cost_scaling_dist) {
       return raw_linear_vel *
