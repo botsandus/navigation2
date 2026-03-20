@@ -78,12 +78,6 @@ public:
     std::vector<Point> & data) = 0;
 
   /**
-   * @brief Returns timing breakdown string from the last getData() call.
-   * Overridden by sources that track sub-timings (e.g. PointCloud).
-   */
-  virtual std::string getLastTimingBreakdown() const {return "";}
-
-  /**
    * @brief Obtains source enabled state
    * @return Whether source is enabled
    */
