@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class CostmapMetrics(MetricsCollector):
-    """Track max footprint cost via the GetCosts service during navigation."""
+    """Track max footprint cost via the GetCosts service."""
 
     def __init__(
         self,
@@ -22,8 +22,8 @@ class CostmapMetrics(MetricsCollector):
         self._node = None
         self._client = None
         self._timer = None
-        self._max_cost = 0.0
-        self._costs = []
+        self._max_footprint_cost = 0.0
+        self._max_center_cost = 0.0
 
     def topics(self) -> list:
         """No topic subscriptions needed — uses a service."""
@@ -39,7 +39,7 @@ class CostmapMetrics(MetricsCollector):
         """Not used — cost is polled via service."""
 
     def _poll_cost(self) -> None:
-        """Timer callback: send an async GetCosts request for the robot pose."""
+        """Timer callback: send async GetCosts requests for the robot pose."""
         if self._client is None or not self._client.service_is_ready():
             return
 
@@ -47,15 +47,22 @@ class CostmapMetrics(MetricsCollector):
         pose.header.frame_id = 'base_link'
         pose.pose.orientation.w = 1.0
 
-        req = GetCosts.Request()
-        req.use_footprint = True
-        req.poses = [pose]
+        footprint_req = GetCosts.Request()
+        footprint_req.use_footprint = True
+        footprint_req.poses = [pose]
+        self._client.call_async(footprint_req).add_done_callback(
+            self._on_footprint_response
+        )
 
-        future = self._client.call_async(req)
-        future.add_done_callback(self._on_cost_response)
+        center_req = GetCosts.Request()
+        center_req.use_footprint = False
+        center_req.poses = [pose]
+        self._client.call_async(center_req).add_done_callback(
+            self._on_center_response
+        )
 
-    def _on_cost_response(self, future) -> None:
-        """Process the GetCosts response."""
+    def _on_footprint_response(self, future) -> None:
+        """Process the footprint GetCosts response."""
         try:
             result = future.result()
         except Exception:
@@ -63,39 +70,53 @@ class CostmapMetrics(MetricsCollector):
             return
         if not result.success or not result.costs:
             return
+        self._max_footprint_cost = max(self._max_footprint_cost, result.costs[0])
 
-        cost = result.costs[0]
-        self._costs.append(cost)
-        self._max_cost = max(self._max_cost, cost)
+    def _on_center_response(self, future) -> None:
+        """Process the center-point GetCosts response."""
+        try:
+            result = future.result()
+        except Exception:
+            logger.debug('GetCosts service call failed', exc_info=True)
+            return
+        if not result.success or not result.costs:
+            return
+        self._max_center_cost = max(self._max_center_cost, result.costs[0])
 
     def check(self, limits: dict) -> str:
-        """Check max footprint cost against limits."""
-        if 'max_footprint_cost' in limits:
-            lo, hi = limits['max_footprint_cost']
-            if hi is not None and self._max_cost > hi:
+        """Check max footprint and center cost against limits."""
+        if 'footprint_cost' in limits:
+            lo, hi = limits['footprint_cost']
+            if hi is not None and self._max_footprint_cost > hi:
                 return (
-                    f'max_footprint_cost={self._max_cost:.0f} exceeds max {hi}'
+                    f'footprint_cost={self._max_footprint_cost:.0f} exceeds max {hi}'
                 )
-            if lo is not None and self._max_cost < lo:
+            if lo is not None and self._max_footprint_cost < lo:
                 return (
-                    f'max_footprint_cost={self._max_cost:.0f} below min {lo}'
+                    f'footprint_cost={self._max_footprint_cost:.0f} below min {lo}'
+                )
+        if 'center_cost' in limits:
+            lo, hi = limits['center_cost']
+            if hi is not None and self._max_center_cost > hi:
+                return (
+                    f'center_cost={self._max_center_cost:.0f} exceeds max {hi}'
+                )
+            if lo is not None and self._max_center_cost < lo:
+                return (
+                    f'center_cost={self._max_center_cost:.0f} below min {lo}'
                 )
         return None
 
     def report(self) -> dict:
         """Return costmap proximity metrics."""
         return {
-            'max_footprint_cost': self._max_cost,
-            'avg_footprint_cost': (
-                sum(self._costs) / len(self._costs)
-                if self._costs else 0.0
-            ),
-            'samples': len(self._costs),
+            'footprint_cost': self._max_footprint_cost,
+            'center_cost': self._max_center_cost,
         }
 
     def reset(self) -> None:
         """Clear buffered data and restart the polling timer."""
-        self._max_cost = 0.0
-        self._costs.clear()
+        self._max_footprint_cost = 0.0
+        self._max_center_cost = 0.0
         if self._timer is not None:
             self._timer.reset()

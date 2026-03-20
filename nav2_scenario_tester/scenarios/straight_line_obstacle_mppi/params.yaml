@@ -26,29 +26,63 @@ bt_navigator:
 controller_server:
   ros__parameters:
     controller_frequency: 30.0
+    min_x_velocity_threshold: 0.01
+    min_y_velocity_threshold: 0.5
+    min_theta_velocity_threshold: 0.01
+    failure_tolerance: -1.0
+    progress_checker_plugin: "progress_checker"
+    goal_checker_plugins: ["goal_checker"]
+    controller_plugins: ["FollowPath"]
+    path_handler_plugins: ["PathHandlerMPPI"]
+
+    # Progress checker
+    progress_checker:
+      plugin: "nav2_controller::PoseProgressChecker"
+      required_movement_radius: 0.1
+      movement_time_allowance: 1500.0
+      required_movement_angle: 2.0  # 115 deg
+
+    # Goal checkers
+    goal_checker:
+      stateful: true
+      plugin: "nav2_controller::SimpleGoalChecker"
+      xy_goal_tolerance: 0.25
+      yaw_goal_tolerance: 0.25
+
+    # Path handlers
+    PathHandlerMPPI:
+      plugin: "nav2_controller::FeasiblePathHandler"
+      prune_distance: 5.0
+      max_robot_pose_search_dist: 1.0
+      enforce_path_inversion: true
+      enforce_path_rotation: false
+      inversion_xy_tolerance: 0.4
+      inversion_yaw_tolerance: 0.4
+      reject_unit_path: false
+
     FollowPath:
       plugin: "nav2_mppi_controller::MPPIController"
       time_steps: 56
       model_dt: 0.05
       batch_size: 2000
-      vx_std: 0.2
-      vy_std: 0.2
+      vx_std: 0.3
+      vy_std: 0.0
       wz_std: 0.4
       vx_max: 0.5
       vx_min: -0.5
       vy_max: 0.5
       wz_max: 0.8
-      ax_max: 3.0
-      ax_min: -3.0
-      ay_min: -3.0
-      ay_max: 3.0
+      ax_max: 0.5
+      ax_min: -0.5
+      ay_min: 0.0
+      ay_max: 0.0
       az_max: 3.5
       iteration_count: 1
       temperature: 0.3
       gamma: 0.015
       motion_model: "DiffDrive"
       visualize: true
-      critic_index_to_visualize: 0
+      critic_index_to_visualize: 2
       regenerate_noises: false
       TrajectoryVisualizer:
         trajectory_step: 5
@@ -75,8 +109,9 @@ controller_server:
       CostCritic:
         enabled: true
         cost_power: 1
-        cost_weight: 3.81
-        critical_cost: 300.0
+        cost_weight: 4.0
+        critical_cost: 400.0
+        near_collision_cost: 200
         consider_footprint: true
         collision_cost: 1000000.0
         near_goal_distance: 1.0
@@ -174,7 +209,7 @@ local_costmap:
         map_topic: "/vo_map"
       inflation_layer_local:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 3.0
+        cost_scaling_factor: 0.6
         inflation_radius: 2.0
 
 global_costmap:

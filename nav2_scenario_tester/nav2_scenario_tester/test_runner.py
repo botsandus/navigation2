@@ -377,7 +377,7 @@ class NavTestRunner(Node):
                             goal_handle.cancel_goal_async()
                             return False, -2, f'Limit breached: {violation}'
                         if violation not in violations:
-                            self.get_logger().warning(
+                            self.get_logger().error(
                                 f'Limit breached: {violation}'
                             )
                             violations.append(violation)

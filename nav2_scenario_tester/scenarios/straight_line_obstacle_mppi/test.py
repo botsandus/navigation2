@@ -13,6 +13,7 @@ import rclpy
 
 TEST_YAML = os.path.join(os.path.dirname(__file__), 'test_cases.yaml')
 TEST_SUITE = load_test_suite(TEST_YAML)
+PARAMS_FILE = os.path.join(os.path.dirname(__file__), 'params.yaml')
 BT_XML = os.path.join(
     get_package_share_directory('nav2_bt_navigator'),
     'behavior_trees', 'navigate_to_pose_simple.xml',
@@ -25,8 +26,8 @@ def generate_test_description():
 
     launch_args = {
         'use_sim_time': 'True',
-        'params_file': os.path.join(os.path.dirname(__file__), 'params.yaml'),
-        'rviz': 'true',
+        'params_file': PARAMS_FILE,
+        'rviz': 'false',
     }
     if TEST_SUITE.map_yaml:
         launch_args['map'] = TEST_SUITE.map_yaml

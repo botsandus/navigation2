@@ -62,16 +62,16 @@ test_cases:
     limits:                                 # optional, [min, max] per metric
       distance_travelled: [null, 4.0]       # null = no bound
       plan_length: [2.0, 6.0]
-      max_footprint_cost: [null, 252]
+      footprint_cost: [null, 252]
 ```
 
 ## Metrics collectors
 
 | Collector | Source | Metrics |
 |---|---|---|
-| `OdometryMetrics` | `/odom` topic | `distance_travelled`, `elapsed_time`, `max_linear_speed`, `max_angular_speed` |
+| `OdometryMetrics` | `/odom` topic | `distance_travelled`, `elapsed_time`, `linear_speed`, `angular_speed`, `linear_acceleration`, `linear_deceleration`, `angular_acceleration`, `angular_deceleration` |
 | `PlanMetrics` | `/plan` topic | `plan_length`, `plan_waypoints`, `plan_count` |
-| `CostmapMetrics` | `/local_costmap/get_costs` service | `max_footprint_cost`, `avg_footprint_cost`, `samples` |
+| `CostmapMetrics` | `/local_costmap/get_costs` service | `footprint_cost`, `center_cost` |
 
 All collectors support live limit checking: if a `[min, max]` bound from the
 YAML is breached mid-navigation, the goal is cancelled early.
