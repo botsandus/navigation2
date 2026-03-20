@@ -12,6 +12,7 @@ class OdometryMetrics(MetricsCollector):
         self._odom_topic = odom_topic
         self._positions = []
         self._speeds = []
+        self._angular_speeds = []
         self._timestamps = []
         self._distance = 0.0
 
@@ -32,9 +33,8 @@ class OdometryMetrics(MetricsCollector):
         self._positions.append((x, y))
         self._timestamps.append(msg.header.stamp.sec + msg.header.stamp.nanosec / 1e9)
 
-        vx = msg.twist.twist.linear.x
-        vy = msg.twist.twist.linear.y
-        self._speeds.append(math.hypot(vx, vy))
+        self._speeds.append(abs(msg.twist.twist.linear.x))
+        self._angular_speeds.append(abs(msg.twist.twist.angular.z))
 
     def check(self, limits: dict) -> str:
         """Check distance and speed against limits."""
@@ -54,19 +54,22 @@ class OdometryMetrics(MetricsCollector):
             return {
                 'distance_travelled': 0.0,
                 'elapsed_time': 0.0,
-                'max_speed': 0.0,
+                'max_linear_speed': 0.0,
+                'max_angular_speed': 0.0,
             }
 
         elapsed = self._timestamps[-1] - self._timestamps[0]
         return {
             'distance_travelled': self._distance,
             'elapsed_time': elapsed,
-            'max_speed': max(self._speeds) if self._speeds else 0.0,
+            'max_linear_speed': max(self._speeds) if self._speeds else 0.0,
+            'max_angular_speed': max(self._angular_speeds) if self._angular_speeds else 0.0,
         }
 
     def reset(self) -> None:
         """Clear buffered data."""
         self._positions.clear()
         self._speeds.clear()
+        self._angular_speeds.clear()
         self._timestamps.clear()
         self._distance = 0.0

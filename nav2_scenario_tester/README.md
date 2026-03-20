@@ -69,7 +69,7 @@ test_cases:
 
 | Collector | Source | Metrics |
 |---|---|---|
-| `OdometryMetrics` | `/odom` topic | `distance_travelled`, `elapsed_time`, `max_speed` |
+| `OdometryMetrics` | `/odom` topic | `distance_travelled`, `elapsed_time`, `max_linear_speed`, `max_angular_speed` |
 | `PlanMetrics` | `/plan` topic | `plan_length`, `plan_waypoints`, `plan_count` |
 | `CostmapMetrics` | `/local_costmap/get_costs` service | `max_footprint_cost`, `avg_footprint_cost`, `samples` |
 
