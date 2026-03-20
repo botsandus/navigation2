@@ -355,7 +355,7 @@ class NavTestRunner(Node):
         get_result_future = goal_handle.get_result_async()
 
         # Spin loop: process callbacks (collectors) and check limits
-        violations = []
+        violations = {}
         start = time.time()
         while not get_result_future.done():
             rclpy.spin_once(self, timeout_sec=0.1)
@@ -376,11 +376,12 @@ class NavTestRunner(Node):
                             )
                             goal_handle.cancel_goal_async()
                             return False, -2, f'Limit breached: {violation}'
-                        if violation not in violations:
+                        metric_name = violation.split('=')[0]
+                        if metric_name not in violations:
                             self.get_logger().error(
                                 f'Limit breached: {violation}'
                             )
-                            violations.append(violation)
+                            violations[metric_name] = violation
 
         status = get_result_future.result().status
         if status != GoalStatus.STATUS_SUCCEEDED:
@@ -388,7 +389,7 @@ class NavTestRunner(Node):
             return False, result.error_code, result.error_msg
 
         if violations:
-            return False, -2, '; '.join(violations)
+            return False, -2, '; '.join(violations.values())
 
         self.get_logger().info('Goal succeeded')
         return True, 0, ''
