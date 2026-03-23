@@ -58,7 +58,7 @@ def create_test(test_file: str):
         launch_args = {
             'use_sim_time': 'True',
             'params_file': params_file,
-            'rviz': 'false',
+            'rviz': 'true',
         }
         if suite.map_yaml:
             launch_args['map'] = suite.map_yaml
