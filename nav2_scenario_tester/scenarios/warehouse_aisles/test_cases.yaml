@@ -36,13 +36,13 @@ test_cases:
       angular_speed: [null, 0.8]
       linear_acceleration: [null, 0.5]
       center_cost: [null, 0]
+  - name: tracking_error_near_goal
+    initial_pose: {x: 86.09, y: 23.27, yaw: -1.66}
+    goal_pose: {x: 86.35, y: 21.47, yaw: -1.63}
+    limits:
+      position_tracking_error: [null, 0.15]
 
   # Failing
-  # - name: tracking_error_near_goal
-  #   initial_pose: {x: 86.09, y: 23.27, yaw: -1.66}
-  #   goal_pose: {x: 86.35, y: 21.47, yaw: -1.63}
-  #   limits:
-  #     position_tracking_error: [null, 0.2]
   # - name: reach_goal_near_obstacle
   #   initial_pose: {x: 80.62, y: 35.35, yaw: -3.09}
   #   goal_pose: {x: 79.64, y: 35.34, yaw: 3.08}
