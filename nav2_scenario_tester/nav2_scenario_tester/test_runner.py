@@ -116,7 +116,7 @@ class NavTestRunner(Node):
         self,
         initial_pose: Pose,
         goal_pose: Pose,
-        timeout: float = 60.0,
+        timeout: float = 30.0,
         settle_time: float = 2.0,
         limits: dict = None,
         fail_fast: bool = False,
