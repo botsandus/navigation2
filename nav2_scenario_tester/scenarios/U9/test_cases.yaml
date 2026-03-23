@@ -10,9 +10,12 @@ test_cases:
   - name: charger_to_aisle
     initial_pose: {x: 23.122644, y: 20.402042, yaw: -2.25151}
     goal_pose: {x: 21.143406, y: 13.403617, yaw: -3.113322}
+  - name: aisle_to_bigger_aisle
+    initial_pose: {x: 20.79, y: 8.66, yaw: 0.01}
+    goal_pose: {x: 21.16, y: 4.57, yaw: 3.08}
   # Failing
-  - name: aisle_to_aisle
-    initial_pose: {x: 20.99, y: 13.14, yaw: 0.03}
-    goal_pose: {x: 21.67, y: 8.77, yaw: -3.12}
+  - name: inversion_in_aisle_middle
+    initial_pose: {x: 13.902715, y: 8.848982, yaw: -0.017738}
+    goal_pose: {x: 14.072762, y: 8.783441, yaw: -3.140573}
 map: U9.yaml
 params: params.yaml
