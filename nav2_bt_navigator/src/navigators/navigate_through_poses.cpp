@@ -23,6 +23,8 @@
 #include "nav2_msgs/msg/tracking_feedback.hpp"
 #include "nav2_ros_common/node_utils.hpp"
 
+#include "tf2/utils.hpp"
+
 namespace nav2_bt_navigator
 {
 
@@ -280,9 +282,17 @@ NavigateThroughPosesNavigator::initializeGoalPoses(ActionT::Goal::ConstSharedPtr
 
   if (goals_array.goals.size() > 0) {
     RCLCPP_INFO(
-      logger_, "Begin navigating from current location through %zu poses to (%.2f, %.2f)",
-      goals_array.goals.size(), goals_array.goals.back().pose.position.x,
-      goals_array.goals.back().pose.position.y);
+      logger_,
+      "Begin navigating from current location through %zu poses to (%.2f, %.2f) "
+      "[q: %.2f, %.2f, %.2f, %.2f] (yaw: %.2f)",
+      goals_array.goals.size(),
+      goals_array.goals.back().pose.position.x,
+      goals_array.goals.back().pose.position.y,
+      goals_array.goals.back().pose.orientation.x,
+      goals_array.goals.back().pose.orientation.y,
+      goals_array.goals.back().pose.orientation.z,
+      goals_array.goals.back().pose.orientation.w,
+      tf2::getYaw(goals_array.goals.back().pose.orientation));
   }
 
   // Reset state for new action feedback

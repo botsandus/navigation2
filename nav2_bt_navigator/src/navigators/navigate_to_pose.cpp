@@ -21,6 +21,8 @@
 #include "nav2_msgs/msg/tracking_feedback.hpp"
 #include "nav2_ros_common/node_utils.hpp"
 
+#include "tf2/utils.hpp"
+
 namespace nav2_bt_navigator
 {
 
@@ -257,9 +259,17 @@ NavigateToPoseNavigator::initializeGoalPose(ActionT::Goal::ConstSharedPtr goal)
   }
 
   RCLCPP_INFO(
-    logger_, "Begin navigating from current location (%.2f, %.2f) to (%.2f, %.2f)",
+    logger_,
+    "Begin navigating from current location (%.2f, %.2f) [q: %.2f, %.2f, %.2f, %.2f] "
+    "(yaw: %.2f) to (%.2f, %.2f) [q: %.2f, %.2f, %.2f, %.2f] (yaw: %.2f)",
     current_pose.pose.position.x, current_pose.pose.position.y,
-    goal_pose.pose.position.x, goal_pose.pose.position.y);
+    current_pose.pose.orientation.x, current_pose.pose.orientation.y,
+    current_pose.pose.orientation.z, current_pose.pose.orientation.w,
+    tf2::getYaw(current_pose.pose.orientation),
+    goal_pose.pose.position.x, goal_pose.pose.position.y,
+    goal_pose.pose.orientation.x, goal_pose.pose.orientation.y,
+    goal_pose.pose.orientation.z, goal_pose.pose.orientation.w,
+    tf2::getYaw(goal_pose.pose.orientation));
 
   // Reset state for new action feedback
   start_time_ = clock_->now();
