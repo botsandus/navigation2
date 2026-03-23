@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cmath>
 #include "nav2_mppi_controller/critic_manager.hpp"
 
 namespace mppi
@@ -85,6 +86,8 @@ void CriticManager::evalTrajectoriesScores(
     stats_msg->critics.reserve(critics_.size());
     stats_msg->changed.reserve(critics_.size());
     stats_msg->costs_sum.reserve(critics_.size());
+    stats_msg->costs_range.reserve(critics_.size());
+    stats_msg->costs_std.reserve(critics_.size());
   }
 
   for (size_t i = 0; i < critics_.size(); ++i) {
@@ -109,6 +112,15 @@ void CriticManager::evalTrajectoriesScores(
       float costs_sum = cost_diff.sum();
       stats_msg->costs_sum.push_back(costs_sum);
       stats_msg->changed.push_back(costs_sum != 0.0f);
+
+      // Calculate range and std dev to measure how much this critic differentiates
+      float cost_min = cost_diff.minCoeff();
+      float cost_max = cost_diff.maxCoeff();
+      stats_msg->costs_range.push_back(cost_max - cost_min);
+      float mean = cost_diff.mean();
+      float std_dev = std::sqrt((cost_diff - mean).square().mean());
+      stats_msg->costs_std.push_back(std_dev);
+
       critic_costs_.emplace_back(critic_names_[i], std::move(cost_diff));
     }
   }

@@ -3,3 +3,5 @@ builtin_interfaces/Time stamp
 string[] critics
 bool[] changed
 float32[] costs_sum
+float32[] costs_range
+float32[] costs_std
