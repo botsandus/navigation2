@@ -23,7 +23,11 @@ class CostmapMetrics(MetricsCollector):
         self._client = None
         self._timer = None
         self._max_footprint_cost = 0.0
+        self._min_footprint_cost = float('inf')
         self._max_center_cost = 0.0
+        self._min_center_cost = float('inf')
+        self._has_footprint = False
+        self._has_center = False
 
     def topics(self) -> list:
         """No topic subscriptions needed — uses a service."""
@@ -71,6 +75,8 @@ class CostmapMetrics(MetricsCollector):
         if not result.success or not result.costs:
             return
         self._max_footprint_cost = max(self._max_footprint_cost, result.costs[0])
+        self._min_footprint_cost = min(self._min_footprint_cost, result.costs[0])
+        self._has_footprint = True
 
     def _on_center_response(self, future) -> None:
         """Process the center-point GetCosts response."""
@@ -82,6 +88,8 @@ class CostmapMetrics(MetricsCollector):
         if not result.success or not result.costs:
             return
         self._max_center_cost = max(self._max_center_cost, result.costs[0])
+        self._min_center_cost = min(self._min_center_cost, result.costs[0])
+        self._has_center = True
 
     def check(self, limits: dict) -> str:
         """Check max footprint and center cost against limits."""
@@ -108,15 +116,25 @@ class CostmapMetrics(MetricsCollector):
         return None
 
     def report(self) -> dict:
-        """Return costmap proximity metrics."""
+        """Return costmap proximity metrics as ``(min, max)`` tuples."""
         return {
-            'footprint_cost': self._max_footprint_cost,
-            'center_cost': self._max_center_cost,
+            'footprint_cost': (
+                self._min_footprint_cost if self._has_footprint else 0.0,
+                self._max_footprint_cost,
+            ),
+            'center_cost': (
+                self._min_center_cost if self._has_center else 0.0,
+                self._max_center_cost,
+            ),
         }
 
     def reset(self) -> None:
         """Clear buffered data and restart the polling timer."""
         self._max_footprint_cost = 0.0
+        self._min_footprint_cost = float('inf')
         self._max_center_cost = 0.0
+        self._min_center_cost = float('inf')
+        self._has_footprint = False
+        self._has_center = False
         if self._timer is not None:
             self._timer.reset()

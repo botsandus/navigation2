@@ -114,12 +114,13 @@ def create_test(test_file: str):
 
                     # Log metrics
                     if result.metrics:
-                        self.runner.get_logger().info(
-                            f'[{tc.name}] metrics: ' + ', '.join(
-                                f'{k}={v:.3f}' for k, v in result.metrics.items()
-                                if isinstance(v, (int, float))
-                            )
-                        )
+                        lines = [f'[{tc.name}] metrics:']
+                        for k, v in result.metrics.items():
+                            if isinstance(v, tuple):
+                                lines.append(f'  {k}: {v[0]:.3f} / {v[1]:.3f}')
+                            elif isinstance(v, (int, float)):
+                                lines.append(f'  {k}: {v:.3f}')
+                        self.runner.get_logger().info('\n'.join(lines))
 
                     # Assert navigation succeeded
                     self.assertTrue(
@@ -134,6 +135,9 @@ def create_test(test_file: str):
                             value = result.metrics.get(metric)
                             if value is None:
                                 continue
+                            # Tuples are (min, max); use max for limit checks
+                            if isinstance(value, tuple):
+                                value = value[1]
                             lo, hi = bounds
                             if lo is not None:
                                 self.assertGreaterEqual(

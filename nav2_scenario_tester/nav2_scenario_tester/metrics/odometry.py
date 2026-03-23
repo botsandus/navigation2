@@ -122,34 +122,50 @@ class OdometryMetrics(MetricsCollector):
         return None
 
     def report(self) -> dict:
-        """Return final odometry metrics."""
+        """Return final odometry metrics as ``(min, max)`` tuples."""
         if len(self._positions) < 2:
             return {
                 'distance_travelled': 0.0,
                 'elapsed_time': 0.0,
-                'linear_speed': 0.0,
-                'angular_speed': 0.0,
-                'linear_acceleration': 0.0,
-                'linear_deceleration': 0.0,
-                'angular_acceleration': 0.0,
-                'angular_deceleration': 0.0,
+                'linear_speed': (0.0, 0.0),
+                'angular_speed': (0.0, 0.0),
+                'linear_acceleration': (0.0, 0.0),
+                'linear_deceleration': (0.0, 0.0),
+                'angular_acceleration': (0.0, 0.0),
+                'angular_deceleration': (0.0, 0.0),
             }
 
         elapsed = self._timestamps[-1] - self._timestamps[0]
         return {
             'distance_travelled': self._distance,
             'elapsed_time': elapsed,
-            'linear_speed': max(self._speeds) if self._speeds else 0.0,
-            'angular_speed': max(self._angular_speeds) if self._angular_speeds else 0.0,
-            'linear_acceleration': max(self._accelerations) if self._accelerations else 0.0,
-            'linear_deceleration': max(self._decelerations) if self._decelerations else 0.0,
+            'linear_speed': (
+                min(self._speeds) if self._speeds else 0.0,
+                max(self._speeds) if self._speeds else 0.0,
+            ),
+            'angular_speed': (
+                min(self._angular_speeds) if self._angular_speeds else 0.0,
+                max(self._angular_speeds) if self._angular_speeds else 0.0,
+            ),
+            'linear_acceleration': (
+                min(self._accelerations) if self._accelerations else 0.0,
+                max(self._accelerations) if self._accelerations else 0.0,
+            ),
+            'linear_deceleration': (
+                min(self._decelerations) if self._decelerations else 0.0,
+                max(self._decelerations) if self._decelerations else 0.0,
+            ),
             'angular_acceleration': (
+                min(self._angular_accelerations)
+                if self._angular_accelerations else 0.0,
                 max(self._angular_accelerations)
-                if self._angular_accelerations else 0.0
+                if self._angular_accelerations else 0.0,
             ),
             'angular_deceleration': (
+                min(self._angular_decelerations)
+                if self._angular_decelerations else 0.0,
                 max(self._angular_decelerations)
-                if self._angular_decelerations else 0.0
+                if self._angular_decelerations else 0.0,
             ),
         }
 

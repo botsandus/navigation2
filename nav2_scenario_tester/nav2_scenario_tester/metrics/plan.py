@@ -47,13 +47,14 @@ class PlanMetrics(MetricsCollector):
         """Return final planning metrics."""
         if not self._plan_lengths:
             return {
-                'plan_length': 0.0,
+                'plan_length': (0.0, 0.0),
                 'plan_waypoints': 0,
                 'plan_count': 0,
             }
-        last_length, last_waypoints = self._plan_lengths[-1]
+        lengths = [length for length, _ in self._plan_lengths]
+        last_waypoints = self._plan_lengths[-1][1]
         return {
-            'plan_length': last_length,
+            'plan_length': (min(lengths), max(lengths)),
             'plan_waypoints': last_waypoints,
             'plan_count': len(self._plan_lengths),
         }

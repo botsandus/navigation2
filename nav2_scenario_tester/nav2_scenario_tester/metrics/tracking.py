@@ -41,15 +41,21 @@ class TrackingMetrics(MetricsCollector):
         return None
 
     def report(self) -> dict:
-        """Return tracking error metrics."""
+        """Return tracking error metrics as ``(min, max)`` tuples."""
         if not self._position_errors:
             return {
-                'position_tracking_error': 0.0,
-                'heading_tracking_error': 0.0,
+                'position_tracking_error': (0.0, 0.0),
+                'heading_tracking_error': (0.0, 0.0),
             }
         return {
-            'position_tracking_error': max(self._position_errors),
-            'heading_tracking_error': max(self._heading_errors),
+            'position_tracking_error': (
+                min(self._position_errors),
+                max(self._position_errors),
+            ),
+            'heading_tracking_error': (
+                min(self._heading_errors),
+                max(self._heading_errors),
+            ),
         }
 
     def reset(self) -> None:
