@@ -43,6 +43,11 @@ test_cases:
       position_tracking_error: [null, 0.16]
 
   # Failing
+  - name: straight_line_at_inflation_radius_border
+    initial_pose: {x: 3.74, y: 27.08, yaw: 1.50}
+    goal_pose: {x: 3.75, y: 30.53, yaw: 1.55}
+    limits:
+    position_tracking_error: [null, 0.1]
   - name: narrow_aisle_to_aisle
     initial_pose: {x: 78.278519, y: 9.954653, yaw: -0.004202}
     goal_pose: {x: 78.780594, y: 14.306622, yaw: 3.13739}
