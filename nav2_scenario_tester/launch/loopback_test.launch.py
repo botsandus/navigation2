@@ -18,18 +18,10 @@ Launch file for nav2 navigation integration tests with loopback simulation.
 Spins up a loopback simulator, map_server, and minimal nav2 nodes.
 Intended to be included from user test launch files via IncludeLaunchDescription.
 
-Usage from another package:
-    IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(
-                get_package_share_directory('nav2_scenario_tester'),
-                'launch', 'loopback_test.launch.py'
-            )
-        ),
-        launch_arguments={
-            'params_file': '/path/to/my_params.yaml',
-        }.items(),
-    )
+Usage::
+
+    ros2 launch nav2_scenario_tester loopback_test.launch.py \
+        params_file:=params.yaml map:=warehouse_aisles.yaml rviz:=true
 """
 
 import os
@@ -39,7 +31,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, SetEnvironmentVariable
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node, SetParameter
 from nav2_common.launch import LaunchConfigAsBool
 
@@ -47,23 +39,21 @@ from nav2_common.launch import LaunchConfigAsBool
 def generate_launch_description() -> LaunchDescription:
     pkg_dir = get_package_share_directory('nav2_scenario_tester')
 
-    params_file = LaunchConfiguration('params_file')
-    map_yaml = LaunchConfiguration('map')
+    # Resolve bare filenames against their package subdirectories
+    params_file = PathJoinSubstitution([pkg_dir, 'params', LaunchConfiguration('params_file')])
+    map_yaml = PathJoinSubstitution([pkg_dir, 'maps', LaunchConfiguration('map')])
     use_sim_time = LaunchConfigAsBool('use_sim_time')
     namespace = LaunchConfiguration('namespace')
     log_level = LaunchConfiguration('log_level')
 
-    default_params = os.path.join(pkg_dir, 'config', 'default_test_params.yaml')
-    default_map = os.path.join(pkg_dir, 'maps', 'empty.yaml')
-
     # ── Declare arguments ──────────────────────────────────────────────
     declare_params_file = DeclareLaunchArgument(
-        'params_file', default_value=default_params,
-        description='Full path to the ROS2 parameters file',
+        'params_file', default_value='params.yaml',
+        description='Nav2 parameters filename (looked up in params/)',
     )
     declare_map = DeclareLaunchArgument(
-        'map', default_value=default_map,
-        description='Full path to the map YAML file',
+        'map', default_value='empty.yaml',
+        description='Map YAML filename (looked up in maps/)',
     )
     declare_use_sim_time = DeclareLaunchArgument(
         'use_sim_time', default_value='true',

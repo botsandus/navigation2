@@ -7,9 +7,12 @@ test_cases:
       - [[87.325424, 28.452196], [86.786751, 28.475378], [87.126793, 28.135109]]
     limits:
       center_cost: [null, 200]
+  - name: charger_to_aisle
+    initial_pose: {x: 23.122644, y: 20.402042, yaw: -2.25151}
+    goal_pose: {x: 21.143406, y: 13.403617, yaw: -3.113322}
   # Failing
-  # - name: aisle_to_aisle
-  #   initial_pose: {x: 20.99, y: 13.14, yaw: 0.03}
-  #   goal_pose: {x: 21.67, y: 8.77, yaw: -3.12}
+  - name: aisle_to_aisle
+    initial_pose: {x: 20.99, y: 13.14, yaw: 0.03}
+    goal_pose: {x: 21.67, y: 8.77, yaw: -3.12}
 map: U9.yaml
 params: params.yaml
