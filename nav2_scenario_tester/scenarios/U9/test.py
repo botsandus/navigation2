@@ -1,0 +1,3 @@
+from nav2_scenario_tester.scenario_test import create_test
+
+generate_test_description, TestParameterizedNavigation = create_test(__file__)

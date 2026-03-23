@@ -431,6 +431,23 @@ class TestSuite:
 
     cases: List[TestCase]
     map_yaml: str = None
+    params_file: str = None
+    bt_xml: str = None
+
+
+def _resolve_path(raw: str, yaml_dir: str, pkg_fallback_dir: str) -> str:
+    """Resolve a relative path against *yaml_dir* first, then *pkg_fallback_dir*."""
+    if not raw:
+        return None
+    if os.path.isabs(raw):
+        return raw
+    candidate = os.path.join(yaml_dir, raw)
+    if os.path.isfile(candidate):
+        return candidate
+    candidate = os.path.join(pkg_fallback_dir, raw)
+    if os.path.isfile(candidate):
+        return candidate
+    return raw
 
 
 def _parse_cases(data: dict) -> List[TestCase]:
@@ -462,6 +479,8 @@ def load_test_suite(yaml_path: str) -> TestSuite:
 
         map: warehouse.yaml     # relative to YAML dir or package maps/
         map: /absolute/path.yaml  # absolute path used as-is
+        params: mppi_tuned.yaml  # relative to YAML dir or package params/
+        behavior_tree: navigate_w_replanning_only_if_goal_is_updated.xml  # optional
 
         test_cases:
           - name: short_forward
@@ -472,31 +491,39 @@ def load_test_suite(yaml_path: str) -> TestSuite:
     Returns
     -------
     TestSuite
-        With ``map`` (str or None) and ``cases`` (list of TestCase).
+        With ``map``, ``params_file``, ``bt_xml`` (str or None) and
+        ``cases`` (list of TestCase).
 
     """
     with open(yaml_path, 'r') as f:
         data = yaml.safe_load(f)
 
-    map_path = data.get('map')
-    if map_path and not os.path.isabs(map_path):
-        # Try relative to the YAML file's directory first
-        yaml_dir = os.path.dirname(os.path.abspath(yaml_path))
-        candidate = os.path.join(yaml_dir, map_path)
+    from ament_index_python.packages import get_package_share_directory
+    yaml_dir = os.path.dirname(os.path.abspath(yaml_path))
+    pkg_share = get_package_share_directory('nav2_scenario_tester')
+
+    map_path = _resolve_path(
+        data.get('map'), yaml_dir, os.path.join(pkg_share, 'maps'),
+    )
+    params_file = _resolve_path(
+        data.get('params'), yaml_dir, os.path.join(pkg_share, 'params'),
+    )
+
+    bt_xml = data.get('behavior_tree')
+    if bt_xml and not os.path.isabs(bt_xml):
+        candidate = os.path.join(yaml_dir, bt_xml)
         if os.path.isfile(candidate):
-            map_path = candidate
+            bt_xml = candidate
         else:
-            # Fall back to the package's maps/ directory
-            from ament_index_python.packages import get_package_share_directory
-            pkg_maps = os.path.join(
-                get_package_share_directory('nav2_scenario_tester'), 'maps',
-            )
-            candidate = os.path.join(pkg_maps, map_path)
+            bt_pkg = get_package_share_directory('nav2_bt_navigator')
+            candidate = os.path.join(bt_pkg, 'behavior_trees', bt_xml)
             if os.path.isfile(candidate):
-                map_path = candidate
+                bt_xml = candidate
 
     return TestSuite(
         map_yaml=map_path,
+        params_file=params_file,
+        bt_xml=bt_xml,
         cases=_parse_cases(data),
     )
 

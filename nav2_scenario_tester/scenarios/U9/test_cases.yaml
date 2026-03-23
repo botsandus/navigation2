@@ -1,0 +1,10 @@
+test_cases:
+  - name: inversion_in_aisle
+    initial_pose: {x: 9.317657, y: 8.798326, yaw: 0.015}
+    goal_pose: {x: 9.366913, y: 8.734664, yaw: 3.107613}
+    obstacles:
+      - [[87.325424, 28.452196], [86.786751, 28.475378], [87.126793, 28.135109]]
+    limits:
+      center_cost: [null, 200]
+map: U9.yaml
+params: params.yaml

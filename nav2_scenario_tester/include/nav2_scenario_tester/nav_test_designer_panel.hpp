@@ -106,6 +106,8 @@ private:
   rclcpp::Client<nav2_msgs::srv::LoadMap>::SharedPtr load_map_client_;
   std::string current_map_;
   std::string map_yaml_value_;
+  /// Original root YAML node — preserves unknown top-level fields for round-tripping.
+  YAML::Node loaded_root_;
 
   // Column indices
   static constexpr int COL_NAME = 0;

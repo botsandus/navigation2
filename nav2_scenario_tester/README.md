@@ -72,6 +72,7 @@ test_cases:
 | `OdometryMetrics` | `/odom` topic | `distance_travelled`, `elapsed_time`, `linear_speed`, `angular_speed`, `linear_acceleration`, `linear_deceleration`, `angular_acceleration`, `angular_deceleration` |
 | `PlanMetrics` | `/plan` topic | `plan_length`, `plan_waypoints`, `plan_count` |
 | `CostmapMetrics` | `/local_costmap/get_costs` service | `footprint_cost`, `center_cost` |
+| `TrackingMetrics` | `/tracking_feedback` topic | `position_tracking_error`, `heading_tracking_error` |
 
 All collectors support live limit checking: if a `[min, max]` bound from the
 YAML is breached mid-navigation, the goal is cancelled early.

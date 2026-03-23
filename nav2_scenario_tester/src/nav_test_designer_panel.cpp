@@ -393,6 +393,17 @@ void NavTestDesignerPanel::saveYaml()
     root["map"] = map_yaml_value_;
   }
 
+  // Preserve top-level keys from the original file (e.g. params, behavior_tree)
+  if (loaded_root_.IsDefined() && loaded_root_.IsMap()) {
+    for (const auto & kv : loaded_root_) {
+      auto key = kv.first.as<std::string>();
+      if (key == "test_cases" || key == "map") {continue;}
+      if (!root[key]) {
+        root[key] = kv.second;
+      }
+    }
+  }
+
   std::ofstream ofs(path.toStdString());
   if (!ofs.is_open()) {
     QMessageBox::warning(this, "Error", "Cannot open file for writing.");
@@ -426,6 +437,7 @@ void NavTestDesignerPanel::loadYamlFromPath(const std::string & path)
   }
 
   // Load map if specified
+  loaded_root_ = YAML::Clone(root);
   if (root["map"]) {
     map_yaml_value_ = root["map"].as<std::string>();
     auto yaml_dir = std::filesystem::path(path).parent_path().string();
