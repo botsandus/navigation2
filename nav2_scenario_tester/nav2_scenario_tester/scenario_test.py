@@ -101,8 +101,11 @@ def create_test(test_file: str):
 
         def test_all_cases(self):
             """Run each test case from the YAML file as a subTest."""
-            for tc in suite.cases:
+            for i, tc in enumerate(suite.cases, 1):
                 with self.subTest(name=tc.name):
+                    self.runner.get_logger().info(
+                        f'--- [{i}/{len(suite.cases)}] Running: {tc.name} ---'
+                    )
                     result = self.runner.run(
                         initial_pose=tc.initial_pose,
                         goal_pose=tc.goal_pose,
