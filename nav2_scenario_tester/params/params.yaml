@@ -45,9 +45,10 @@ controller_server:
     # Goal checkers
     goal_checker:
       stateful: true
-      plugin: "nav2_controller::SimpleGoalChecker"
-      xy_goal_tolerance: 0.25
-      yaw_goal_tolerance: 0.25
+      plugin: "nav2_controller::StoppedGoalChecker"
+      xy_goal_tolerance: 0.4
+      yaw_goal_tolerance: 0.2
+      path_length_tolerance: 1.0
 
     # Path handlers
     PathHandlerMPPI:
