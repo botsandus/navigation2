@@ -1,71 +1,71 @@
 test_cases:
   # Working
-  # - name: straight_line_forward
-  #   initial_pose: {x: 86.0, y: 33.0, yaw: -1.57}
-  #   goal_pose: {x: 86.0, y: 22.0, yaw: -1.57}
-  #   limits:
-  #     distance_travelled: [null, 12.0]
-  #     linear_speed: [null, 0.5]
-  #     angular_speed: [null, 0.8]
-  #     linear_acceleration: [null, 0.6]
-  #     position_tracking_error: [null, 0.2]
-  # - name: straight_line_backward
-  #   initial_pose: {x: 86.0, y: 22.0, yaw: -1.57}
-  #   goal_pose: {x: 86.0, y: 33.0, yaw: -1.57}
-  #   limits:
-  #     distance_travelled: [null, 12.0]
-  #     linear_speed: [null, 0.5]
-  #     angular_speed: [null, 0.8]
-  #     linear_acceleration: [null, 0.6]
-  #     position_tracking_error: [null, 0.2]
-  # - name: narrowly_passing_next_to_obstacle
-  #   initial_pose: {x: 86.092621, y: 33.756149, yaw: -1.541884}
-  #   goal_pose: {x: 86.351738, y: 22.574089, yaw: -1.600002}
-  #   obstacles:
-  #     - [[87.325424, 28.452196], [86.786751, 28.475378], [87.126793, 28.135109]]
-  #   limits:
-  #     center_cost: [null, 200]
+  - name: straight_line_forward
+    initial_pose: {x: 86.0, y: 33.0, yaw: -1.57}
+    goal_pose: {x: 86.0, y: 22.0, yaw: -1.57}
+    limits:
+      distance_travelled: [null, 12.0]
+      linear_speed: [null, 0.5]
+      angular_speed: [null, 0.8]
+      linear_acceleration: [null, 0.6]
+      position_tracking_error: [null, 0.2]
+  - name: straight_line_backward
+    initial_pose: {x: 86.0, y: 22.0, yaw: -1.57}
+    goal_pose: {x: 86.0, y: 33.0, yaw: -1.57}
+    limits:
+      distance_travelled: [null, 12.0]
+      linear_speed: [null, 0.5]
+      angular_speed: [null, 0.8]
+      linear_acceleration: [null, 0.6]
+      position_tracking_error: [null, 0.2]
+  - name: narrowly_passing_next_to_obstacle
+    initial_pose: {x: 86.092621, y: 33.756149, yaw: -1.541884}
+    goal_pose: {x: 86.351738, y: 22.574089, yaw: -1.600002}
+    obstacles:
+      - [[87.325424, 28.452196], [86.786751, 28.475378], [87.126793, 28.135109]]
+    limits:
+      center_cost: [null, 200]
   - name: narrowly_passing_between_obstacles
     initial_pose: {x: 86.09, y: 33.76, yaw: -1.54}
     goal_pose: {x: 85.89, y: 23.18, yaw: -1.63}
     obstacles:
       - [[84.629776, 28.045177], [84.930023, 28.567486], [84.330132, 28.475439]]
       - [[87.325424, 28.452196], [86.786751, 28.475378], [87.126793, 28.135109]]
-  #   limits:
-  #     distance_travelled: [null, 12.0]
-  #     linear_speed: [null, 0.5]
-  #     angular_speed: [null, 0.8]
-  #     linear_acceleration: [null, 0.6]
-  #     center_cost: [null, 210]
-  # - name: inversion_in_free_space
-  #   initial_pose: {x: 84.74, y: 33.02, yaw: -1.51}
-  #   goal_pose: {x: 84.93, y: 34.74, yaw: 0.58}
-  #   limits:
-  #     distance_travelled: [null, 3.0]
-  #     linear_speed: [null, 0.5]
-  #     angular_speed: [null, 0.8]
-  #     linear_acceleration: [null, 0.6]
-  #     center_cost: [null, 0]
-  # - name: straight_line_at_inflation_radius_border
-  #   initial_pose: {x: 3.74, y: 27.08, yaw: 1.50}
-  #   goal_pose: {x: 3.75, y: 30.53, yaw: 1.55}
-  #   limits:
-  #     position_tracking_error: [null, 0.2]
-  # - name: narrow_aisle_to_aisle
-  #   initial_pose: {x: 78.278519, y: 9.954653, yaw: -0.004202}
-  #   goal_pose: {x: 78.780594, y: 14.306622, yaw: 3.13739}
-  # - name: reach_goal_near_obstacle
-  #   initial_pose: {x: 80.62, y: 35.35, yaw: -3.09}
-  #   goal_pose: {x: 79.64, y: 35.34, yaw: 3.08}
-  # - name: inversion_in_aisle
-  #   initial_pose: {x: 79.72, y: 35.26, yaw: 3.13}
-  #   goal_pose: {x: 79.65, y: 35.23, yaw: 0.0}
-  #   limits:
-  #     distance_travelled: [null, 12.0]
-  #     linear_speed: [null, 0.5]
-  #     angular_speed: [null, 0.8]
-  #     linear_acceleration: [null, 0.6]
-  #     center_cost: [null, 210]
+    limits:
+      distance_travelled: [null, 12.0]
+      linear_speed: [null, 0.5]
+      angular_speed: [null, 0.8]
+      linear_acceleration: [null, 0.6]
+      center_cost: [null, 210]
+  - name: inversion_in_free_space
+    initial_pose: {x: 84.74, y: 33.02, yaw: -1.51}
+    goal_pose: {x: 84.93, y: 34.74, yaw: 0.58}
+    limits:
+      distance_travelled: [null, 3.0]
+      linear_speed: [null, 0.5]
+      angular_speed: [null, 0.8]
+      linear_acceleration: [null, 0.6]
+      center_cost: [null, 0]
+  - name: straight_line_at_inflation_radius_border
+    initial_pose: {x: 3.74, y: 27.08, yaw: 1.50}
+    goal_pose: {x: 3.75, y: 30.53, yaw: 1.55}
+    limits:
+      position_tracking_error: [null, 0.2]
+  - name: narrow_aisle_to_aisle
+    initial_pose: {x: 78.278519, y: 9.954653, yaw: -0.004202}
+    goal_pose: {x: 78.780594, y: 14.306622, yaw: 3.13739}
+  - name: reach_goal_near_obstacle
+    initial_pose: {x: 80.62, y: 35.35, yaw: -3.09}
+    goal_pose: {x: 79.64, y: 35.34, yaw: 3.08}
+  - name: inversion_in_aisle
+    initial_pose: {x: 79.72, y: 35.26, yaw: 3.13}
+    goal_pose: {x: 79.65, y: 35.23, yaw: 0.0}
+    limits:
+      distance_travelled: [null, 12.0]
+      linear_speed: [null, 0.5]
+      angular_speed: [null, 0.8]
+      linear_acceleration: [null, 0.6]
+      center_cost: [null, 210]
   # Failing
   # - name: blocked_by_obstacle
   #   initial_pose: {x: 22.302568, y: 44.420254, yaw: 0.007143}

@@ -1,5 +1,4 @@
 test_cases:
-  # Working
   - name: inversion_in_aisle
     initial_pose: {x: 9.319006, y: 3.845842, yaw: 3.132664}
     goal_pose: {x: 9.268562, y: 3.879472, yaw: 0.01282}
