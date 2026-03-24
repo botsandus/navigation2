@@ -83,7 +83,7 @@ controller_server:
       gamma: 0.015
       motion_model: "DiffDrive"
       visualize: true
-      critic_index_to_visualize: 2
+      critic_index_to_visualize: 0
       regenerate_noises: false
       TrajectoryVisualizer:
         trajectory_step: 5
@@ -99,8 +99,8 @@ controller_server:
         cost_weight: 4.0
       GoalCritic:
         enabled: true
-        cost_power: 1
-        cost_weight: 7.0
+        cost_power: 2
+        cost_weight: 5.0
         threshold_to_consider: 1.4
       GoalAngleCritic:
         enabled: true
@@ -129,7 +129,7 @@ controller_server:
       PathFollowCritic:
         enabled: true
         cost_power: 1
-        cost_weight: 5.0
+        cost_weight: 6.0
         offset_from_furthest: 5
         threshold_to_consider: 1.4
       PathAngleCritic:

@@ -13,7 +13,6 @@ test_cases:
   - name: aisle_to_bigger_aisle
     initial_pose: {x: 20.79, y: 8.66, yaw: 0.01}
     goal_pose: {x: 21.16, y: 4.57, yaw: 3.08}
-  # Failing
   - name: inversion_in_aisle_middle
     initial_pose: {x: 13.902715, y: 8.848982, yaw: -0.017738}
     goal_pose: {x: 14.072762, y: 8.783441, yaw: -3.140573}
