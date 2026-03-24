@@ -90,7 +90,7 @@ def generate_launch_description() -> LaunchDescription:
             'scan_frame_id': 'base_scan',
             'base_frame_id': 'base_link',
             'publish_scan': False,
-            'update_duration': 0.03,
+            'update_duration': 0.05,
         }],
     )
 
