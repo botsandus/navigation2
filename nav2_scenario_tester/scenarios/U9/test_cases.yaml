@@ -17,5 +17,8 @@ test_cases:
   - name: inversion_in_aisle_middle
     initial_pose: {x: 13.902715, y: 8.848982, yaw: -0.017738}
     goal_pose: {x: 14.072762, y: 8.783441, yaw: -3.140573}
+  - name: inversion_before_going_into_aisle
+    initial_pose: {x: 4.02, y: 5.56, yaw: 1.72}
+    goal_pose: {x: 6.59, y: 8.97, yaw: -3.12}
 map: U9.yaml
 params: params.yaml
