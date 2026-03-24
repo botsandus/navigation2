@@ -110,7 +110,7 @@ controller_server:
       CostCritic:
         enabled: true
         cost_power: 1
-        cost_weight: 4.0
+        cost_weight: 5.0
         critical_cost: 400.0
         near_collision_cost: 200
         consider_footprint: true

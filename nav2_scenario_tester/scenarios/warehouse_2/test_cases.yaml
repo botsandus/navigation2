@@ -1,0 +1,8 @@
+test_cases:
+  - name: corner
+    initial_pose: {x: 54.72, y: 36.03, yaw: 1.54}
+    goal_pose: {x: 59.97, y: 40.96, yaw: -0.02}
+    limits:
+      center_cost: [null, 200]
+map: warehouse_2.yaml
+params: params.yaml
