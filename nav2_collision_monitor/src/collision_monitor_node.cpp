@@ -15,6 +15,7 @@
 #include "nav2_collision_monitor/collision_monitor_node.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <exception>
 #include <utility>
 #include <functional>
@@ -430,6 +431,7 @@ void CollisionMonitor::process(const Velocity & cmd_vel_in, const std_msgs::msg:
   // Polygon causing robot action (if any)
   std::shared_ptr<Polygon> action_polygon;
 
+  auto t_get_data_start = std::chrono::steady_clock::now();
   // Fill collision points array from different data sources
   auto marker_array = std::make_unique<visualization_msgs::msg::MarkerArray>();
   for (std::shared_ptr<Source> source : sources_) {
@@ -476,11 +478,13 @@ void CollisionMonitor::process(const Velocity & cmd_vel_in, const std_msgs::msg:
       marker_array->markers.push_back(marker);
     }
   }
+  auto t_get_data_end = std::chrono::steady_clock::now();
 
   if (collision_points_marker_pub_->get_subscription_count() > 0) {
     collision_points_marker_pub_->publish(std::move(marker_array));
   }
 
+  auto t_process_start = std::chrono::steady_clock::now();
   for (std::shared_ptr<Polygon> polygon : polygons_) {
     if (!polygon->getEnabled() || !enabled_) {
       continue;
@@ -515,6 +519,12 @@ void CollisionMonitor::process(const Velocity & cmd_vel_in, const std_msgs::msg:
     // Report changed robot behavior
     notifyActionState(robot_action, action_polygon);
   }
+
+  auto getdata_ms = std::chrono::duration_cast<std::chrono::microseconds>(
+    t_get_data_end - t_get_data_start).count() / 1000.0;
+  auto process_ms = std::chrono::duration_cast<std::chrono::microseconds>(
+    std::chrono::steady_clock::now() - t_process_start).count() / 1000.0;
+  RCLCPP_INFO(get_logger(), "[perf] get_data=%.3fms, process=%.3fms", getdata_ms, process_ms);
 
   // Publish required robot velocity
   publishVelocity(robot_action, header);
