@@ -10,9 +10,13 @@ find_package(ament_cmake_python REQUIRED)
 find_package(ament_index_cpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(pluginlib REQUIRED)
-find_package(Qt5 REQUIRED COMPONENTS Widgets)
 find_package(rclcpp REQUIRED)
 find_package(rviz_common REQUIRED)
+find_package(Qt6 QUIET COMPONENTS Widgets)
+if(NOT Qt6_FOUND)
+  find_package(Qt5 REQUIRED COMPONENTS Widgets)
+endif()
+set(QT_WIDGETS_TARGET Qt${QT_VERSION_MAJOR}::Widgets)
 find_package(rviz_default_plugins REQUIRED)
 find_package(rviz_rendering REQUIRED)
 find_package(tf2 REQUIRED)
@@ -49,7 +53,7 @@ target_link_libraries(${rviz_lib} PUBLIC
   ${nav2_msgs_TARGETS}
   ${visualization_msgs_TARGETS}
   tf2::tf2
-  Qt5::Widgets
+  ${QT_WIDGETS_TARGET}
   yaml-cpp::yaml-cpp
 )
 
