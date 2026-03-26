@@ -3,8 +3,8 @@
 
 #include "nav2_scenario_tester/nav_test_designer_panel.hpp"
 
-#include <tf2/LinearMath/Matrix3x3.hpp>
-#include <tf2/LinearMath/Quaternion.hpp>
+#include <tf2/LinearMath/Matrix3x3.h>
+#include <tf2/LinearMath/Quaternion.h>
 #include <QMessageBox>
 
 #include <fstream>
