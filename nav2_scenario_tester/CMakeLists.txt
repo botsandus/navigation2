@@ -10,9 +10,16 @@ find_package(ament_cmake_python REQUIRED)
 find_package(ament_index_cpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(pluginlib REQUIRED)
-find_package(Qt5 REQUIRED COMPONENTS Widgets)
 find_package(rclcpp REQUIRED)
 find_package(rviz_common REQUIRED)
+# rviz switched to Qt6: https://github.com/ros2/rviz/pull/1635
+if(rviz_common_VERSION_MAJOR GREATER_EQUAL 15 AND rviz_common_VERSION_MINOR GREATER_EQUAL 1)
+  find_package(Qt6 REQUIRED COMPONENTS Widgets)
+  set(QT_VERSION_MAJOR 6)
+else()
+  find_package(Qt5 REQUIRED COMPONENTS Widgets)
+  set(QT_VERSION_MAJOR 5)
+endif()
 find_package(rviz_default_plugins REQUIRED)
 find_package(rviz_rendering REQUIRED)
 find_package(tf2 REQUIRED)
@@ -49,7 +56,7 @@ target_link_libraries(${rviz_lib} PUBLIC
   ${nav2_msgs_TARGETS}
   ${visualization_msgs_TARGETS}
   tf2::tf2
-  Qt5::Widgets
+  Qt${QT_VERSION_MAJOR}::Widgets
   yaml-cpp::yaml-cpp
 )
 
