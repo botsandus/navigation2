@@ -4,7 +4,7 @@
 #ifndef NAV2_SCENARIO_TESTER__START_POSE_TOOL_HPP_
 #define NAV2_SCENARIO_TESTER__START_POSE_TOOL_HPP_
 
-#include <tf2/LinearMath/Quaternion.h>
+#include <tf2/LinearMath/Quaternion.hpp>
 
 #include <geometry_msgs/msg/pose.hpp>
 #include <rviz_common/load_resource.hpp>
