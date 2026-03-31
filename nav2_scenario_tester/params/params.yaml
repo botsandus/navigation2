@@ -75,6 +75,11 @@ controller_server:
       vx_min: -0.5
       vy_max: 0.5
       wz_max: 0.8
+      ax_max: 3.0
+      ax_min: -3.0
+      ay_max: 3.0
+      ay_min: -3.0
+      az_max: 3.5
       iteration_count: 1
       temperature: 0.3
       gamma: 0.015
