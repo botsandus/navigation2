@@ -1,5 +1,8 @@
 test_cases:
   - name: inversion_in_aisle
+    # Verifies inversion inside a large aisle; expect the robot to
+    # reverse its heading without colliding and to stay under the center-cost
+    # limit while maneuvering.
     initial_pose: {x: 9.319006, y: 3.845842, yaw: 3.132664}
     goal_pose: {x: 9.268562, y: 3.879472, yaw: 0.01282}
     obstacles:
@@ -7,15 +10,20 @@ test_cases:
     limits:
       center_cost: [null, 200]
   - name: charger_to_aisle
+    # Verifies a generic scenario from free space area into an aisle
     initial_pose: {x: 23.122644, y: 20.402042, yaw: -2.25151}
     goal_pose: {x: 21.143406, y: 13.403617, yaw: -3.113322}
   - name: aisle_to_bigger_aisle
+    # Verifies a transition from an aisle into a wider aisle.
     initial_pose: {x: 20.79, y: 8.66, yaw: 0.01}
     goal_pose: {x: 21.16, y: 4.57, yaw: 3.08}
-  - name: inversion_in_aisle_middle
+  - name: inversion_in_narrow_aisle
+    # Verifies the behavior of inversion in a narrow aisle by going out, inverting and coming back in
+    # Ideally when rotating outside the isle, the footprint should not be too close from the lethal aisle walls
     initial_pose: {x: 13.902715, y: 8.848982, yaw: -0.017738}
     goal_pose: {x: 14.072762, y: 8.783441, yaw: -3.140573}
   - name: inversion_before_going_into_aisle
+    # Verifies reorientation before entering an aisle
     initial_pose: {x: 4.02, y: 5.56, yaw: 1.72}
     goal_pose: {x: 6.59, y: 8.97, yaw: -3.12}
 map: U9.yaml

@@ -1,5 +1,7 @@
 test_cases:
-  - name: corner
+  - name: around_the_corner
+    # Verifies turning through a corner; expect the robot to
+    # round the bend and keep a distance margin from the walls while reaching the goal.
     initial_pose: {x: 54.72, y: 36.03, yaw: 1.54}
     goal_pose: {x: 59.97, y: 40.96, yaw: -0.02}
     limits:
