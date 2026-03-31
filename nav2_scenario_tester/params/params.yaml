@@ -80,7 +80,7 @@ controller_server:
       gamma: 0.015
       motion_model: "DiffDrive"
       visualize: true
-      critic_index_to_visualize: 2
+      critic_index_to_visualize: 0
       regenerate_noises: true
       TrajectoryVisualizer:
         trajectory_step: 5
