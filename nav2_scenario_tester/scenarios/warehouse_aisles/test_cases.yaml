@@ -58,9 +58,11 @@ test_cases:
     limits:
       position_tracking_error: [null, 0.2]
   - name: narrow_aisle_to_narrow_aisle
-    # Verifies a transition from one narrow aisle into another.
+    # Verifies a transition from one narrow aisle into another without getting too close to the walls
     initial_pose: {x: 78.278519, y: 9.954653, yaw: -0.004202}
     goal_pose: {x: 78.780594, y: 14.306622, yaw: 3.13739}
+    limits:
+      center_cost: [null, 220]
   - name: reach_goal_in_high_cost_corridor
     # Verifies that we can reach a goal that is located in a high-cost corridor
     initial_pose: {x: 80.62, y: 35.35, yaw: -3.09}

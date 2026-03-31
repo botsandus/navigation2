@@ -14,9 +14,11 @@ test_cases:
     initial_pose: {x: 23.122644, y: 20.402042, yaw: -2.25151}
     goal_pose: {x: 21.143406, y: 13.403617, yaw: -3.113322}
   - name: aisle_to_bigger_aisle
-    # Verifies a transition from an aisle into a wider aisle.
+    # Verifies a transition from an aisle into a wider aisle while keeping a distance margin from the walls
     initial_pose: {x: 20.79, y: 8.66, yaw: 0.01}
     goal_pose: {x: 21.16, y: 4.57, yaw: 3.08}
+    limits:
+      center_cost: [null, 230]
   - name: inversion_in_narrow_aisle
     # Verifies the behavior of inversion in a narrow aisle by going out, inverting and coming back in
     # Ideally when rotating outside the isle, the footprint should not be too close from the lethal aisle walls
