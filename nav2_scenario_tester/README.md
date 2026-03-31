@@ -44,6 +44,24 @@ ros2 launch nav2_scenario_tester loopback_test.launch.py \
 | `params_file` | `params.yaml` | Filename looked up in `params/` |
 | `rviz` | `false` | Launch RViz |
 
+## Running tests against an already-running environment
+
+If you have already launched the environment (e.g. in a separate terminal), you
+can run only the test assertions without relaunching the nav2 stack:
+
+```bash
+# Terminal 1 — start the environment
+ros2 launch nav2_scenario_tester loopback_test.launch.py \
+    params_file:=params.yaml map:=warehouse_aisles.yaml rviz:=true
+
+# Terminal 2 — run tests only
+NAV2_SCENARIO_SKIP_LAUNCH=1 launch_test nav2_scenario_tester/scenarios/warehouse_aisles/test.py
+```
+
+Setting `NAV2_SCENARIO_SKIP_LAUNCH=1` skips launching the nav2 stack and
+connects directly to the running environment. The runner still waits for
+`bt_navigator` to become active before executing the first test case.
+
 ## Test designer
 
 Launch the RViz test designer to visually create and edit test cases:

@@ -15,7 +15,7 @@ import unittest
 
 from ament_index_python.packages import get_package_share_directory
 import launch
-from launch.actions import IncludeLaunchDescription, TimerAction
+from launch.actions import ExecuteProcess, IncludeLaunchDescription, TimerAction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 import launch_testing
 import launch_testing.actions
@@ -52,7 +52,32 @@ def create_test(test_file: str):
     bt_xml = suite.bt_xml or default_bt
 
     def generate_test_description():
-        """Set up the nav2 stack with loopback simulation."""
+        """
+        Set up the nav2 stack with loopback simulation.
+
+        If the environment variable ``NAV2_SCENARIO_SKIP_LAUNCH`` is set to a
+        non-empty value the loopback stack is **not** launched.  Use this when
+        you have already started the environment separately (e.g. via
+        ``ros2 launch nav2_scenario_tester loopback_test.launch.py``) and only
+        want to run the test assertions against it::
+
+            NAV2_SCENARIO_SKIP_LAUNCH=1 launch_test path/to/scenario/test.py
+
+        The runner will still wait for ``bt_navigator`` to become active before
+        executing the first test case.
+        """
+        if os.environ.get('NAV2_SCENARIO_SKIP_LAUNCH'):
+            # Environment is already running — just signal readiness immediately.
+            # A keepalive process is required so launch_testing does not exit
+            # before the tests complete (it terminates when all processes stop).
+            return launch.LaunchDescription([
+                ExecuteProcess(cmd=['sleep', 'infinity'], output='screen'),
+                TimerAction(
+                    period=0.5,
+                    actions=[launch_testing.actions.ReadyToTest()],
+                ),
+            ])
+
         nav_test_dir = get_package_share_directory('nav2_scenario_tester')
 
         launch_args = {
