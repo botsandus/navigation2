@@ -10,6 +10,7 @@ test_cases:
       linear_speed: [null, 0.5]
       angular_speed: [null, 0.8]
       position_tracking_error: [null, 0.2]
+      linear_acceleration: [null, 0.3]
   - name: straight_line_backward
     # Verifies nominal backward motion in clear space; expect a near-straight
     # traversal to the goal while staying within distance, speed, acceleration,
