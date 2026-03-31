@@ -120,7 +120,10 @@ def create_test(test_file: str):
 
         @classmethod
         def tearDownClass(cls):
-            cls.runner.shutdown()
+            # In tests-only mode, the environment was started externally and
+            # must remain running after tests complete.
+            if not os.environ.get('NAV2_SCENARIO_SKIP_LAUNCH'):
+                cls.runner.shutdown()
             cls.runner.destroy_node()
             rclpy.shutdown()
 

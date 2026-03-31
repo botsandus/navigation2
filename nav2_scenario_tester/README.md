@@ -60,7 +60,9 @@ NAV2_SCENARIO_SKIP_LAUNCH=1 launch_test nav2_scenario_tester/scenarios/warehouse
 
 Setting `NAV2_SCENARIO_SKIP_LAUNCH=1` skips launching the nav2 stack and
 connects directly to the running environment. The runner still waits for
-`bt_navigator` to become active before executing the first test case.
+`bt_navigator` to become active before executing the first test case. In this
+mode, test teardown does not shut down lifecycle managers, so the externally
+launched environment stays up after tests complete.
 
 ## Test designer
 
