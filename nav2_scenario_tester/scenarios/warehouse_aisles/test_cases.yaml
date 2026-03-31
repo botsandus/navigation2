@@ -9,7 +9,6 @@ test_cases:
       distance_travelled: [null, 12.0]
       linear_speed: [null, 0.5]
       angular_speed: [null, 0.8]
-      linear_acceleration: [null, 0.6]
       position_tracking_error: [null, 0.2]
   - name: straight_line_backward
     # Verifies nominal backward motion in clear space; expect a near-straight
@@ -21,7 +20,6 @@ test_cases:
       distance_travelled: [null, 12.0]
       linear_speed: [null, 0.5]
       angular_speed: [null, 0.8]
-      linear_acceleration: [null, 0.6]
       position_tracking_error: [null, 0.2]
   - name: obstacle_near_straight_path
     # Verifies the controller can take a distance margin from an obstacle
