@@ -28,5 +28,11 @@ test_cases:
     # Verifies reorientation before entering an aisle
     initial_pose: {x: 4.02, y: 5.56, yaw: 1.72}
     goal_pose: {x: 6.59, y: 8.97, yaw: -3.12}
+  - name: go_around_obstacle_in_aisle
+    # Verifies the ability to go around an obstacle in an aisle
+    initial_pose: {x: 5.540443, y: 8.76238, yaw: 0.014285}
+    goal_pose: {x: 11.357257, y: 8.894393, yaw: -0.019606}
+    obstacles:
+      - [[8.353523, 7.9152], [9.274371, 7.922567], [9.274371, 8.276173], [8.287223, 8.313006]]
 map: U9.yaml
 params: params.yaml
