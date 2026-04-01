@@ -423,6 +423,7 @@ class TestCase:
     timeout: float = 60.0
     obstacles: list = None
     limits: dict = None
+    bt_xml: str = None
 
 
 @dataclass
@@ -435,19 +436,22 @@ class TestSuite:
     bt_xml: str = None
 
 
-def _resolve_path(raw: str, yaml_dir: str, pkg_fallback_dir: str) -> str:
-    """Resolve a relative path against *yaml_dir* first, then *pkg_fallback_dir*."""
-    if not raw:
+def _resolve_path(name: str, pkg_dir: str) -> str:
+    """Resolve a filename to an absolute path inside a package directory."""
+    if not name:
         return None
-    if os.path.isabs(raw):
-        return raw
-    candidate = os.path.join(yaml_dir, raw)
-    if os.path.isfile(candidate):
-        return candidate
-    candidate = os.path.join(pkg_fallback_dir, raw)
-    if os.path.isfile(candidate):
-        return candidate
-    return raw
+    if os.path.isabs(name):
+        return name
+    return os.path.join(pkg_dir, name)
+
+
+def _resolve_bt_path(name: str, pkg_share: str) -> str:
+    """Resolve a BT filename to an absolute path inside the package behavior_trees/ folder."""
+    if not name:
+        return None
+    if os.path.isabs(name):
+        return name
+    return os.path.join(pkg_share, 'behavior_trees', name)
 
 
 def _parse_cases(data: dict) -> List[TestCase]:
@@ -463,6 +467,7 @@ def _parse_cases(data: dict) -> List[TestCase]:
             timeout=tc.get('timeout', 60.0),
             obstacles=tc.get('obstacles'),
             limits=tc.get('limits'),
+            bt_xml=tc.get('behavior_tree'),
         ))
     return cases
 
@@ -499,32 +504,26 @@ def load_test_suite(yaml_path: str) -> TestSuite:
         data = yaml.safe_load(f)
 
     from ament_index_python.packages import get_package_share_directory
-    yaml_dir = os.path.dirname(os.path.abspath(yaml_path))
     pkg_share = get_package_share_directory('nav2_scenario_tester')
 
     map_path = _resolve_path(
-        data.get('map'), yaml_dir, os.path.join(pkg_share, 'maps'),
+        data.get('map'), os.path.join(pkg_share, 'maps'),
     )
     params_file = _resolve_path(
-        data.get('params'), yaml_dir, os.path.join(pkg_share, 'params'),
+        data.get('params'), os.path.join(pkg_share, 'params'),
     )
 
-    bt_xml = data.get('behavior_tree')
-    if bt_xml and not os.path.isabs(bt_xml):
-        candidate = os.path.join(yaml_dir, bt_xml)
-        if os.path.isfile(candidate):
-            bt_xml = candidate
-        else:
-            bt_pkg = get_package_share_directory('nav2_bt_navigator')
-            candidate = os.path.join(bt_pkg, 'behavior_trees', bt_xml)
-            if os.path.isfile(candidate):
-                bt_xml = candidate
+    bt_xml = _resolve_bt_path(data.get('behavior_tree'), pkg_share)
+
+    cases = _parse_cases(data)
+    for case in cases:
+        case.bt_xml = _resolve_bt_path(case.bt_xml, pkg_share)
 
     return TestSuite(
         map_yaml=map_path,
         params_file=params_file,
         bt_xml=bt_xml,
-        cases=_parse_cases(data),
+        cases=cases,
     )
 
 

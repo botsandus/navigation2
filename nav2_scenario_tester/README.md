@@ -10,12 +10,12 @@ launch_test nav2_scenario_tester/scenarios/warehouse_aisles/test.py
 
 Each scenario directory contains a `test.py` and a `test_cases.yaml`.
 
-The `test_cases.yaml` defines the map, params, and test cases:
+The `test_cases.yaml` defines the map, params, behavior tree, and test cases:
 
 ```yaml
 map: warehouse_aisles.yaml              # filename in maps/
 params: params.yaml                      # filename in params/
-behavior_tree: navigate_w_replanning_only_if_goal_is_updated.xml  # optional
+behavior_tree: navigate_w_replanning_only_if_goal_is_updated.xml  # optional, looked up in behavior_trees/
 
 test_cases:
   - name: narrowly_passing_next_to_obstacle

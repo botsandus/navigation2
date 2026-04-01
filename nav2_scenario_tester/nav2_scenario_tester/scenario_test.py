@@ -45,7 +45,7 @@ def create_test(test_file: str):
     suite = load_test_suite(test_yaml)
 
     default_bt = os.path.join(
-        get_package_share_directory('nav2_bt_navigator'),
+        get_package_share_directory('nav2_scenario_tester'),
         'behavior_trees', 'navigate_w_replanning_only_if_goal_is_updated.xml',
     )
     params_file = suite.params_file or os.path.join(scenario_dir, 'params.yaml')
@@ -134,12 +134,13 @@ def create_test(test_file: str):
                     self.runner.get_logger().info(
                         f'--- [{i}/{len(suite.cases)}] Running: {tc.name} ---'
                     )
+                    case_bt_xml = tc.bt_xml or bt_xml
                     result = self.runner.run(
                         initial_pose=tc.initial_pose,
                         goal_pose=tc.goal_pose,
                         timeout=tc.timeout,
                         limits=tc.limits,
-                        behavior_tree=bt_xml,
+                        behavior_tree=case_bt_xml,
                         obstacles=tc.obstacles,
                     )
 

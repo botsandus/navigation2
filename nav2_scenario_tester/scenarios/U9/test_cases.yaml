@@ -36,3 +36,4 @@ test_cases:
       - [[8.353523, 7.9152], [9.274371, 7.922567], [9.274371, 8.276173], [8.287223, 8.313006]]
 map: U9.yaml
 params: params.yaml
+behavior_tree: navigate_w_replanning_only_if_goal_is_updated.xml

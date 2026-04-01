@@ -83,3 +83,4 @@ test_cases:
       - [[30.620054, 44.992714], [30.519032, 43.982494], [31.360884, 43.948818], [31.596603, 44.992714]]
 map: warehouse_aisles.yaml
 params: params.yaml
+behavior_tree: navigate_w_replanning_only_if_goal_is_updated.xml
