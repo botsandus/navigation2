@@ -66,16 +66,15 @@ void Optimizer::initialize(
   RCLCPP_INFO(logger_, "Loaded trajectory validator plugin: %s", validator_plugin_type.c_str());
 
 #ifdef NAV2_CUDA_SUPPORT
-  auto node_locked = parent_.lock();
-  nav2::declare_parameter_if_not_declared(
-    node_locked, name_ + ".use_gpu", rclcpp::ParameterValue(false));
-  use_gpu_ = node_locked->get_parameter(name_ + ".use_gpu").as_bool();
-  if (use_gpu_) {
-    // Default max costmap: 400x400 = 160K cells. Resized in reset() if needed.
-    gpu_scorer_.initialize(settings_.batch_size, settings_.time_steps, 400 * 400);
-    RCLCPP_INFO(logger_, "GPU acceleration enabled for MPPI optimizer");
-  } else {
-    RCLCPP_INFO(logger_, "GPU acceleration available but disabled (use_gpu: false)");
+  {
+    auto get_param = parameters_handler_->getParamGetter(name_);
+    get_param(use_gpu_, "use_gpu", false);
+    if (use_gpu_) {
+      gpu_scorer_.initialize(settings_.batch_size, settings_.time_steps, 400 * 400);
+      RCLCPP_INFO(logger_, "GPU acceleration enabled for MPPI optimizer");
+    } else {
+      RCLCPP_INFO(logger_, "GPU acceleration available but disabled (use_gpu: false)");
+    }
   }
 #endif
 
@@ -242,6 +241,8 @@ std::tuple<geometry_msgs::msg::TwistStamped, Eigen::ArrayXXf> Optimizer::evalCon
   Eigen::ArrayXXf optimal_trajectory;
   bool trajectory_valid = true;
 
+  const auto eval_start = std::chrono::steady_clock::now();
+
   do {
     optimize();
     optimal_trajectory = getOptimizedTrajectory();
@@ -270,15 +271,37 @@ std::tuple<geometry_msgs::msg::TwistStamped, Eigen::ArrayXXf> Optimizer::evalCon
     shiftControlSequence();
   }
 
+  const auto eval_end = std::chrono::steady_clock::now();
+  const double eval_ms =
+    std::chrono::duration<double, std::milli>(eval_end - eval_start).count();
+
+#ifdef NAV2_CUDA_SUPPORT
+  const char * mode = use_gpu_ ? "GPU" : "CPU";
+#else
+  const char * mode = "CPU";
+#endif
+
+  RCLCPP_INFO_THROTTLE(
+    logger_, *parent_.lock()->get_clock(), 2000,
+    "[MPPI %s] evalControl: %.2f ms (batch=%d, steps=%d, iters=%u)",
+    mode, eval_ms,
+    settings_.batch_size, settings_.time_steps, settings_.iteration_count);
+
   return std::make_tuple(control, optimal_trajectory);
 }
 
 void Optimizer::optimize()
 {
   for (size_t i = 0; i < settings_.iteration_count; ++i) {
+    const auto iter_start = std::chrono::steady_clock::now();
     generateNoisedTrajectories();
+    const auto noise_end = std::chrono::steady_clock::now();
 
 #ifdef NAV2_CUDA_SUPPORT
+    if (use_gpu_ && !gpu_scorer_.isInitialized()) {
+      gpu_scorer_.initialize(settings_.batch_size, settings_.time_steps, 400 * 400);
+      RCLCPP_INFO(logger_, "GPU scorer initialized on first use");
+    }
     if (use_gpu_ && gpu_scorer_.isInitialized()) {
       // Upload costmap to GPU once per iteration
       gpu_scorer_.uploadCostmap(costmap_);
@@ -312,7 +335,24 @@ void Optimizer::optimize()
 #endif
 
     critic_manager_.evalTrajectoriesScores(critics_data_);
+    const auto critics_end = std::chrono::steady_clock::now();
     updateControlSequence();
+    const auto iter_end = std::chrono::steady_clock::now();
+
+    const double noise_ms =
+      std::chrono::duration<double, std::milli>(noise_end - iter_start).count();
+    const double critics_ms =
+      std::chrono::duration<double, std::milli>(critics_end - noise_end).count();
+    const double update_ms =
+      std::chrono::duration<double, std::milli>(iter_end - critics_end).count();
+    const double total_ms =
+      std::chrono::duration<double, std::milli>(iter_end - iter_start).count();
+
+    RCLCPP_INFO_THROTTLE(
+      logger_, *parent_.lock()->get_clock(), 2000,
+      "[MPPI optimize] iter %zu: total=%.2f ms "
+      "(noise=%.2f, critics=%.2f, update=%.2f)",
+      i, total_ms, noise_ms, critics_ms, update_ms);
   }
 }
 
