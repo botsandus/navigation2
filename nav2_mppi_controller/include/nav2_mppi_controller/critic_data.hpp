@@ -27,6 +27,10 @@
 #include "nav2_mppi_controller/models/path.hpp"
 #include "nav2_mppi_controller/motion_models.hpp"
 
+// Ensure NAV2_CUDA_SUPPORT is visible when included from optimizer
+#ifdef NAV2_CUDA_SUPPORT
+#endif
+
 
 namespace mppi
 {
@@ -52,6 +56,12 @@ struct CriticData
   std::optional<std::vector<bool>> path_pts_valid;
   std::optional<size_t> furthest_reached_path_point;
   std::vector<bool> trajectories_in_collision;
+
+#ifdef NAV2_CUDA_SUPPORT
+  /// When true, costmap-based scoring was already done on GPU.
+  /// CostCritic and ObstaclesCritic should skip their hot loops.
+  bool gpu_scored_costmap{false};
+#endif
 };
 
 }  // namespace mppi

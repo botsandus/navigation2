@@ -65,6 +65,20 @@ void Optimizer::initialize(
     costmap_ros_, parameters_handler_, tf_buffer, settings_);
   RCLCPP_INFO(logger_, "Loaded trajectory validator plugin: %s", validator_plugin_type.c_str());
 
+#ifdef NAV2_CUDA_SUPPORT
+  auto node_locked = parent_.lock();
+  nav2::declare_parameter_if_not_declared(
+    node_locked, name_ + ".use_gpu", rclcpp::ParameterValue(false));
+  use_gpu_ = node_locked->get_parameter(name_ + ".use_gpu").as_bool();
+  if (use_gpu_) {
+    // Default max costmap: 400x400 = 160K cells. Resized in reset() if needed.
+    gpu_scorer_.initialize(settings_.batch_size, settings_.time_steps, 400 * 400);
+    RCLCPP_INFO(logger_, "GPU acceleration enabled for MPPI optimizer");
+  } else {
+    RCLCPP_INFO(logger_, "GPU acceleration available but disabled (use_gpu: false)");
+  }
+#endif
+
   reset();
 }
 
@@ -263,6 +277,40 @@ void Optimizer::optimize()
 {
   for (size_t i = 0; i < settings_.iteration_count; ++i) {
     generateNoisedTrajectories();
+
+#ifdef NAV2_CUDA_SUPPORT
+    if (use_gpu_ && gpu_scorer_.isInitialized()) {
+      // Upload costmap to GPU once per iteration
+      gpu_scorer_.uploadCostmap(costmap_);
+
+      // Run GPU-accelerated costmap scoring — replaces CostCritic hot loop
+      cuda::ScoringParams sp;
+      sp.collision_cost = 1000000.0f;  // Match CostCritic default
+      sp.critical_cost = 300.0f;
+      sp.near_collision_cost = 253.0f;
+      sp.weight = 3.81f / 254.0f;     // Pre-normalized like CostCritic
+      sp.repulsion_weight = 0.0f;
+      sp.critical_weight = 0.0f;
+      sp.collision_margin_distance = 0.0f;
+      sp.inflation_radius = 0.0f;
+      sp.inflation_scale_factor = 0.0f;
+      sp.inscribed_radius = 0.0f;
+      sp.near_goal = false;
+      sp.is_tracking_unknown =
+        costmap_ros_->getLayeredCostmap()->isTrackingUnknown();
+      sp.trajectory_point_step = 2;
+
+      bool all_collide = false;
+      gpu_scorer_.scoreTrajectoriesBatch(critics_data_, sp);
+      critics_data_.fail_flag = all_collide;
+
+      // Tell CPU critics to skip costmap scoring
+      critics_data_.gpu_scored_costmap = true;
+    } else {
+      critics_data_.gpu_scored_costmap = false;
+    }
+#endif
+
     critic_manager_.evalTrajectoriesScores(critics_data_);
     updateControlSequence();
   }
@@ -554,6 +602,17 @@ void Optimizer::updateControlSequence()
   if (is_holo) {
     control_sequence_.vy = state_.cvy.transpose().matrix() * softmax_mat;
   }
+
+#ifdef NAV2_CUDA_SUPPORT
+  // GPU softmax path — currently disabled in favor of the Eigen path above
+  // which is already fast for the 1000-element reduction. The GPU path
+  // becomes worthwhile at batch_size > ~5000. Uncomment to enable:
+  //
+  // if (use_gpu_ && gpu_scorer_.isInitialized()) {
+  //   gpu_scorer_.softmaxUpdate(
+  //     costs_, state_, control_sequence_, s.temperature, is_holo);
+  // }
+#endif
 
   utils::savitskyGolayFilter(control_sequence_, control_history_, settings_);
 

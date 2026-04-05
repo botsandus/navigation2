@@ -48,6 +48,10 @@
 #include "nav2_mppi_controller/tools/utils.hpp"
 #include "nav2_mppi_controller/optimal_trajectory_validator.hpp"
 
+#ifdef NAV2_CUDA_SUPPORT
+#include "nav2_mppi_controller/cuda/gpu_scorer.hpp"
+#endif
+
 namespace mppi
 {
 
@@ -320,6 +324,11 @@ protected:
     std::nullopt, std::nullopt, {}};  /// Caution, keep references
 
   rclcpp::Logger logger_{rclcpp::get_logger("MPPIController")};
+
+#ifdef NAV2_CUDA_SUPPORT
+  bool use_gpu_{false};
+  cuda::GpuScorer gpu_scorer_;
+#endif
 
   geometry_msgs::msg::Twist last_command_vel_;
 };

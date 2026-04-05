@@ -123,6 +123,15 @@ void ObstaclesCritic::score(CriticData & data)
     return;
   }
 
+#ifdef NAV2_CUDA_SUPPORT
+  // If GPU already scored costmap-based costs, skip CPU hot loop.
+  // Note: GPU scoring uses center-point cost only (no footprint).
+  // If consider_footprint_ is true, fall through to CPU path.
+  if (data.gpu_scored_costmap && !consider_footprint_) {
+    return;
+  }
+#endif
+
   if (consider_footprint_) {
     // footprint may have changed since initialization if user has dynamic footprints
     possible_collision_cost_ = findCircumscribedCost(costmap_ros_);

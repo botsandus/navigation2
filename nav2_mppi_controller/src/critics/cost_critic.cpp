@@ -134,6 +134,13 @@ void CostCritic::score(CriticData & data)
     return;
   }
 
+#ifdef NAV2_CUDA_SUPPORT
+  // If GPU already scored costmap-based costs, skip CPU hot loop
+  if (data.gpu_scored_costmap) {
+    return;
+  }
+#endif
+
   // Setup cost information for various parts of the critic
   is_tracking_unknown_ = costmap_ros_->getLayeredCostmap()->isTrackingUnknown();
   auto * costmap = collision_checker_.getCostmap();

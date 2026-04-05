@@ -22,6 +22,25 @@ find_package(visualization_msgs REQUIRED)
 find_package(nav2_ros_common REQUIRED)
 find_package(Eigen3 REQUIRED)
 
+# ── Optional GPU acceleration ──────────────────────────────────────────
+option(NAV2_CUDA_SUPPORT "Enable CUDA GPU acceleration for MPPI" OFF)
+if(NAV2_CUDA_SUPPORT)
+  include(CheckLanguage)
+  check_language(CUDA)
+  if(CMAKE_CUDA_COMPILER)
+    cmake_policy(SET CMP0104 NEW)
+    if(NOT CMAKE_CUDA_ARCHITECTURES)
+      set(CMAKE_CUDA_ARCHITECTURES native)
+    endif()
+    enable_language(CUDA)
+    find_package(CUDAToolkit REQUIRED)
+    message(STATUS "CUDA support enabled for MPPI controller (${CMAKE_CUDA_COMPILER})")
+  else()
+    message(WARNING "NAV2_CUDA_SUPPORT requested but no CUDA compiler found. Disabling.")
+    set(NAV2_CUDA_SUPPORT OFF)
+  endif()
+endif()
+
 include_directories(
   include
   ${EIGEN3_INCLUDE_DIR}
@@ -29,15 +48,44 @@ include_directories(
 
 nav2_package()
 
+# When CUDA is enabled, wrap directory-level compile options in generator
+# expressions so GCC/Clang flags (e.g. -Wdeprecated) are not passed to nvcc.
+if(NAV2_CUDA_SUPPORT AND CMAKE_CUDA_COMPILER)
+  get_directory_property(_dir_compile_opts COMPILE_OPTIONS)
+  set_directory_properties(PROPERTIES COMPILE_OPTIONS "")
+  foreach(_opt IN LISTS _dir_compile_opts)
+    add_compile_options("$<$<COMPILE_LANGUAGE:C,CXX>:${_opt}>")
+  endforeach()
+endif()
+
 include(CheckCXXCompilerFlag)
 
 check_cxx_compiler_flag("-mfma" COMPILER_SUPPORTS_FMA)
 
 if(COMPILER_SUPPORTS_FMA)
-  add_compile_options(-mfma)
+  add_compile_options("$<$<COMPILE_LANGUAGE:C,CXX>:-mfma>")
 endif()
 
 # If building one the same hardware to be deployed on, try `-march=native`!
+
+# ── Optional CUDA kernels library ──────────────────────────────────────
+if(NAV2_CUDA_SUPPORT)
+  add_library(mppi_cuda SHARED
+    src/cuda/mppi_kernels.cu
+  )
+  set_target_properties(mppi_cuda PROPERTIES
+    CUDA_SEPARABLE_COMPILATION ON
+    CUDA_STANDARD 17
+    POSITION_INDEPENDENT_CODE ON
+  )
+  target_include_directories(mppi_cuda
+    PUBLIC
+      "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+      "$<INSTALL_INTERFACE:include/${PROJECT_NAME}>")
+  target_link_libraries(mppi_cuda PUBLIC
+    CUDA::cudart
+  )
+endif()
 
 add_library(mppi_controller SHARED
   src/controller.cpp
@@ -70,6 +118,11 @@ target_link_libraries(mppi_controller PUBLIC
   tf2_ros::tf2_ros
   ${visualization_msgs_TARGETS}
 )
+
+if(NAV2_CUDA_SUPPORT)
+  target_compile_definitions(mppi_controller PUBLIC NAV2_CUDA_SUPPORT)
+  target_link_libraries(mppi_controller PUBLIC mppi_cuda)
+endif()
 
 add_library(mppi_critics SHARED
   src/critics/constraint_critic.cpp
@@ -115,6 +168,10 @@ target_link_libraries(mppi_critics PRIVATE
   pluginlib::pluginlib
 )
 
+if(NAV2_CUDA_SUPPORT)
+  target_compile_definitions(mppi_critics PUBLIC NAV2_CUDA_SUPPORT)
+endif()
+
 add_library(mppi_trajectory_validators SHARED
   src/trajectory_validators/optimal_trajectory_validator.cpp
 )
@@ -149,6 +206,15 @@ install(TARGETS mppi_controller mppi_critics mppi_trajectory_validators
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
 )
+
+if(NAV2_CUDA_SUPPORT)
+  install(TARGETS mppi_cuda
+    EXPORT nav2_mppi_controller
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
+  )
+endif()
 
 install(DIRECTORY include/
   DESTINATION include/${PROJECT_NAME}
