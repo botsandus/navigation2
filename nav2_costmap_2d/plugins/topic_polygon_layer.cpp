@@ -14,7 +14,7 @@
 
 #include "nav2_costmap_2d/topic_polygon_layer.hpp"
 
-#include <tf2/exceptions.h>
+#include <tf2/exceptions.hpp>
 
 #include <algorithm>
 #include <cmath>
