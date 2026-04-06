@@ -21,6 +21,7 @@
 
 #include "rclcpp/rclcpp.hpp"
 #include "nav_msgs/msg/occupancy_grid.hpp"
+#include "nav2_msgs/msg/polygon_objects.hpp"
 
 #include "tf2_ros/buffer.hpp"
 #include "tf2_ros/transform_listener.hpp"
@@ -91,6 +92,11 @@ protected:
    * @return Iterator to the shape, if found. Otherwise past-the-end iterator.
    */
   std::vector<std::shared_ptr<Shape>>::iterator findShape(const unsigned char * uuid);
+
+  /**
+   * @brief Publishes current polygon data on the polygons topic
+   */
+  void publishPolygons();
 
   /**
    * @brief Transform all vector shapes from their local frame to output map frame
@@ -192,7 +198,7 @@ protected:
   double resolution_;
   /// @brief Default value the output map to be filled with
   int8_t default_value_;
-  /// @brief @Overlay Type of overlay of vector objects on the map
+  /// @brief Overlay Type of overlay of vector objects on the map
   OverlayType overlay_type_;
 
   /// @brief Output map with vector objects on it
@@ -217,10 +223,15 @@ protected:
   /// @brief RemoveShapes service
   nav2::ServiceServer<nav2_msgs::srv::RemoveShapes>::SharedPtr remove_shapes_service_;
 
-  /// @beirf Topic name where the output map to be published to
+  /// @brief Topic name where the output map is published
   std::string map_topic_;
   /// @brief Output map publisher
   nav2::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr map_pub_;
+
+  /// @brief Topic name where polygon data is published
+  std::string polygons_topic_;
+  /// @brief Polygon data publisher
+  nav2::Publisher<nav2_msgs::msg::PolygonObjects>::SharedPtr polygons_pub_;
 };
 
 }  // namespace nav2_map_server

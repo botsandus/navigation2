@@ -28,6 +28,7 @@ find_package(tf2_sensor_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(point_cloud_transport REQUIRED)
 find_package(Eigen3 REQUIRED)
+find_package(OpenCV REQUIRED COMPONENTS imgproc)
 
 option(ENABLE_OPENMP "Enable OpenMP parallelization" OFF)
 
@@ -81,6 +82,7 @@ add_library(layers SHARED
   plugins/range_sensor_layer.cpp
   plugins/denoise_layer.cpp
   plugins/plugin_container_layer.cpp
+  plugins/topic_polygon_layer.cpp
 )
 target_include_directories(layers
   PUBLIC
@@ -99,6 +101,7 @@ target_link_libraries(layers PUBLIC
   nav2_ros_common::nav2_ros_common
   point_cloud_transport::point_cloud_transport
   Eigen3::Eigen
+  ${OpenCV_LIBRARIES}
 )
 
 # Link OpenMP if enabled

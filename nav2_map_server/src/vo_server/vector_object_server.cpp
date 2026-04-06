@@ -59,6 +59,15 @@ VectorObjectServer::on_configure(const rclcpp_lifecycle::State & /*state*/)
     map_topic_,
     nav2::qos::LatchedPublisherQoS());
 
+  // Polygon topic publisher (for TopicPolygonLayer)
+  polygons_topic_ = nav2::declare_or_get_parameter(
+    shared_from_this(), "polygons_topic", std::string{"vo_polygons"});
+  rclcpp::QoS polygons_qos(1);
+  polygons_qos.transient_local();
+  polygons_qos.reliable();
+  polygons_pub_ = create_publisher<nav2_msgs::msg::PolygonObjects>(
+    polygons_topic_, polygons_qos);
+
   add_shapes_service_ = create_service<nav2_msgs::srv::AddShapes>(
     "~/add_shapes",
     std::bind(&VectorObjectServer::addShapesCallback, this, _1, _2, _3));
@@ -80,9 +89,11 @@ VectorObjectServer::on_activate(const rclcpp_lifecycle::State & /*state*/)
   RCLCPP_INFO(get_logger(), "Activating");
 
   map_pub_->on_activate();
+  polygons_pub_->on_activate();
 
   // Trigger map to be published
   process_map_ = true;
+  publishPolygons();
   switchMapUpdate();
 
   // Creating bond connection
@@ -103,6 +114,7 @@ VectorObjectServer::on_deactivate(const rclcpp_lifecycle::State & /*state*/)
   process_map_ = false;
 
   map_pub_->on_deactivate();
+  polygons_pub_->on_deactivate();
 
   // Destroying bond connection
   destroyBond();
@@ -120,6 +132,7 @@ VectorObjectServer::on_cleanup(const rclcpp_lifecycle::State & /*state*/)
   remove_shapes_service_.reset();
 
   map_pub_.reset();
+  polygons_pub_.reset();
   map_.reset();
 
   shapes_.clear();
@@ -362,6 +375,25 @@ void VectorObjectServer::processMap()
   publishMap();
 }
 
+void VectorObjectServer::publishPolygons()
+{
+  auto msg = std::make_unique<nav2_msgs::msg::PolygonObjects>();
+  msg->header.stamp = this->now();
+  msg->header.frame_id = global_frame_id_;
+
+  for (auto shape : shapes_) {
+    if (shape->getType() == POLYGON) {
+      auto polygon = std::static_pointer_cast<Polygon>(shape);
+      auto params = polygon->getParams();
+      msg->polygons.push_back(*params);
+    }
+    // Circles are not supported by TopicPolygonLayer (polygons only).
+    // They continue to be served via GetShapes and the OccupancyGrid path.
+  }
+
+  polygons_pub_->publish(std::move(msg));
+}
+
 void VectorObjectServer::switchMapUpdate()
 {
   for (auto shape : shapes_) {
@@ -489,6 +521,7 @@ void VectorObjectServer::addShapesCallback(
     }
   }
 
+  publishPolygons();
   switchMapUpdate();
 }
 
@@ -547,6 +580,7 @@ void VectorObjectServer::removeShapesCallback(
     }
   }
 
+  publishPolygons();
   switchMapUpdate();
 }
 
