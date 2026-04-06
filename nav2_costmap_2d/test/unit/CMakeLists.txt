@@ -77,3 +77,9 @@ target_link_libraries(obstacle_layer_test
   nav2_costmap_2d_core
   layers
 )
+
+nav2_add_gtest(topic_polygon_layer_test topic_polygon_layer_test.cpp)
+target_link_libraries(topic_polygon_layer_test
+  nav2_costmap_2d_core
+  layers
+)

@@ -24,6 +24,9 @@
     <class type="nav2_costmap_2d::PluginContainerLayer" base_class_type="nav2_costmap_2d::Layer">
       <description>Plugin to group different layers within the same costmap</description>
     </class>
+    <class type="nav2_costmap_2d::TopicPolygonLayer" base_class_type="nav2_costmap_2d::Layer">
+      <description>Subscribes to a PolygonObjects topic and rasterises polygons directly into the costmap using OpenCV, replacing the VectorObjectServer OccupancyGrid pipeline.</description>
+    </class>
   </library>
 
   <library path="filters">

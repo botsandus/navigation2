@@ -44,6 +44,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/TrajectoryPoint.msg"
   "srv/GetCosts.srv"
   "msg/PolygonObject.msg"
+  "msg/PolygonObjects.msg"
   "msg/CircleObject.msg"
   "srv/GetCostmap.srv"
   "srv/IsPathValid.srv"
