@@ -333,7 +333,7 @@ protected:
       plugin_muxer_->preemptCurrentNavigator();
 
       const auto start = std::chrono::steady_clock::now();
-      rclcpp::Rate r(100);
+      rclcpp::Rate r(100, clock_);
       while (plugin_muxer_->isNavigating()) {
         if (std::chrono::steady_clock::now() - start > navigator_preemption_timeout_) {
           RCLCPP_ERROR(
