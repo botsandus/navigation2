@@ -21,7 +21,7 @@
 #include <utility>
 #include <vector>
 
-#include "nav2_ros_common/wall_rate.hpp"
+#include "nav2_ros_common/rate.hpp"
 
 namespace nav2_waypoint_follower
 {
@@ -200,7 +200,7 @@ void WaypointFollower::followWaypointsHandler(
     return;
   }
 
-  nav2::WallRate r(this, params_->loop_rate);
+  nav2::Rate r(this, params_->loop_rate);
 
   // get the goal index, by default, the first in the list of waypoints given.
   uint32_t goal_index = goal->goal_index;

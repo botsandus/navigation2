@@ -22,7 +22,7 @@
 #include "lifecycle_msgs/msg/state.hpp"
 #include "nav2_core/controller_exceptions.hpp"
 #include "nav2_ros_common/node_utils.hpp"
-#include "nav2_ros_common/wall_rate.hpp"
+#include "nav2_ros_common/rate.hpp"
 #include "nav2_util/geometry_utils.hpp"
 #include "nav2_util/path_utils.hpp"
 #include "nav2_controller/controller_server.hpp"
@@ -495,7 +495,7 @@ void ControllerServer::computeControl()
     }
 
     last_valid_cmd_time_ = now();
-    nav2::WallRate loop_rate(this, params_->controller_frequency);
+    nav2::Rate loop_rate(this, params_->controller_frequency);
     while (rclcpp::ok()) {
       auto start_time = this->now();
 
