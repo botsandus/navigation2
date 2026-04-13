@@ -16,6 +16,7 @@
 #define NAV2_BEHAVIOR_TREE__UTILS__LOOP_RATE_HPP_
 
 #include <memory>
+#include <utility>
 
 #include "rclcpp/rclcpp.hpp"
 #include "behaviortree_cpp/bt_factory.h"
@@ -27,8 +28,10 @@ namespace nav2_behavior_tree
 class LoopRate
 {
 public:
-  LoopRate(const rclcpp::Duration & period, BT::Tree * tree)
-  : clock_(std::make_shared<rclcpp::Clock>(RCL_STEADY_TIME)), period_(period),
+  LoopRate(
+    const rclcpp::Duration & period, BT::Tree * tree,
+    rclcpp::Clock::SharedPtr clock)
+  : clock_(std::move(clock)), period_(period),
     last_interval_(clock_->now()), tree_(tree)
   {}
 
@@ -57,11 +60,25 @@ public:
       // Either way do not sleep and return false
       return false;
     }
-    // Calculate the time to sleep
-    auto time_to_sleep = next_interval - now;
-    std::chrono::nanoseconds time_to_sleep_ns(time_to_sleep.nanoseconds());
-    // Sleep (can get interrupted by emitWakeUpSignal())
-    tree_->sleep(std::chrono::duration_cast<std::chrono::microseconds>(time_to_sleep_ns));
+    auto wake_up = tree_->wakeUpSignal();
+    static constexpr auto poll_interval = std::chrono::milliseconds(2);
+    const bool is_sim_time =
+      clock_->get_clock_type() == RCL_ROS_TIME &&
+      clock_->ros_time_is_active();
+    while ((now = clock_->now()) < next_interval) {
+      // Sleep using the wake-up signal directly so we can poll the target clock.
+      // tree_->sleep() always waits in wall-clock time, which diverges from sim
+      // time. For ROS/sim time, poll in short wall-clock intervals and re-check
+      // the target clock. For steady/system clocks, wait only for the remaining
+      // time to avoid oversleeping past next_interval.
+      const auto remaining = next_interval - now;
+      const auto remaining_ns = std::chrono::nanoseconds(remaining.nanoseconds());
+      const auto wait_duration = std::chrono::duration_cast<std::chrono::microseconds>(
+        is_sim_time && remaining_ns > poll_interval ? poll_interval : remaining_ns);
+      if (wake_up->waitFor(wait_duration)) {  // Preempted by emitWakeUpSignal()
+        return true;
+      }
+    }
     return true;
   }
 
