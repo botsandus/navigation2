@@ -102,9 +102,13 @@ LoopbackSimulator::on_configure(const rclcpp_lifecycle::State & /*state*/)
   }
 
   param_validator_ = add_on_set_parameters_callback(
-    std::bind(&LoopbackSimulator::validateParameters, this, std::placeholders::_1));
+    std::bind(
+      &LoopbackSimulator::validateParameterUpdatesCallback, this,
+      std::placeholders::_1));
   param_updater_ = add_post_set_parameters_callback(
-    std::bind(&LoopbackSimulator::applyParameters, this, std::placeholders::_1));
+    std::bind(
+      &LoopbackSimulator::updateParametersCallback, this,
+      std::placeholders::_1));
 
   return nav2::CallbackReturn::SUCCESS;
 }
@@ -239,11 +243,6 @@ void LoopbackSimulator::getBaseToLaserTf()
 
 void LoopbackSimulator::setupTimerCallback()
 {
-  // Publish initial identity transforms to warm up the system
-  if (publish_map_odom_tf_) {
-    t_map_to_odom_.header.stamp = this->now();
-    tf_broadcaster_->sendTransform(t_map_to_odom_);
-  }
   t_odom_to_base_link_.header.stamp = this->now();
   tf_broadcaster_->sendTransform(t_odom_to_base_link_);
   if (publish_scan_ && !has_map_) {
@@ -288,7 +287,6 @@ void LoopbackSimulator::initialPoseCallback(
     // Initialize map->odom from input pose, odom->base_link starts as identity
     t_map_to_odom_.transform.translation.x = initial_pose_.position.x;
     t_map_to_odom_.transform.translation.y = initial_pose_.position.y;
-    t_map_to_odom_.transform.translation.z = 0.0;
     t_map_to_odom_.transform.rotation = initial_pose_.orientation;
     t_odom_to_base_link_.transform.translation = geometry_msgs::msg::Vector3();
     t_odom_to_base_link_.transform.rotation = geometry_msgs::msg::Quaternion();
@@ -518,7 +516,8 @@ void LoopbackSimulator::getLaserScan(
   }
 }
 
-rcl_interfaces::msg::SetParametersResult LoopbackSimulator::validateParameters(
+rcl_interfaces::msg::SetParametersResult
+LoopbackSimulator::validateParameterUpdatesCallback(
   const std::vector<rclcpp::Parameter> & parameters)
 {
   rcl_interfaces::msg::SetParametersResult result;
@@ -536,7 +535,7 @@ rcl_interfaces::msg::SetParametersResult LoopbackSimulator::validateParameters(
   return result;
 }
 
-void LoopbackSimulator::applyParameters(
+void LoopbackSimulator::updateParametersCallback(
   const std::vector<rclcpp::Parameter> & parameters)
 {
   for (const auto & param : parameters) {
