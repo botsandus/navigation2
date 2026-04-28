@@ -48,7 +48,6 @@ def generate_launch_description() -> LaunchDescription:
         'planner_server',
         'route_server',
         'behavior_server',
-        'velocity_smoother',
         'collision_monitor',
         'bt_navigator',
         'waypoint_follower',
@@ -168,7 +167,7 @@ def generate_launch_description() -> LaunchDescription:
                 respawn_delay=2.0,
                 parameters=[configured_params],
                 arguments=['--ros-args', '--log-level', log_level],
-                remappings=remappings + [('cmd_vel', 'cmd_vel_nav')],
+                remappings=remappings,
             ),
             Node(
                 package='nav2_smoother',
@@ -211,7 +210,7 @@ def generate_launch_description() -> LaunchDescription:
                 respawn_delay=2.0,
                 parameters=[configured_params],
                 arguments=['--ros-args', '--log-level', log_level],
-                remappings=remappings + [('cmd_vel', 'cmd_vel_nav')],
+                remappings=remappings,
             ),
             Node(
                 package='nav2_bt_navigator',
@@ -234,18 +233,6 @@ def generate_launch_description() -> LaunchDescription:
                 parameters=[configured_params],
                 arguments=['--ros-args', '--log-level', log_level],
                 remappings=remappings,
-            ),
-            Node(
-                package='nav2_velocity_smoother',
-                executable='velocity_smoother',
-                name='velocity_smoother',
-                output='screen',
-                respawn=use_respawn,
-                respawn_delay=2.0,
-                parameters=[configured_params],
-                arguments=['--ros-args', '--log-level', log_level],
-                remappings=remappings
-                + [('cmd_vel', 'cmd_vel_nav')],
             ),
             Node(
                 package='nav2_collision_monitor',
@@ -307,7 +294,7 @@ def generate_launch_description() -> LaunchDescription:
                         plugin='nav2_controller::ControllerServer',
                         name='controller_server',
                         parameters=[configured_params],
-                        remappings=remappings + [('cmd_vel', 'cmd_vel_nav')],
+                        remappings=remappings,
                         extra_arguments=[{'use_intra_process_comms': use_intra_process_comms}],
                     ),
                     ComposableNode(
@@ -339,7 +326,7 @@ def generate_launch_description() -> LaunchDescription:
                         plugin='behavior_server::BehaviorServer',
                         name='behavior_server',
                         parameters=[configured_params],
-                        remappings=remappings + [('cmd_vel', 'cmd_vel_nav')],
+                        remappings=remappings,
                         extra_arguments=[{'use_intra_process_comms': use_intra_process_comms}],
                     ),
                     ComposableNode(
@@ -356,15 +343,6 @@ def generate_launch_description() -> LaunchDescription:
                         name='waypoint_follower',
                         parameters=[configured_params],
                         remappings=remappings,
-                        extra_arguments=[{'use_intra_process_comms': use_intra_process_comms}],
-                    ),
-                    ComposableNode(
-                        package='nav2_velocity_smoother',
-                        plugin='nav2_velocity_smoother::VelocitySmoother',
-                        name='velocity_smoother',
-                        parameters=[configured_params],
-                        remappings=remappings
-                        + [('cmd_vel', 'cmd_vel_nav')],
                         extra_arguments=[{'use_intra_process_comms': use_intra_process_comms}],
                     ),
                     ComposableNode(
