@@ -108,6 +108,7 @@ protected:
 
 private:
   void update_route_graph(void);
+  void publish_graph_visualization(void);
   void on_clicked_point(const geometry_msgs::msg::PointStamped::ConstSharedPtr & msg);
   void rebuild_interactive_markers(void);
   void on_marker_feedback(
