@@ -4,6 +4,7 @@ project(nav2_rviz_plugins)
 find_package(ament_cmake REQUIRED)
 find_package(backward_ros REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(interactive_markers REQUIRED)
 find_package(nav2_common REQUIRED)
 find_package(nav2_lifecycle_manager REQUIRED)
 find_package(nav2_msgs REQUIRED)
@@ -105,6 +106,7 @@ target_include_directories(${library_name} PUBLIC
 )
 target_link_libraries(${library_name} PUBLIC
   ${geometry_msgs_TARGETS}
+  interactive_markers::interactive_markers
   nav2_lifecycle_manager::nav2_lifecycle_manager_core
   ${nav2_msgs_TARGETS}
   nav2_util::nav2_util_core
