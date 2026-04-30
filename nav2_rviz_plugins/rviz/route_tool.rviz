@@ -34,7 +34,7 @@ Visualization Manager:
   Displays:
     - Class: rviz_default_plugins/MarkerArray
       Enabled: true
-      Name: Route Graph
+      Name: Route Tool Graph
       Namespaces:
         {}
       Topic:
@@ -42,7 +42,7 @@ Visualization Manager:
         Durability Policy: Transient Local
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /route_graph
+        Value: /route_tool_graph
       Value: true
     - Class: rviz_default_plugins/InteractiveMarkers
       Enabled: true
