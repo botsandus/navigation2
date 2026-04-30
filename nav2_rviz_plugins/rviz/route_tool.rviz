@@ -44,6 +44,15 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /route_graph
       Value: true
+    - Class: rviz_default_plugins/InteractiveMarkers
+      Enabled: true
+      Enable Transparency: true
+      Interactive Markers Namespace: /route_graph_nodes
+      Name: Route Graph Drag Handles
+      Show Axes: false
+      Show Descriptions: false
+      Show Visual Aids: false
+      Value: true
     - Alpha: 0.699999988079071
       Class: rviz_default_plugins/Map
       Color Scheme: map
