@@ -26,6 +26,7 @@
 #include "interactive_markers/interactive_marker_server.hpp"
 #include "nav_msgs/msg/occupancy_grid.hpp"
 #include "visualization_msgs/msg/interactive_marker_feedback.hpp"
+#include "nav2_msgs/srv/set_route_graph.hpp"
 #include "nav2_route/graph_loader.hpp"
 #include "nav2_route/graph_saver.hpp"
 #include "nav2_route/types.hpp"
@@ -135,6 +136,7 @@ private:
   nav2::Subscription<geometry_msgs::msg::PointStamped>::SharedPtr
     clicked_point_subscription_;
   std::shared_ptr<interactive_markers::InteractiveMarkerServer> im_server_;
+  rclcpp::Client<nav2_msgs::srv::SetRouteGraph>::SharedPtr set_route_graph_client_;
 
   unsigned int next_node_id_ = 0;
 };
