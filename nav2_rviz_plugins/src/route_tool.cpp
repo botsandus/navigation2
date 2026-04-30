@@ -642,12 +642,16 @@ void RouteTool::apply_marker_drag(unsigned int node_id, float x, float y, bool c
   graph_vis_publisher_->publish(nav2_route::utils::toMsg(graph_, "map", node_->now()));
 
   if (commit) {
-    // If this node is currently selected on the Edit tab, sync the fields.
-    if (ui_->tabWidget->currentIndex() == 1 && ui_->edit_node_button->isChecked() &&
-      ui_->edit_id->toPlainText().toUInt() == node_id)
-    {
+    // Click / drag-release selects the node in the current tab.
+    constexpr int kEditTabIndex = 1;
+    constexpr int kRemoveTabIndex = 2;
+    const int tab = ui_->tabWidget->currentIndex();
+    if (tab == kEditTabIndex && ui_->edit_node_button->isChecked()) {
+      ui_->edit_id->setText(QString::number(node_id));
       ui_->edit_field_1->setText(QString::number(x));
       ui_->edit_field_2->setText(QString::number(y));
+    } else if (tab == kRemoveTabIndex && ui_->remove_node_button->isChecked()) {
+      ui_->remove_id->setText(QString::number(node_id));
     }
   }
 }
