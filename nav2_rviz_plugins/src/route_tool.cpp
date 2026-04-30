@@ -16,6 +16,7 @@
 
 #include <sys/types.h>
 
+#include <algorithm>
 #include <cmath>
 #include <functional>
 
@@ -41,7 +42,7 @@ RouteTool::RouteTool(QWidget * parent)
   node_ = std::make_shared<nav2::LifecycleNode>("route_tool_node", "", rclcpp::NodeOptions());
   node_->configure();
   graph_vis_publisher_ = node_->create_publisher<visualization_msgs::msg::MarkerArray>(
-    "route_graph", rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
+    "route_tool_graph", rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
   node_->activate();
   tf_ = nav2::create_transform_buffer(node_);
   graph_loader_ = std::make_shared<nav2_route::GraphLoader>(node_, tf_, "map");
@@ -81,6 +82,9 @@ void RouteTool::onInitialize(void)
   // get_interactive_markers service actually answers.
   im_server_ = std::make_shared<interactive_markers::InteractiveMarkerServer>(
     "/route_graph_nodes", node);
+
+  set_route_graph_client_ = node->create_client<nav2_msgs::srv::SetRouteGraph>(
+    "/route_server/set_route_graph");
 }
 
 void RouteTool::on_clicked_point(const geometry_msgs::msg::PointStamped::ConstSharedPtr & msg)
@@ -284,8 +288,41 @@ void RouteTool::on_save_button_clicked(void)
     this,
     tr("Open Address Book"), "",
     tr("Address Book (*.geojson);;All Files (*)"));
+  if (filename.isEmpty()) {
+    return;
+  }
   RCLCPP_INFO(node_->get_logger(), "Save graph to: %s", filename.toStdString().c_str());
   graph_saver_->saveGraphToFile(graph_, filename.toStdString());
+
+  // Ask the route_server to reload the graph it just had written. Async so the
+  // UI never blocks; if the server isn't there we just log a warning.
+  if (!set_route_graph_client_) {
+    return;
+  }
+  if (!set_route_graph_client_->service_is_ready()) {
+    RCLCPP_WARN(
+      node_->get_logger(),
+      "set_route_graph service not available (route_server not running?); "
+      "skipping server reload");
+    return;
+  }
+  auto request = std::make_shared<nav2_msgs::srv::SetRouteGraph::Request>();
+  request->graph_filepath = filename.toStdString();
+  auto logger = node_->get_logger();
+  set_route_graph_client_->async_send_request(
+    request,
+    [logger, filename](rclcpp::Client<nav2_msgs::srv::SetRouteGraph>::SharedFuture future) {
+      auto response = future.get();
+      if (response->success) {
+        RCLCPP_INFO(
+          logger, "route_server reloaded graph from %s",
+          filename.toStdString().c_str());
+      } else {
+        RCLCPP_WARN(
+          logger, "route_server rejected reload of %s",
+          filename.toStdString().c_str());
+      }
+    });
 }
 
 void RouteTool::on_create_button_clicked(void)
@@ -377,24 +414,42 @@ void RouteTool::on_delete_button_clicked(void)
   if (ui_->remove_id->toPlainText() == "") {return;}
   if (ui_->remove_node_button->isChecked()) {
     unsigned int node_id = ui_->remove_id->toPlainText().toInt();
-    // Remove edges pointing to the removed node
+    auto map_it = graph_to_id_map_.find(node_id);
+    if (map_it == graph_to_id_map_.end()) {
+      return;
+    }
+    auto * deleted_node = &graph_[map_it->second];
+
+    // Remove outgoing edges (FROM the deleted node TO others).
+    for (const auto & edge : deleted_node->neighbors) {
+      edge_to_node_map_.erase(edge.edgeid);
+      auto inc_it = graph_to_incoming_edges_map_.find(edge.end->nodeid);
+      if (inc_it != graph_to_incoming_edges_map_.end()) {
+        auto & vec = inc_it->second;
+        vec.erase(std::remove(vec.begin(), vec.end(), edge.edgeid), vec.end());
+      }
+      RCLCPP_INFO(node_->get_logger(), "Removed outgoing edge %d", edge.edgeid);
+    }
+    deleted_node->neighbors.clear();
+
+    // Remove incoming edges (FROM others TO the deleted node).
     for (auto edge_id : graph_to_incoming_edges_map_[node_id]) {
       auto start_node = &graph_[graph_to_id_map_[edge_to_node_map_[edge_id]]];
       for (auto itr = start_node->neighbors.begin(); itr != start_node->neighbors.end(); itr++) {
         if (itr->edgeid == edge_id) {
           start_node->neighbors.erase(itr);
           edge_to_node_map_.erase(edge_id);
+          RCLCPP_INFO(node_->get_logger(), "Removed incoming edge %d", edge_id);
           break;
         }
       }
     }
-    if (graph_[graph_to_id_map_[node_id]].nodeid == node_id) {
-      // Use max int to mark the node as deleted
-      graph_[graph_to_id_map_[node_id]].nodeid = std::numeric_limits<int>::max();
-      graph_to_id_map_.erase(node_id);
-      graph_to_incoming_edges_map_.erase(node_id);
-      RCLCPP_INFO(node_->get_logger(), "Removed node %d", node_id);
-    }
+
+    // Mark node as deleted.
+    deleted_node->nodeid = std::numeric_limits<int>::max();
+    graph_to_id_map_.erase(node_id);
+    graph_to_incoming_edges_map_.erase(node_id);
+    RCLCPP_INFO(node_->get_logger(), "Removed node %d", node_id);
     update_route_graph();
   } else if (ui_->remove_edge_button->isChecked()) {
     auto edge_id = (unsigned int) ui_->remove_id->toPlainText().toInt();
