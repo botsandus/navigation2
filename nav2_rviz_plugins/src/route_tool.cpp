@@ -592,9 +592,23 @@ void RouteTool::on_make_bidirectional_button_clicked(void)
   update_route_graph();
 }
 
+void RouteTool::publish_graph_visualization(void)
+{
+  // Tombstoned nodes (nodeid == INT_MAX) stay in graph_ to keep neighbor
+  // pointers valid; filter them out before serializing so they don't render.
+  nav2_route::Graph live;
+  live.reserve(graph_.size());
+  for (const auto & node : graph_) {
+    if (node.nodeid != static_cast<unsigned int>(std::numeric_limits<int>::max())) {
+      live.push_back(node);
+    }
+  }
+  graph_vis_publisher_->publish(nav2_route::utils::toMsg(live, "map", node_->now()));
+}
+
 void RouteTool::update_route_graph(void)
 {
-  graph_vis_publisher_->publish(nav2_route::utils::toMsg(graph_, "map", node_->now()));
+  publish_graph_visualization();
   rebuild_interactive_markers();
 }
 
@@ -694,7 +708,7 @@ void RouteTool::apply_marker_drag(unsigned int node_id, float x, float y, bool c
   // Live preview during drag: just republish the visualization. Avoid calling
   // update_route_graph(), which would clear and reinsert the marker the user
   // is currently dragging and cancel the gesture.
-  graph_vis_publisher_->publish(nav2_route::utils::toMsg(graph_, "map", node_->now()));
+  publish_graph_visualization();
 
   if (commit) {
     // Click / drag-release selects the node in the current tab.
