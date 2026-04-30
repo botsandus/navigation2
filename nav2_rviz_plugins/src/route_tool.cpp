@@ -23,7 +23,11 @@
 
 #include <QDesktopServices>
 #include <QFileDialog>
+#include <QMetaObject>
 #include <QUrl>
+
+#include "tf2/LinearMath/Quaternion.h"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 
 
 namespace nav2_rviz_plugins
@@ -72,6 +76,11 @@ void RouteTool::onInitialize(void)
   clicked_point_subscription_ = node->create_subscription<geometry_msgs::msg::PointStamped>(
     "clicked_point", 1,
     std::bind(&RouteTool::on_clicked_point, this, std::placeholders::_1));
+
+  // Use the rviz node (already spun by rviz) so the marker server's
+  // get_interactive_markers service actually answers.
+  im_server_ = std::make_shared<interactive_markers::InteractiveMarkerServer>(
+    "/route_graph_nodes", node);
 }
 
 void RouteTool::on_clicked_point(const geometry_msgs::msg::PointStamped::ConstSharedPtr & msg)
@@ -531,6 +540,116 @@ void RouteTool::on_make_bidirectional_button_clicked(void)
 void RouteTool::update_route_graph(void)
 {
   graph_vis_publisher_->publish(nav2_route::utils::toMsg(graph_, "map", node_->now()));
+  rebuild_interactive_markers();
+}
+
+void RouteTool::rebuild_interactive_markers(void)
+{
+  if (!im_server_) {
+    return;
+  }
+  im_server_->clear();
+  for (const auto & node : graph_) {
+    if (node.nodeid == static_cast<unsigned int>(std::numeric_limits<int>::max())) {
+      continue;  // Skip deleted nodes
+    }
+
+    visualization_msgs::msg::InteractiveMarker int_marker;
+    int_marker.header.frame_id = "map";
+    int_marker.header.stamp = node_->now();
+    int_marker.name = std::to_string(node.nodeid);
+    int_marker.description = "";
+    int_marker.scale = 0.6f;
+    int_marker.pose.position.x = node.coords.x;
+    int_marker.pose.position.y = node.coords.y;
+    int_marker.pose.position.z = 0.0;
+    int_marker.pose.orientation.w = 1.0;
+
+    visualization_msgs::msg::InteractiveMarkerControl control;
+    // Quaternion for a control whose normal points along +Z (drag in XY plane).
+    tf2::Quaternion q;
+    q.setRPY(0.0, M_PI_2, 0.0);
+    q.normalize();
+    control.orientation.w = q.w();
+    control.orientation.x = q.x();
+    control.orientation.y = q.y();
+    control.orientation.z = q.z();
+    control.name = "move_xy";
+    control.interaction_mode =
+      visualization_msgs::msg::InteractiveMarkerControl::MOVE_PLANE;
+    control.always_visible = true;
+
+    // Visible disc handle so the user has something to grab.
+    visualization_msgs::msg::Marker handle;
+    handle.type = visualization_msgs::msg::Marker::CYLINDER;
+    handle.scale.x = 0.4;
+    handle.scale.y = 0.4;
+    handle.scale.z = 0.05;
+    handle.color.r = 0.2f;
+    handle.color.g = 0.6f;
+    handle.color.b = 1.0f;
+    handle.color.a = 0.6f;
+    control.markers.push_back(handle);
+
+    int_marker.controls.push_back(control);
+
+    im_server_->insert(
+      int_marker,
+      std::bind(&RouteTool::on_marker_feedback, this, std::placeholders::_1));
+  }
+  im_server_->applyChanges();
+}
+
+void RouteTool::on_marker_feedback(
+  const visualization_msgs::msg::InteractiveMarkerFeedback::ConstSharedPtr & feedback)
+{
+  using Feedback = visualization_msgs::msg::InteractiveMarkerFeedback;
+  if (feedback->event_type != Feedback::POSE_UPDATE &&
+    feedback->event_type != Feedback::MOUSE_UP)
+  {
+    return;
+  }
+  unsigned int node_id;
+  try {
+    node_id = static_cast<unsigned int>(std::stoul(feedback->marker_name));
+  } catch (const std::exception &) {
+    return;
+  }
+  const float x = static_cast<float>(feedback->pose.position.x);
+  const float y = static_cast<float>(feedback->pose.position.y);
+  const bool commit = (feedback->event_type == Feedback::MOUSE_UP);
+
+  // Feedback fires on an executor thread; bounce to the Qt/UI thread before
+  // touching graph_ and the panel widgets.
+  QMetaObject::invokeMethod(
+    this,
+    [this, node_id, x, y, commit]() {apply_marker_drag(node_id, x, y, commit);},
+    Qt::QueuedConnection);
+}
+
+void RouteTool::apply_marker_drag(unsigned int node_id, float x, float y, bool commit)
+{
+  auto it = graph_to_id_map_.find(node_id);
+  if (it == graph_to_id_map_.end()) {
+    return;
+  }
+  graph_[it->second].coords.x = x;
+  graph_[it->second].coords.y = y;
+
+  // Live preview during drag: just republish the visualization. Avoid calling
+  // update_route_graph(), which would clear and reinsert the marker the user
+  // is currently dragging and cancel the gesture.
+  graph_vis_publisher_->publish(nav2_route::utils::toMsg(graph_, "map", node_->now()));
+
+  if (commit) {
+    // If this node is currently selected on the Edit tab, sync the fields.
+    if (ui_->tabWidget->currentIndex() == 1 && ui_->edit_node_button->isChecked() &&
+      ui_->edit_id->toPlainText().toUInt() == node_id)
+    {
+      ui_->edit_field_1->setText(QString::number(x));
+      ui_->edit_field_2->setText(QString::number(y));
+    }
+  }
 }
 
 void RouteTool::save(rviz_common::Config config) const
