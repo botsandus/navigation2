@@ -28,6 +28,7 @@
 
 #include "nav2_ros_common/lifecycle_node.hpp"
 #include "nav2_msgs/msg/collision_detector_state.hpp"
+#include "sensor_msgs/msg/point_cloud2.hpp"
 #include "visualization_msgs/msg/marker_array.hpp"
 
 #include "nav2_collision_monitor/types.hpp"
@@ -154,6 +155,10 @@ protected:
   /// @brief Collision points marker publisher
   nav2::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr
     collision_points_marker_pub_;
+
+  /// @brief Collision points PointCloud2 publisher
+  nav2::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr
+    collision_points_pc_pub_;
   /// @brief timer that runs actions
   rclcpp::TimerBase::SharedPtr timer_;
 

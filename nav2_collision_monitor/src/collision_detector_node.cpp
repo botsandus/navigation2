@@ -19,6 +19,7 @@
 #include <utility>
 #include <functional>
 
+#include "sensor_msgs/point_cloud2_iterator.hpp"
 #include "tf2_ros/create_timer_ros.hpp"
 
 #include "nav2_ros_common/node_utils.hpp"
@@ -58,6 +59,9 @@ CollisionDetector::on_configure(const rclcpp_lifecycle::State & state)
   collision_points_marker_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>(
     "~/collision_points_marker");
 
+  collision_points_pc_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
+    "~/collision_points");
+
   // Obtaining ROS parameters
   if (!getParameters()) {
     on_cleanup(state);
@@ -75,6 +79,7 @@ CollisionDetector::on_activate(const rclcpp_lifecycle::State & /*state*/)
   // Activating lifecycle publisher
   state_pub_->on_activate();
   collision_points_marker_pub_->on_activate();
+  collision_points_pc_pub_->on_activate();
 
   // Activating polygons
   for (std::shared_ptr<Polygon> polygon : polygons_) {
@@ -103,6 +108,7 @@ CollisionDetector::on_deactivate(const rclcpp_lifecycle::State & /*state*/)
   // Deactivating lifecycle publishers
   state_pub_->on_deactivate();
   collision_points_marker_pub_->on_deactivate();
+  collision_points_pc_pub_->on_deactivate();
 
   // Deactivating polygons
   for (std::shared_ptr<Polygon> polygon : polygons_) {
@@ -122,6 +128,7 @@ CollisionDetector::on_cleanup(const rclcpp_lifecycle::State & /*state*/)
 
   state_pub_.reset();
   collision_points_marker_pub_.reset();
+  collision_points_pc_pub_.reset();
 
   polygons_.clear();
   sources_.clear();
@@ -354,6 +361,29 @@ void CollisionDetector::process()
     }
     marker_array->markers.push_back(marker);
     collision_points_marker_pub_->publish(std::move(marker_array));
+  }
+
+  // Publish all collision points as a single PointCloud2
+  if (collision_points_pc_pub_->get_subscription_count() > 0) {
+    sensor_msgs::msg::PointCloud2 pc_msg;
+    pc_msg.header.frame_id = get_parameter("base_frame_id").as_string();
+    pc_msg.header.stamp = this->now();
+    pc_msg.height = 1;
+    pc_msg.width = collision_points.size();
+    pc_msg.is_dense = true;
+    pc_msg.is_bigendian = false;
+    sensor_msgs::PointCloud2Modifier modifier(pc_msg);
+    modifier.setPointCloud2FieldsByString(1, "xyz");
+    sensor_msgs::PointCloud2Iterator<float> iter_x(pc_msg, "x");
+    sensor_msgs::PointCloud2Iterator<float> iter_y(pc_msg, "y");
+    sensor_msgs::PointCloud2Iterator<float> iter_z(pc_msg, "z");
+    for (const auto & point : collision_points) {
+      *iter_x = static_cast<float>(point.x);
+      *iter_y = static_cast<float>(point.y);
+      *iter_z = 0.0f;
+      ++iter_x; ++iter_y; ++iter_z;
+    }
+    collision_points_pc_pub_->publish(pc_msg);
   }
 
   for (std::shared_ptr<Polygon> polygon : polygons_) {
