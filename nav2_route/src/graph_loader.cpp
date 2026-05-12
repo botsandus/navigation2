@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <filesystem>
 #include <memory>
 
 #include "nav2_route/graph_loader.hpp"
@@ -93,6 +94,14 @@ bool GraphLoader::loadGraphFromParameter(
 {
   if (graph_filepath_.empty()) {
     RCLCPP_INFO(logger_, "No graph file provided to load yet.");
+    return true;
+  }
+
+  if (!std::filesystem::exists(graph_filepath_)) {
+    RCLCPP_WARN(
+      logger_,
+      "Graph file %s does not exist; starting with an empty graph.",
+      graph_filepath_.c_str());
     return true;
   }
 
