@@ -182,6 +182,24 @@ VelocitySmoother::on_activate(const rclcpp_lifecycle::State &)
       &VelocitySmoother::validateParameterUpdatesCallback,
       this, std::placeholders::_1));
 
+  // Resync cached params with the parameter store: catches set_parameters calls
+  // made while we were inactive (no on-set callback registered), which would
+  // otherwise leave the cached members stale until the parameter is set again.
+  // Skip parameters that are declared but uninitialized (PARAMETER_NOT_SET) —
+  // a bulk get_parameters on those throws ParameterUninitializedException.
+  std::vector<rclcpp::Parameter> initialized;
+  for (const auto & name : node->list_parameters({}, 0).names) {
+    rclcpp::Parameter p;
+    if (node->get_parameter(name, p) &&
+      p.get_type() != rclcpp::ParameterType::PARAMETER_NOT_SET)
+    {
+      initialized.push_back(p);
+    }
+  }
+  if (!initialized.empty()) {
+    updateParametersCallback(initialized);
+  }
+
   // create bond connection
   createBond();
   return nav2::CallbackReturn::SUCCESS;
