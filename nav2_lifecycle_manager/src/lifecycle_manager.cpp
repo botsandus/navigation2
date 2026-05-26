@@ -16,6 +16,7 @@
 #include "nav2_lifecycle_manager/lifecycle_manager.hpp"
 
 #include <chrono>
+#include <thread>
 #include <memory>
 #include <string>
 #include <vector>
@@ -44,6 +45,11 @@ LifecycleManager::LifecycleManager(const rclcpp::NodeOptions & options)
   autostart_ = nav2::declare_or_get_parameter(node, "autostart", false);
   double bond_timeout_s = nav2::declare_or_get_parameter(node, "bond_timeout", 4.0);
   double service_timeout_s = nav2::declare_or_get_parameter(node, "service_timeout", 5.0);
+  change_state_retries_ = nav2::declare_or_get_parameter(node, "change_state_retries", 3);
+  int change_state_retry_backoff_ms = nav2::declare_or_get_parameter(
+    node, "change_state_retry_backoff_ms", 250);
+  change_state_retry_backoff_ =
+    std::chrono::milliseconds(change_state_retry_backoff_ms);
   double respawn_timeout_s = nav2::declare_or_get_parameter(
     node, "bond_respawn_max_duration", 10.0);
   attempt_respawn_reconnection_ = nav2::declare_or_get_parameter(
@@ -298,11 +304,29 @@ LifecycleManager::changeStateForNode(const std::string & node_name, std::uint8_t
 {
   message(transition_label_map_[transition] + node_name);
 
-  if (!node_map_[node_name]->change_state(
-      transition, std::chrono::milliseconds(-1),
-      service_timeout_) ||
-    !(node_map_[node_name]->get_state(service_timeout_) == transition_state_map_[transition]))
-  {
+  // Retry on transient failures. Under rmw_zenoh we have observed change_state
+  // returning failure within ~1ms while the server-side on_configure is still
+  // running (~170ms). A short retry covers that race; lifecycle transitions
+  // re-issued from the same source state are idempotent.
+  bool transition_ok = false;
+  for (int attempt = 0; attempt <= change_state_retries_; ++attempt) {
+    if (attempt > 0) {
+      RCLCPP_WARN(
+        get_logger(),
+        "Retrying change_state for node %s (attempt %d/%d)",
+        node_name.c_str(), attempt, change_state_retries_);
+      std::this_thread::sleep_for(change_state_retry_backoff_);
+    }
+    if (node_map_[node_name]->change_state(
+        transition, std::chrono::milliseconds(-1),
+        service_timeout_) &&
+      node_map_[node_name]->get_state(service_timeout_) == transition_state_map_[transition])
+    {
+      transition_ok = true;
+      break;
+    }
+  }
+  if (!transition_ok) {
     RCLCPP_ERROR(get_logger(), "Failed to change state for node: %s", node_name.c_str());
     return false;
   }
