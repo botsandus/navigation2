@@ -71,6 +71,17 @@ public:
     const double &, const double &);
 
   /**
+   * @brief Whether the upcoming path is obstructed within the path-arc-length horizon
+   * @param robot_pose Robot pose in the costmap's global frame
+   * @param transformed_global_plan Path in the costmap's global frame
+   * @return True if any path pose within params_->min_distance_to_path_obstacle of the
+   *         closest path pose to the robot collides with the local costmap footprint
+   */
+  bool isPathObstructed(
+    const geometry_msgs::msg::PoseStamped & robot_pose,
+    const nav_msgs::msg::Path & transformed_global_plan);
+
+  /**
    * @brief checks for collision at projected pose
    * @param x Pose of pose x
    * @param y Pose of pose y
@@ -98,6 +109,7 @@ protected:
   footprint_collision_checker_;
   Parameters * params_;
   nav2::Publisher<nav_msgs::msg::Path>::SharedPtr carrot_arc_pub_;
+  nav2::Publisher<nav_msgs::msg::Path>::SharedPtr path_obstacle_check_pub_;
   rclcpp::Clock::SharedPtr clock_;
 };
 
