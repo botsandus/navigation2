@@ -43,6 +43,52 @@ CollisionChecker::CollisionChecker(
 
   carrot_arc_pub_ = node->create_publisher<nav_msgs::msg::Path>("lookahead_collision_arc");
   carrot_arc_pub_->on_activate();
+
+  path_obstacle_check_pub_ = node->create_publisher<nav_msgs::msg::Path>("path_obstacle_check");
+  path_obstacle_check_pub_->on_activate();
+}
+
+bool CollisionChecker::isPathObstructed(
+  const geometry_msgs::msg::PoseStamped & robot_pose,
+  const nav_msgs::msg::Path & transformed_global_plan)
+{
+  if (transformed_global_plan.poses.size() < 2) {
+    return false;
+  }
+
+  auto closest = nav2_util::geometry_utils::min_by(
+    transformed_global_plan.poses.begin(), transformed_global_plan.poses.end(),
+    [&robot_pose](const geometry_msgs::msg::PoseStamped & ps) {
+      return nav2_util::geometry_utils::euclidean_distance(robot_pose.pose, ps.pose);
+    });
+
+  auto checked_msg = std::make_unique<nav_msgs::msg::Path>();
+  checked_msg->header.frame_id = costmap_ros_->getGlobalFrameID();
+  checked_msg->header.stamp = robot_pose.header.stamp;
+
+  double accumulated = 0.0;
+  bool obstructed = false;
+  for (auto it = closest; it != transformed_global_plan.poses.end(); ++it) {
+    checked_msg->poses.push_back(*it);
+
+    const double yaw = tf2::getYaw(it->pose.orientation);
+    if (inCollision(it->pose.position.x, it->pose.position.y, yaw)) {
+      obstructed = true;
+      break;
+    }
+
+    auto next = std::next(it);
+    if (next == transformed_global_plan.poses.end()) {
+      break;
+    }
+    accumulated += nav2_util::geometry_utils::euclidean_distance(*it, *next);
+    if (accumulated > params_->min_distance_to_path_obstacle) {
+      break;
+    }
+  }
+
+  path_obstacle_check_pub_->publish(std::move(checked_msg));
+  return obstructed;
 }
 
 bool CollisionChecker::isCollisionImminent(

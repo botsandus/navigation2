@@ -296,6 +296,13 @@ geometry_msgs::msg::TwistStamped RegulatedPurePursuitController::computeVelocity
     throw nav2_core::NoValidControl("RegulatedPurePursuitController detected collision ahead!");
   }
 
+  if (params_->use_collision_detection && params_->min_distance_to_path_obstacle > 0.0 &&
+    collision_checker_->isPathObstructed(pose, transformed_global_plan))
+  {
+    throw nav2_core::NoValidControl(
+      "RegulatedPurePursuitController detected obstacle on upcoming path!");
+  }
+
   // Publish whether we are rotating to goal heading
   auto is_rotating_to_heading_msg = std::make_unique<std_msgs::msg::Bool>();
   is_rotating_to_heading_msg->data = is_rotating_to_heading_;
