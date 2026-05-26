@@ -94,6 +94,13 @@ public:
     return collision_checker_->isCollisionImminent(
       robot_pose, linear_vel, angular_vel, carrot_dist, dist_to_path_end);
   }
+
+  bool isPathObstructedWrapper(
+    const geometry_msgs::msg::PoseStamped & robot_pose,
+    const nav_msgs::msg::Path & transformed_global_plan)
+  {
+    return collision_checker_->isPathObstructed(robot_pose, transformed_global_plan);
+  }
 };
 
 TEST(RegulatedPurePursuitTest, basicAPI)
@@ -723,6 +730,94 @@ TEST(RegulatedPurePursuitTest, testParameterWarnings)
   node->set_parameter(rclcpp::Parameter(name + ".use_velocity_scaled_lookahead_dist", true));
   node->set_parameter(rclcpp::Parameter(name + ".min_distance_to_obstacle", -1.0));
   ctrl->configure(node, name, tf, costmap);
+  ctrl->cleanup();
+}
+
+TEST(RegulatedPurePursuitTest, testPathObstructed)
+{
+  auto ctrl = std::make_shared<BasicAPIRPP>();
+  auto node = std::make_shared<nav2::LifecycleNode>("testRPP");
+  std::string name = "PathFollower";
+  auto tf = std::make_shared<tf2_ros::Buffer>(node->get_clock());
+  auto costmap = std::make_shared<nav2_costmap_2d::Costmap2DROS>("fake_costmap");
+  rclcpp_lifecycle::State state;
+  costmap->on_configure(state);
+
+  nav2::declare_parameter_if_not_declared(
+    node, name + ".use_collision_detection", rclcpp::ParameterValue(true));
+  nav2::declare_parameter_if_not_declared(
+    node, name + ".min_distance_to_path_obstacle", rclcpp::ParameterValue(1.0));
+
+  ctrl->configure(node, name, tf, costmap);
+  ctrl->activate();
+
+  auto * raw_costmap = costmap->getCostmap();
+  const double resolution = raw_costmap->getResolution();
+  const double origin_x = raw_costmap->getOriginX();
+  const double origin_y = raw_costmap->getOriginY();
+  const unsigned int size_x = raw_costmap->getSizeInCellsX();
+  const unsigned int size_y = raw_costmap->getSizeInCellsY();
+
+  const double robot_x = origin_x + (size_x * resolution) / 2.0;
+  const double robot_y = origin_y + (size_y * resolution) / 2.0;
+
+  geometry_msgs::msg::PoseStamped start_pose;
+  start_pose.header.frame_id = costmap->getGlobalFrameID();
+  start_pose.header.stamp = node->get_clock()->now();
+  start_pose.pose.position.x = robot_x;
+  start_pose.pose.position.y = robot_y;
+  start_pose.pose.orientation.w = 1.0;
+
+  // 3 m straight path along +x, dense pose spacing
+  auto plan = path_utils::generate_path(
+    start_pose, 0.05,
+    {std::make_unique<path_utils::Straight>(3.0)});
+
+  geometry_msgs::msg::PoseStamped robot_pose = start_pose;
+
+  // 1. Clean costmap, clean path -> false
+  EXPECT_FALSE(ctrl->isPathObstructedWrapper(robot_pose, plan));
+
+  // 2. Lethal cell on path at ~0.5 m (within 1.0 m horizon) -> true
+  unsigned int obs_mx, obs_my;
+  raw_costmap->worldToMap(robot_x + 0.5, robot_y, obs_mx, obs_my);
+  raw_costmap->setCost(obs_mx, obs_my, nav2_costmap_2d::LETHAL_OBSTACLE);
+  EXPECT_TRUE(ctrl->isPathObstructedWrapper(robot_pose, plan));
+  raw_costmap->setCost(obs_mx, obs_my, nav2_costmap_2d::FREE_SPACE);
+
+  // 3. Lethal cell on path at ~1.5 m (beyond 1.0 m horizon) -> false
+  raw_costmap->worldToMap(robot_x + 1.5, robot_y, obs_mx, obs_my);
+  raw_costmap->setCost(obs_mx, obs_my, nav2_costmap_2d::LETHAL_OBSTACLE);
+  EXPECT_FALSE(ctrl->isPathObstructedWrapper(robot_pose, plan));
+  raw_costmap->setCost(obs_mx, obs_my, nav2_costmap_2d::FREE_SPACE);
+
+  // 4. Lethal cell off-path (1 m sideways) at 0.5 m forward -> false
+  raw_costmap->worldToMap(robot_x + 0.5, robot_y + 1.0, obs_mx, obs_my);
+  raw_costmap->setCost(obs_mx, obs_my, nav2_costmap_2d::LETHAL_OBSTACLE);
+  EXPECT_FALSE(ctrl->isPathObstructedWrapper(robot_pose, plan));
+  raw_costmap->setCost(obs_mx, obs_my, nav2_costmap_2d::FREE_SPACE);
+
+  // 5. Empty / single-pose path -> false (early return)
+  nav_msgs::msg::Path empty_plan;
+  empty_plan.header = plan.header;
+  EXPECT_FALSE(ctrl->isPathObstructedWrapper(robot_pose, empty_plan));
+  nav_msgs::msg::Path one_pose;
+  one_pose.header = plan.header;
+  one_pose.poses.push_back(plan.poses.front());
+  EXPECT_FALSE(ctrl->isPathObstructedWrapper(robot_pose, one_pose));
+
+  // 6. Dynamic param: shrink horizon to 0.3 m, the 0.5 m obstacle now out of horizon
+  raw_costmap->worldToMap(robot_x + 0.5, robot_y, obs_mx, obs_my);
+  raw_costmap->setCost(obs_mx, obs_my, nav2_costmap_2d::LETHAL_OBSTACLE);
+  EXPECT_TRUE(ctrl->isPathObstructedWrapper(robot_pose, plan));
+  auto results = node->set_parameters_atomically(
+    {rclcpp::Parameter(name + ".min_distance_to_path_obstacle", 0.3)});
+  EXPECT_TRUE(results.successful);
+  rclcpp::spin_some(node->get_node_base_interface());
+  EXPECT_FALSE(ctrl->isPathObstructedWrapper(robot_pose, plan));
+  raw_costmap->setCost(obs_mx, obs_my, nav2_costmap_2d::FREE_SPACE);
+
+  ctrl->deactivate();
   ctrl->cleanup();
 }
 

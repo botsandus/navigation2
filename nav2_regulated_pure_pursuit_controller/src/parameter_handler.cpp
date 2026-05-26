@@ -79,6 +79,8 @@ ParameterHandler::ParameterHandler(
       plugin_name_ + ".max_allowed_time_to_collision_up_to_carrot", 1.0);
   params_.min_distance_to_obstacle = node->declare_or_get_parameter(
     plugin_name_ + ".min_distance_to_obstacle", -1.0);
+  params_.min_distance_to_path_obstacle = node->declare_or_get_parameter(
+    plugin_name_ + ".min_distance_to_path_obstacle", -1.0);
   params_.use_regulated_linear_velocity_scaling =
     node->declare_or_get_parameter(
       plugin_name_ + ".use_regulated_linear_velocity_scaling", true);
@@ -265,6 +267,8 @@ ParameterHandler::updateParametersCallback(
         params_.max_allowed_time_to_collision_up_to_carrot = parameter.as_double();
       } else if (param_name == plugin_name_ + ".min_distance_to_obstacle") {
         params_.min_distance_to_obstacle = parameter.as_double();
+      } else if (param_name == plugin_name_ + ".min_distance_to_path_obstacle") {
+        params_.min_distance_to_path_obstacle = parameter.as_double();
       } else if (param_name == plugin_name_ + ".cost_scaling_dist") {
         params_.cost_scaling_dist = parameter.as_double();
       } else if (param_name == plugin_name_ + ".cost_scaling_gain") {
