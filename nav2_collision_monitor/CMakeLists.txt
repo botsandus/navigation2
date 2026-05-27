@@ -62,6 +62,7 @@ target_link_libraries(${monitor_library_name} PUBLIC
 target_link_libraries(${monitor_library_name} PRIVATE
   rclcpp_components::component
 )
+target_compile_options(${monitor_library_name} PRIVATE -Wno-error=null-dereference)
 
 add_library(${detector_library_name} SHARED
   src/collision_detector_node.cpp
@@ -98,6 +99,7 @@ target_link_libraries(${detector_library_name} PUBLIC
 target_link_libraries(${detector_library_name} PRIVATE
   rclcpp_components::component
 )
+target_compile_options(${detector_library_name} PRIVATE -Wno-error=null-dereference)
 
 add_executable(${monitor_executable_name}
   src/collision_monitor_main.cpp
