@@ -34,6 +34,8 @@ namespace nav2_collision_monitor
 class Circle : public Polygon
 {
 public:
+  using Polygon::updatePolygon;
+
   /**
    * @brief Circle class constructor
    * @param node Collision Monitor node pointer

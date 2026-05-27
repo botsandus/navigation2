@@ -50,8 +50,8 @@ struct Velocity
 /// @brief Point with 2D collision-check coordinates and optional z from the source
 struct Point
 {
-  double x;  // x-coordinate of point
-  double y;  // y-coordinate of point
+  double x = 0.0;  // x-coordinate of point
+  double y = 0.0;  // y-coordinate of point
   double z = 0.0;  // z-coordinate of point (0 for inherently-2D sources)
   std::string source = "";  // name of the data source
 };
