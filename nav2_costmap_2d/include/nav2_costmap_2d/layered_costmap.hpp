@@ -190,7 +190,15 @@ public:
   /** @brief Returns the latest footprint stored with setFootprint(). */
   const std::vector<geometry_msgs::msg::Point> & getFootprint()
   {
-    return *std::atomic_load(&footprint_);
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+    const auto footprint = std::atomic_load(&footprint_);
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+    return *footprint;
   }
 
   /** @brief The radius of a circle centered at the origin of the

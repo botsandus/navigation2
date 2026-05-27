@@ -34,7 +34,14 @@ FootprintSubscriber::getFootprintRaw(
     return false;
   }
 
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
   auto current_footprint = std::atomic_load(&footprint_);
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
   footprint = toPointVector(current_footprint->polygon);
   footprint_header = current_footprint->header;
 
@@ -76,7 +83,14 @@ void
 FootprintSubscriber::footprint_callback(
   const geometry_msgs::msg::PolygonStamped::ConstSharedPtr & msg)
 {
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
   std::atomic_store(&footprint_, msg);
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
   if (!footprint_received_) {
     footprint_received_ = true;
   }
