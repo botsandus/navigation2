@@ -20,6 +20,52 @@
 namespace nav2_behavior_tree
 {
 
+namespace
+{
+
+inline bool timeEqual(const builtin_interfaces::msg::Time & lhs, const builtin_interfaces::msg::Time & rhs)
+{
+  return lhs.sec == rhs.sec && lhs.nanosec == rhs.nanosec;
+}
+
+inline bool headerEqual(const std_msgs::msg::Header & lhs, const std_msgs::msg::Header & rhs)
+{
+  return lhs.frame_id == rhs.frame_id && timeEqual(lhs.stamp, rhs.stamp);
+}
+
+inline bool poseEqual(const geometry_msgs::msg::Pose & lhs, const geometry_msgs::msg::Pose & rhs)
+{
+  return lhs.position.x == rhs.position.x &&
+         lhs.position.y == rhs.position.y &&
+         lhs.position.z == rhs.position.z &&
+         lhs.orientation.x == rhs.orientation.x &&
+         lhs.orientation.y == rhs.orientation.y &&
+         lhs.orientation.z == rhs.orientation.z &&
+         lhs.orientation.w == rhs.orientation.w;
+}
+
+inline bool poseStampedEqual(const geometry_msgs::msg::PoseStamped & lhs, const geometry_msgs::msg::PoseStamped & rhs)
+{
+  return headerEqual(lhs.header, rhs.header) && poseEqual(lhs.pose, rhs.pose);
+}
+
+bool pathEqual(const nav_msgs::msg::Path & lhs, const nav_msgs::msg::Path & rhs)
+{
+  if (!headerEqual(lhs.header, rhs.header) || lhs.poses.size() != rhs.poses.size()) {
+    return false;
+  }
+
+  for (size_t i = 0; i < lhs.poses.size(); ++i) {
+    if (!poseStampedEqual(lhs.poses[i], rhs.poses[i])) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+}  // namespace
+
 FollowPathAction::FollowPathAction(
   const std::string & xml_tag_name,
   const std::string & action_name,
@@ -75,8 +121,8 @@ void FollowPathAction::on_wait_for_result(
   nav_msgs::msg::Path new_path;
   getInput("path", new_path);
 
-  // Check if it is not same with the current one
-  if (goal_.path != new_path && new_path != nav_msgs::msg::Path()) {
+  // Check if path changed and avoid generated message operator!= with GCC15.
+  if (!pathEqual(goal_.path, new_path) && !new_path.poses.empty()) {
     // the action server on the next loop iteration
     goal_.path = new_path;
     goal_updated_ = true;
