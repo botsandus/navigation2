@@ -298,6 +298,9 @@ foreach(bt_plugin ${plugin_libs})
     nav2_ros_common::nav2_ros_common
   )
   target_compile_definitions(${bt_plugin} PRIVATE BT_PLUGIN_EXPORT)
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 15)
+    target_compile_options(${bt_plugin} PRIVATE -Wno-free-nonheap-object)
+  endif()
 endforeach()
 
 install(TARGETS ${library_name} ${plugin_libs}
