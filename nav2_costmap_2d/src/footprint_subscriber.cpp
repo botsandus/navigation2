@@ -34,7 +34,7 @@ FootprintSubscriber::getFootprintRaw(
     return false;
   }
 
-  auto current_footprint = std::atomic_load(&footprint_);
+  auto current_footprint = footprint_.load();
   footprint = toPointVector(current_footprint->polygon);
   footprint_header = current_footprint->header;
 
@@ -76,7 +76,7 @@ void
 FootprintSubscriber::footprint_callback(
   const geometry_msgs::msg::PolygonStamped::ConstSharedPtr & msg)
 {
-  std::atomic_store(&footprint_, msg);
+  footprint_.store(msg);
   if (!footprint_received_) {
     footprint_received_ = true;
   }
