@@ -76,11 +76,18 @@ void FollowPathAction::on_wait_for_result(
   getInput("path", new_path);
 
   // Check if it is not same with the current one
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wnull-dereference"
+#endif
   if (goal_.path != new_path && new_path != nav_msgs::msg::Path()) {
     // the action server on the next loop iteration
     goal_.path = new_path;
     goal_updated_ = true;
   }
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 
   std::string new_controller_id;
   getInput("controller_id", new_controller_id);
