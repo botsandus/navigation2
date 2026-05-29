@@ -85,7 +85,8 @@ public:
     return FollowingServer::getTrackingPose(pose, frame_id);
   }
 
-  virtual bool rotateToObject(geometry_msgs::msg::PoseStamped &)
+  virtual bool rotateToObject(
+    geometry_msgs::msg::PoseStamped &, const std::string & = std::string(""))
   {
     return true;
   }

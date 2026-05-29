@@ -63,10 +63,17 @@ TEST(ParameterHandlerTest, asTypeConversionTest)
   EXPECT_EQ(a.asWrapped<bool>(bool_p), false);
   EXPECT_EQ(a.asWrapped<std::string>(string_p), std::string("hello"));
 
-  EXPECT_EQ(a.asWrapped<std::vector<int64_t>>(intv_p)[0], 1);
-  EXPECT_EQ(a.asWrapped<std::vector<double>>(doublev_p)[0], 10.0);
-  EXPECT_EQ(a.asWrapped<std::vector<bool>>(boolv_p)[0], false);
-  EXPECT_EQ(a.asWrapped<std::vector<std::string>>(stringv_p)[0], std::string("hello"));
+  // Bind results to named locals before indexing: GCC otherwise raises a
+  // spurious -Wnull-dereference inside gtest's comparison when indexing the
+  // temporary vector directly (asWrapped<std::vector<T>>(p)[0]).
+  auto intv = a.asWrapped<std::vector<int64_t>>(intv_p);
+  auto doublev = a.asWrapped<std::vector<double>>(doublev_p);
+  auto boolv = a.asWrapped<std::vector<bool>>(boolv_p);
+  auto stringv = a.asWrapped<std::vector<std::string>>(stringv_p);
+  EXPECT_EQ(intv[0], 1);
+  EXPECT_EQ(doublev[0], 10.0);
+  EXPECT_EQ(boolv[0], false);
+  EXPECT_EQ(stringv[0], std::string("hello"));
 }
 
 TEST(ParameterHandlerTest, PrePostDynamicCallbackTest)
