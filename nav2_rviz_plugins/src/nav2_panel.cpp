@@ -414,11 +414,22 @@ Nav2Panel::Nav2Panel(QWidget * parent)
     &QLineEdit::editingFinished,
     this,
     &Nav2Panel::loophandler);
+  // QCheckBox::stateChanged(int) was deprecated in Qt 6.7 in favour of
+  // checkStateChanged(Qt::CheckState); guard so the Qt5/older-Qt6 build path
+  // still compiles. The slot is argument-less, so it binds to either signal.
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+  QObject::connect(
+    store_initial_pose_checkbox_,
+    &QCheckBox::checkStateChanged,
+    this,
+    &Nav2Panel::initialStateHandler);
+#else
   QObject::connect(
     store_initial_pose_checkbox_,
     &QCheckBox::stateChanged,
     this,
     &Nav2Panel::initialStateHandler);
+#endif
 
   // Start/Reset button click transitions
   initial_->addTransition(start_reset_button_, SIGNAL(clicked()), idle_);
