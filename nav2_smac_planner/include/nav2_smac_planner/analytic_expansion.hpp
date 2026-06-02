@@ -18,6 +18,7 @@
 #include <ompl/base/ScopedState.h>
 #include <ompl/base/spaces/DubinsStateSpace.h>
 #include <ompl/base/spaces/ReedsSheppStateSpace.h>
+#include <ompl/config.h>
 
 #include <functional>
 #include <list>
@@ -33,6 +34,28 @@
 
 namespace nav2_smac_planner
 {
+
+// OMPL 2.0 renamed ReedsSheppStateSpace::ReedsSheppPath to PathType and the
+// reedsShepp() accessor to getPath(). Provide a compatibility alias and helper
+// so this package builds against both OMPL 1.x (ROS Kilted ships OMPL 1.7) and
+// OMPL 2.x (ROS Lyrical ships OMPL 2.0).
+#if OMPL_MAJOR_VERSION >= 2
+using ReedsSheppPathType = ompl::base::ReedsSheppStateSpace::PathType;
+inline ReedsSheppPathType getReedsSheppPath(
+  const ompl::base::ReedsSheppStateSpace & space,
+  const ompl::base::State * s1, const ompl::base::State * s2)
+{
+  return space.getPath(s1, s2);
+}
+#else
+using ReedsSheppPathType = ompl::base::ReedsSheppStateSpace::ReedsSheppPath;
+inline ReedsSheppPathType getReedsSheppPath(
+  const ompl::base::ReedsSheppStateSpace & space,
+  const ompl::base::State * s1, const ompl::base::State * s2)
+{
+  return space.reedsShepp(s1, s2);
+}
+#endif
 
 template<typename NodeT>
 class AnalyticExpansion
@@ -178,7 +201,7 @@ public:
     * @param path The Reeds-Shepp path to count direction changes in
     * @return The number of direction changes in the path
     */
-  int countDirectionChanges(const ompl::base::ReedsSheppStateSpace::PathType & path);
+  int countDirectionChanges(const ReedsSheppPathType & path);
 
   /**
    * @brief Takes an expanded nodes to clean up, if necessary, of any state
