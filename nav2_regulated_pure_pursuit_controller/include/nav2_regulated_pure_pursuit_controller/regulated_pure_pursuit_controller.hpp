@@ -144,19 +144,10 @@ protected:
 
   /**
    * @brief Whether robot should rotate to final goal orientation
-   * @param goal_checker Goal checker instance for tolerances / state
-   * @param robot_pose Current robot pose in costmap's global frame
-   * @param goal_pose Goal pose in costmap's global frame
-   * @param speed Current robot speed
-   * @param transformed_plan The plan in the robot base frame
+   * @param carrot_pose current lookahead point
    * @return Whether should rotate to goal heading
    */
-  bool shouldRotateToGoalHeading(
-    nav2_core::GoalChecker * goal_checker,
-    const geometry_msgs::msg::PoseStamped & robot_pose,
-    const geometry_msgs::msg::PoseStamped & goal_pose,
-    const geometry_msgs::msg::Twist & speed,
-    const nav_msgs::msg::Path & transformed_plan);
+  bool shouldRotateToGoalHeading(const geometry_msgs::msg::PoseStamped & carrot_pose);
 
   /**
    * @brief Create a smooth and kinematically smoothed rotation command
@@ -190,10 +181,12 @@ protected:
   rclcpp::Logger logger_ {rclcpp::get_logger("RegulatedPurePursuitController")};
 
   Parameters * params_;
+  double goal_dist_tol_;
   double control_duration_;
   bool cancelling_ = false;
   bool finished_cancelling_ = false;
   bool is_rotating_to_heading_ = false;
+  bool has_reached_xy_tolerance_ = false;
   geometry_msgs::msg::Twist last_command_velocity_;
 
   nav2::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr carrot_pub_;
