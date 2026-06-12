@@ -814,7 +814,9 @@ TEST(RegulatedPurePursuitTest, testPathObstructed)
   auto results = node->set_parameters_atomically(
     {rclcpp::Parameter(name + ".min_distance_to_path_obstacle", 0.3)});
   EXPECT_TRUE(results.successful);
-  rclcpp::spin_some(node->get_node_base_interface());
+  rclcpp::executors::SingleThreadedExecutor executor;
+  executor.add_node(node->get_node_base_interface());
+  executor.spin_some();
   EXPECT_FALSE(ctrl->isPathObstructedWrapper(robot_pose, plan));
   raw_costmap->setCost(obs_mx, obs_my, nav2_costmap_2d::FREE_SPACE);
 
