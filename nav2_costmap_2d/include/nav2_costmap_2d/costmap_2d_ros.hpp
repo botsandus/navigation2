@@ -43,6 +43,7 @@
 #include <string>
 #include <vector>
 
+#include "rclcpp/executors/events_cbg_executor/events_cbg_executor.hpp"
 #include "geometry_msgs/msg/polygon.hpp"
 #include "geometry_msgs/msg/polygon_stamped.hpp"
 #include "nav2_costmap_2d/costmap_2d_publisher.hpp"
@@ -363,7 +364,7 @@ protected:
 
   // Dedicated callback group and executor for tf timer_interface and message filter
   rclcpp::CallbackGroup::SharedPtr callback_group_;
-  rclcpp::executors::SingleThreadedExecutor::SharedPtr executor_;
+  rclcpp::executors::EventsCBGExecutor::SharedPtr executor_;
   std::unique_ptr<nav2::NodeThread> executor_thread_;
 
   // Transform listener

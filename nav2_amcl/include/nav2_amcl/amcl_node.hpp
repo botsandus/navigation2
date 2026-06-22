@@ -43,6 +43,7 @@
 #include "nav_msgs/srv/set_map.hpp"
 #include "pluginlib/class_loader.hpp"
 #include "rclcpp/node_options.hpp"
+#include "rclcpp/executors/events_cbg_executor/events_cbg_executor.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
 #include "nav2_ros_common/service_server.hpp"
 #include "std_srvs/srv/empty.hpp"
@@ -123,7 +124,7 @@ protected:
   // Dedicated callback group and executor for services and subscriptions in AmclNode,
   // in order to isolate TF timer used in message filter.
   rclcpp::CallbackGroup::SharedPtr callback_group_;
-  rclcpp::executors::SingleThreadedExecutor::SharedPtr executor_;
+  rclcpp::executors::EventsCBGExecutor::SharedPtr executor_;
   std::unique_ptr<nav2::NodeThread> executor_thread_;
 
   // Pose hypothesis

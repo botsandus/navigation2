@@ -17,13 +17,17 @@
 
 #include "nav2_behaviors/behavior_server.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "rclcpp/executors/events_cbg_executor/events_cbg_executor.hpp"
 
 int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
   auto recoveries_node = std::make_shared<behavior_server::BehaviorServer>();
 
-  rclcpp::spin(recoveries_node->get_node_base_interface());
+  rclcpp::executors::EventsCBGExecutor executor(rclcpp::ExecutorOptions(), 1);
+  executor.add_node(recoveries_node->get_node_base_interface());
+  executor.spin();
+  executor.remove_node(recoveries_node->get_node_base_interface());
   rclcpp::shutdown();
 
   return 0;

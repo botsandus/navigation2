@@ -16,12 +16,16 @@
 
 #include "opennav_following/following_server.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "rclcpp/executors/events_cbg_executor/events_cbg_executor.hpp"
 
 int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
   auto node = std::make_shared<opennav_following::FollowingServer>();
-  rclcpp::spin(node->get_node_base_interface());
+  rclcpp::executors::EventsCBGExecutor executor(rclcpp::ExecutorOptions(), 1);
+  executor.add_node(node->get_node_base_interface());
+  executor.spin();
+  executor.remove_node(node->get_node_base_interface());
   rclcpp::shutdown();
 
   return 0;

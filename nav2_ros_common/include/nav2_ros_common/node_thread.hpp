@@ -18,6 +18,7 @@
 #include <memory>
 
 #include "rclcpp/rclcpp.hpp"
+#include "rclcpp/executors/events_cbg_executor/events_cbg_executor.hpp"
 
 namespace nav2
 {
@@ -36,7 +37,8 @@ public:
     rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_base)
   : node_(node_base)
   {
-    executor_ = std::make_shared<rclcpp::executors::SingleThreadedExecutor>();
+    executor_ = std::make_shared<rclcpp::executors::EventsCBGExecutor>(
+      rclcpp::ExecutorOptions(), 1);
     thread_ = std::make_unique<std::thread>(
       [&]()
       {
@@ -52,6 +54,20 @@ public:
    */
   explicit NodeThread(
     rclcpp::executors::SingleThreadedExecutor::SharedPtr executor)
+  : executor_(executor)
+  {
+    thread_ = std::make_unique<std::thread>(
+      [&]() {
+        executor_->spin();
+      });
+  }
+
+  /**
+   * @brief A background thread to process an EventsCBGExecutor's callbacks
+   * @param executor EventsCBGExecutor to spin in thread
+   */
+  explicit NodeThread(
+    rclcpp::executors::EventsCBGExecutor::SharedPtr executor)
   : executor_(executor)
   {
     thread_ = std::make_unique<std::thread>(

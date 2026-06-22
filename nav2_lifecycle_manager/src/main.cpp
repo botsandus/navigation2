@@ -16,12 +16,16 @@
 
 #include "nav2_lifecycle_manager/lifecycle_manager.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "rclcpp/executors/events_cbg_executor/events_cbg_executor.hpp"
 
 int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
   auto node = std::make_shared<nav2_lifecycle_manager::LifecycleManager>();
-  rclcpp::spin(node);
+  rclcpp::executors::EventsCBGExecutor executor(rclcpp::ExecutorOptions(), 1);
+  executor.add_node(node);
+  executor.spin();
+  executor.remove_node(node);
   rclcpp::shutdown();
 
   return 0;

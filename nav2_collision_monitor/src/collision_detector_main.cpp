@@ -15,6 +15,7 @@
 #include <memory>
 
 #include "rclcpp/rclcpp.hpp"
+#include "rclcpp/executors/events_cbg_executor/events_cbg_executor.hpp"
 
 #include "nav2_collision_monitor/collision_detector_node.hpp"
 
@@ -22,7 +23,10 @@ int main(int argc, char * argv[])
 {
   rclcpp::init(argc, argv);
   auto node = std::make_shared<nav2_collision_monitor::CollisionDetector>();
-  rclcpp::spin(node->get_node_base_interface());
+  rclcpp::executors::EventsCBGExecutor executor(rclcpp::ExecutorOptions(), 1);
+  executor.add_node(node->get_node_base_interface());
+  executor.spin();
+  executor.remove_node(node->get_node_base_interface());
   rclcpp::shutdown();
 
   return 0;
