@@ -126,7 +126,8 @@ public:
         "Maximum distance ahead of the robot to validate (-1 = full path)"),
         BT::OutputPort<std::vector<geometry_msgs::msg::PoseStamped>>(
         "collision_poses",
-        "Poses in the path that are in collision")
+        "Poses in the path that are in collision"),
+        BT::OutputPort<std::string>("error_msg")
     });
   }
 
