@@ -11,3 +11,4 @@ float64 max_lookahead_distance -1.0
 bool success
 bool is_valid
 int32[] invalid_pose_indices
+string message

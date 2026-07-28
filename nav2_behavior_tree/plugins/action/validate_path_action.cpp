@@ -52,6 +52,8 @@ void ValidatePath::on_tick()
 BT::NodeStatus ValidatePath::on_completion(
   std::shared_ptr<nav2_msgs::srv::IsPathValid::Response> response)
 {
+  setOutput("error_msg", response->message);
+
   // Check if validation was successful
   if (!response->success) {
     RCLCPP_ERROR(

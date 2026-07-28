@@ -193,6 +193,7 @@ private:
         RCLCPP_ERROR(logger_, "Failed to wait for costmap: %s", ex.what());
         response->success = false;
         response->is_valid = false;
+        response->message = "costmap not available";
         return;
       }
     }
@@ -202,6 +203,7 @@ private:
       RCLCPP_ERROR(logger_, "Failed to get robot pose. Cannot validate path.");
       response->success = false;
       response->is_valid = false;
+      response->message = "robot pose not available";
       return;
     }
 
