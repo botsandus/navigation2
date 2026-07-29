@@ -86,10 +86,15 @@ bool Source::getData(
     return false;
   }
 
-  // Mask out points that fall inside any enabled exclusion zone.
-  if (!exclusion_zones_.empty() && !source_data.empty()) {
-    for (const auto & zone : exclusion_zones_) {
-      zone->apply(curr_time, source_data);
+  // Mask out points that fall inside any enabled exclusion zone. The lock
+  // guards against the node's dynamic-parameter callback swapping membership
+  // (via setExclusionZones) concurrently under a multi-threaded executor.
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!exclusion_zones_.empty() && !source_data.empty()) {
+      for (const auto & zone : exclusion_zones_) {
+        zone->apply(curr_time, source_data);
+      }
     }
   }
 
@@ -105,6 +110,7 @@ bool Source::getData(
 void Source::setExclusionZones(
   const std::vector<std::shared_ptr<ExclusionZone>> & exclusion_zones)
 {
+  std::lock_guard<std::mutex> lock(mutex_);
   exclusion_zones_ = exclusion_zones;
 }
 

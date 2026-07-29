@@ -33,6 +33,8 @@ CollisionDetector::CollisionDetector(const rclcpp::NodeOptions & options)
 
 CollisionDetector::~CollisionDetector()
 {
+  on_set_params_handler_.reset();
+  post_set_params_handler_.reset();
   polygons_.clear();
   sources_.clear();
   exclusion_zones_.clear();
@@ -134,6 +136,9 @@ CollisionDetector::on_cleanup(const rclcpp_lifecycle::State & /*state*/)
   collision_points_marker_pub_.reset();
   triggering_points_pub_.reset();
 
+  on_set_params_handler_.reset();
+  post_set_params_handler_.reset();
+
   polygons_.clear();
   sources_.clear();
   exclusion_zones_.clear();
@@ -185,6 +190,15 @@ bool CollisionDetector::getParameters()
   if (!configurePolygons(base_frame_id_, transform_tolerance)) {
     return false;
   }
+
+  // Register dynamic-parameter callbacks that allow each source's
+  // exclusion-zone membership to be changed at runtime.
+  on_set_params_handler_ = node->add_on_set_parameters_callback(
+    std::bind(
+      &CollisionDetector::validateExclusionZoneParameters, this, std::placeholders::_1));
+  post_set_params_handler_ = node->add_post_set_parameters_callback(
+    std::bind(
+      &CollisionDetector::updateExclusionZoneParameters, this, std::placeholders::_1));
 
   return true;
 }
@@ -394,6 +408,87 @@ bool CollisionDetector::setSourceExclusionZones(
 
   source->setExclusionZones(zones);
   return true;
+}
+
+std::shared_ptr<Source> CollisionDetector::findSource(const std::string & source_name) const
+{
+  for (const auto & source : sources_) {
+    if (source->getSourceName() == source_name) {
+      return source;
+    }
+  }
+  return nullptr;
+}
+
+rcl_interfaces::msg::SetParametersResult CollisionDetector::validateExclusionZoneParameters(
+  const std::vector<rclcpp::Parameter> & parameters)
+{
+  rcl_interfaces::msg::SetParametersResult result;
+  result.successful = true;
+
+  const std::string suffix = ".exclusion_zones";
+  for (const auto & parameter : parameters) {
+    const std::string & param_name = parameter.get_name();
+    if (param_name.size() <= suffix.size() ||
+      param_name.compare(param_name.size() - suffix.size(), suffix.size(), suffix) != 0)
+    {
+      continue;
+    }
+
+    // Only handle references belonging to a configured source.
+    const std::string source_name = param_name.substr(0, param_name.size() - suffix.size());
+    if (!findSource(source_name)) {
+      continue;
+    }
+
+    if (parameter.get_type() != rclcpp::ParameterType::PARAMETER_STRING_ARRAY) {
+      result.successful = false;
+      result.reason = "Parameter '" + param_name + "' must be a string array";
+      return result;
+    }
+
+    for (const std::string & zone_name : parameter.as_string_array()) {
+      if (exclusion_zones_.find(zone_name) == exclusion_zones_.end()) {
+        result.successful = false;
+        result.reason =
+          "Exclusion zone '" + zone_name + "' referenced by '" + param_name +
+          "' is not defined in the node's exclusion_zones parameter";
+        return result;
+      }
+    }
+  }
+
+  return result;
+}
+
+void CollisionDetector::updateExclusionZoneParameters(
+  const std::vector<rclcpp::Parameter> & parameters)
+{
+  const std::string suffix = ".exclusion_zones";
+  for (const auto & parameter : parameters) {
+    const std::string & param_name = parameter.get_name();
+    if (param_name.size() <= suffix.size() ||
+      param_name.compare(param_name.size() - suffix.size(), suffix.size(), suffix) != 0)
+    {
+      continue;
+    }
+
+    const std::string source_name = param_name.substr(0, param_name.size() - suffix.size());
+    const auto source = findSource(source_name);
+    if (!source) {
+      continue;
+    }
+
+    // Names were validated in the on-set callback, so every lookup succeeds.
+    std::vector<std::shared_ptr<ExclusionZone>> zones;
+    for (const std::string & zone_name : parameter.as_string_array()) {
+      const auto it = exclusion_zones_.find(zone_name);
+      if (it != exclusion_zones_.end()) {
+        zones.push_back(it->second);
+      }
+    }
+    source->setExclusionZones(zones);
+  }
 }
 
 void CollisionDetector::process()

@@ -158,6 +158,29 @@ protected:
   bool setSourceExclusionZones(
     const std::shared_ptr<Source> & source, const std::string & source_name);
   /**
+   * @brief Finds a configured source by its name.
+   * @param source_name Source parameter namespace
+   * @return Shared pointer to the source, or nullptr if not found
+   */
+  std::shared_ptr<Source> findSource(const std::string & source_name) const;
+  /**
+   * @brief on-set parameter callback validating dynamic changes to any
+   * ``<source>``.exclusion_zones list against the node's zone pool. Rejects the
+   * change if a referenced zone name is not defined.
+   * @param parameters Parameters being set
+   * @return Validation result
+   */
+  rcl_interfaces::msg::SetParametersResult validateExclusionZoneParameters(
+    const std::vector<rclcpp::Parameter> & parameters);
+  /**
+   * @brief post-set parameter callback applying dynamic changes to any
+   * ``<source>``.exclusion_zones list by re-resolving the referenced names
+   * against the pool and injecting them into the matching source.
+   * @param parameters Parameters that were set
+   */
+  void updateExclusionZoneParameters(
+    const std::vector<rclcpp::Parameter> & parameters);
+  /**
    * @brief Supporting routine creating and configuring all data sources
    * @param base_frame_id Robot base frame ID
    * @param odom_frame_id Odometry frame ID. Used as global frame to get
@@ -257,6 +280,11 @@ protected:
   /// @brief Exclusion zones owned by the node, keyed by zone name. Sources
   /// reference these shared objects by name to mask out their points.
   std::unordered_map<std::string, std::shared_ptr<ExclusionZone>> exclusion_zones_;
+
+  /// @brief Handle for the on-set parameter validation callback
+  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr on_set_params_handler_;
+  /// @brief Handle for the post-set parameter application callback
+  rclcpp::node_interfaces::PostSetParametersCallbackHandle::SharedPtr post_set_params_handler_;
 
   // Input/output speed controls
   /// @brief Input cmd_vel subscriber

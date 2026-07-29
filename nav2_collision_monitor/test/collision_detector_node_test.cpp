@@ -35,6 +35,7 @@
 #include "visualization_msgs/msg/marker_array.hpp"
 #include "nav2_msgs/msg/costmap.hpp"
 #include "nav2_costmap_2d/cost_values.hpp"
+#include "rcl_interfaces/srv/set_parameters.hpp"
 
 #include "nav2_ros_common/tf2_factories.hpp"
 
@@ -154,6 +155,9 @@ public:
     const std::chrono::nanoseconds & timeout,
     const rclcpp::Time & stamp);
   bool waitState(const std::chrono::nanoseconds & timeout);
+  bool waitFuture(
+    rclcpp::Client<rcl_interfaces::srv::SetParameters>::SharedFuture result_future,
+    const std::chrono::nanoseconds & timeout);
   void stateCallback(nav2_msgs::msg::CollisionDetectorState::ConstSharedPtr msg);
   bool waitCollisionPointsMarker(const std::chrono::nanoseconds & timeout);
   void collisionPointsMarkerCallback(visualization_msgs::msg::MarkerArray::ConstSharedPtr msg);
@@ -189,6 +193,8 @@ protected:
   nav2::Subscription<visualization_msgs::msg::MarkerArray>::SharedPtr
     triggering_points_sub_;
   visualization_msgs::msg::MarkerArray::ConstSharedPtr triggering_points_msg_;
+
+  nav2::ServiceClient<rcl_interfaces::srv::SetParameters>::SharedPtr parameters_client_;
 };  // Tester
 
 Tester::Tester()
@@ -224,6 +230,10 @@ Tester::Tester()
   triggering_points_sub_ = cd_->create_subscription<visualization_msgs::msg::MarkerArray>(
     TRIGGERING_POINTS_TOPIC,
     std::bind(&Tester::triggeringPointsCallback, this, std::placeholders::_1));
+
+  parameters_client_ =
+    cd_->create_client<rcl_interfaces::srv::SetParameters>(
+    std::string(cd_->get_name()) + "/set_parameters");
 }
 
 Tester::~Tester()
@@ -277,6 +287,22 @@ bool Tester::waitTriggeringPoints(const std::chrono::nanoseconds & timeout)
   rclcpp::Time start_time = cd_->now();
   while (rclcpp::ok() && cd_->now() - start_time <= rclcpp::Duration(timeout)) {
     if (triggering_points_msg_) {
+      return true;
+    }
+    executor_->spin_some();
+    std::this_thread::sleep_for(10ms);
+  }
+  return false;
+}
+
+bool Tester::waitFuture(
+  rclcpp::Client<rcl_interfaces::srv::SetParameters>::SharedFuture result_future,
+  const std::chrono::nanoseconds & timeout)
+{
+  rclcpp::Time start_time = cd_->now();
+  while (rclcpp::ok() && cd_->now() - start_time <= rclcpp::Duration(timeout)) {
+    std::future_status status = result_future.wait_for(10ms);
+    if (status == std::future_status::ready) {
       return true;
     }
     executor_->spin_some();
@@ -774,6 +800,81 @@ TEST_F(Tester, testScanDetection)
   ASSERT_TRUE(waitState(300ms));
   ASSERT_NE(state_msg_->detections.size(), 0u);
   ASSERT_EQ(state_msg_->detections[0], true);
+
+  // Stop Collision Detector node
+  cd_->stop();
+}
+
+TEST_F(Tester, testSourceExclusionZonesDynamic)
+{
+  rclcpp::Time curr_time = cd_->now();
+
+  // Set Collision Detector parameters.
+  setCommonParameters();
+  // Declare a node-level exclusion zone "ez" covering the [-2, 2] square in the
+  // robot base frame, but do NOT reference it from the source yet.
+  cd_->declare_parameter(
+    "exclusion_zones", rclcpp::ParameterValue(std::vector<std::string>{"ez"}));
+  cd_->declare_parameter("ez.type", rclcpp::ParameterValue("polygon"));
+  cd_->declare_parameter(
+    "ez.points",
+    rclcpp::ParameterValue("[[2.0, 2.0], [2.0, -2.0], [-2.0, -2.0], [-2.0, 2.0]]"));
+  cd_->declare_parameter("ez.enabled", rclcpp::ParameterValue(true));
+  // Create a detection region and a Scan source.
+  addPolygon("DetectionRegion", CIRCLE, 3.0, "none");
+  addSource(SCAN_NAME, SCAN);
+  setVectors({"DetectionRegion"}, {SCAN_NAME});
+
+  // Start Collision Detector node
+  cd_->start();
+  sendTransforms(curr_time);
+
+  // The source does not reference any exclusion zone yet, so the obstacle is detected.
+  publishScan(1.5, curr_time);
+  ASSERT_TRUE(waitData(1.5, 300ms, curr_time));
+  ASSERT_TRUE(waitState(300ms));
+  ASSERT_NE(state_msg_->detections.size(), 0u);
+  ASSERT_EQ(state_msg_->detections[0], true);
+
+  // Referencing an undefined zone must be rejected by the on-set validation.
+  {
+    auto set_parameters_msg = std::make_shared<rcl_interfaces::srv::SetParameters::Request>();
+    rcl_interfaces::msg::Parameter parameter_msg;
+    parameter_msg.name = std::string(SCAN_NAME) + ".exclusion_zones";
+    parameter_msg.value.type = rcl_interfaces::msg::ParameterType::PARAMETER_STRING_ARRAY;
+    parameter_msg.value.string_array_value = {"undefined_zone"};
+    set_parameters_msg->parameters.push_back(parameter_msg);
+    auto result_future = parameters_client_->async_call(set_parameters_msg);
+    ASSERT_TRUE(waitFuture(result_future, 2s));
+    auto response = result_future.get();
+    ASSERT_EQ(response->results.size(), 1u);
+    EXPECT_FALSE(response->results[0].successful);
+  }
+
+  // Referencing the defined zone must be accepted and applied at runtime.
+  {
+    auto set_parameters_msg = std::make_shared<rcl_interfaces::srv::SetParameters::Request>();
+    rcl_interfaces::msg::Parameter parameter_msg;
+    parameter_msg.name = std::string(SCAN_NAME) + ".exclusion_zones";
+    parameter_msg.value.type = rcl_interfaces::msg::ParameterType::PARAMETER_STRING_ARRAY;
+    parameter_msg.value.string_array_value = {"ez"};
+    set_parameters_msg->parameters.push_back(parameter_msg);
+    auto result_future = parameters_client_->async_call(set_parameters_msg);
+    ASSERT_TRUE(waitFuture(result_future, 2s));
+    auto response = result_future.get();
+    ASSERT_EQ(response->results.size(), 1u);
+    EXPECT_TRUE(response->results[0].successful);
+  }
+
+  // The scan ring now falls entirely inside the referenced zone and is masked,
+  // so the obstacle is no longer detected.
+  curr_time = cd_->now();
+  sendTransforms(curr_time);
+  publishScan(1.5, curr_time);
+  state_msg_.reset();
+  ASSERT_TRUE(waitState(500ms));
+  ASSERT_NE(state_msg_->detections.size(), 0u);
+  ASSERT_EQ(state_msg_->detections[0], false);
 
   // Stop Collision Detector node
   cd_->stop();

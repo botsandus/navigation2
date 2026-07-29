@@ -1515,6 +1515,95 @@ TEST_F(Tester, testSourceNotEnabled)
   cm_->stop();
 }
 
+TEST_F(Tester, testSourceExclusionZonesDynamic)
+{
+  // Set Collision Monitor parameters.
+  setCommonParameters();
+  // Declare a node-level exclusion zone "ez" covering the [-1, 1] square in the
+  // robot base frame, but do NOT reference it from the source yet.
+  cm_->declare_parameter(
+    "exclusion_zones", rclcpp::ParameterValue(std::vector<std::string>{"ez"}));
+  cm_->declare_parameter("ez.type", rclcpp::ParameterValue("polygon"));
+  cm_->declare_parameter(
+    "ez.points",
+    rclcpp::ParameterValue("[[1.0, 1.0], [1.0, -1.0], [-1.0, -1.0], [-1.0, 1.0]]"));
+  cm_->declare_parameter("ez.enabled", rclcpp::ParameterValue(true));
+  // Create a STOP polygon and a Scan source.
+  addPolygon("Stop", POLYGON, 1.0, "stop");
+  addSource(SCAN_NAME, SCAN);
+  setVectors({"Stop"}, {SCAN_NAME});
+
+  // Start Collision Monitor node
+  cm_->start();
+
+  // The source does not reference any exclusion zone yet, so the robot stops.
+  rclcpp::Time curr_time = cm_->now();
+  sendTransforms(curr_time);
+  publishScan(0.5, curr_time);
+  ASSERT_TRUE(waitData(0.5, 500ms, curr_time));
+  publishCmdVel(0.5, 0.2, 0.1);
+  ASSERT_TRUE(waitCmdVel(500ms));
+  ASSERT_NEAR(cmd_vel_out_->linear.x, 0.0, EPSILON);
+  ASSERT_TRUE(waitActionState(500ms));
+  ASSERT_EQ(action_state_->action_type, STOP);
+  ASSERT_EQ(action_state_->polygon_name, "Stop");
+
+  // Referencing an undefined zone must be rejected by the on-set validation.
+  {
+    auto set_parameters_msg = std::make_shared<rcl_interfaces::srv::SetParameters::Request>();
+    rcl_interfaces::msg::Parameter parameter_msg;
+    parameter_msg.name = std::string(SCAN_NAME) + ".exclusion_zones";
+    parameter_msg.value.type = rcl_interfaces::msg::ParameterType::PARAMETER_STRING_ARRAY;
+    parameter_msg.value.string_array_value = {"undefined_zone"};
+    set_parameters_msg->parameters.push_back(parameter_msg);
+    auto result_future = parameters_client_->async_call(set_parameters_msg);
+    ASSERT_TRUE(waitFuture(result_future, 2s));
+    auto response = result_future.get();
+    ASSERT_EQ(response->results.size(), 1u);
+    EXPECT_FALSE(response->results[0].successful);
+  }
+
+  // Referencing the defined zone must be accepted and applied at runtime.
+  {
+    auto set_parameters_msg = std::make_shared<rcl_interfaces::srv::SetParameters::Request>();
+    rcl_interfaces::msg::Parameter parameter_msg;
+    parameter_msg.name = std::string(SCAN_NAME) + ".exclusion_zones";
+    parameter_msg.value.type = rcl_interfaces::msg::ParameterType::PARAMETER_STRING_ARRAY;
+    parameter_msg.value.string_array_value = {"ez"};
+    set_parameters_msg->parameters.push_back(parameter_msg);
+    auto result_future = parameters_client_->async_call(set_parameters_msg);
+    ASSERT_TRUE(waitFuture(result_future, 2s));
+    auto response = result_future.get();
+    ASSERT_EQ(response->results.size(), 1u);
+    EXPECT_TRUE(response->results[0].successful);
+  }
+
+  // The scan ring now falls entirely inside the referenced zone and is masked,
+  // so the robot no longer stops. Masking empties the source data, so waitData()
+  // (which looks for a surviving point at 0.5 m) cannot be used here; spin
+  // briefly instead to let the source ingest the new scan before processing.
+  curr_time = cm_->now();
+  sendTransforms(curr_time);
+  publishScan(0.5, curr_time);
+  const rclcpp::Time ingest_start = cm_->now();
+  while (rclcpp::ok() && cm_->now() - ingest_start <= rclcpp::Duration(300ms)) {
+    executor_->spin_some();
+    std::this_thread::sleep_for(10ms);
+  }
+  cmd_vel_out_.reset();
+  publishCmdVel(0.5, 0.2, 0.1);
+  ASSERT_TRUE(waitCmdVel(500ms));
+  ASSERT_NEAR(cmd_vel_out_->linear.x, 0.5, EPSILON);
+  ASSERT_NEAR(cmd_vel_out_->linear.y, 0.2, EPSILON);
+  ASSERT_NEAR(cmd_vel_out_->angular.z, 0.1, EPSILON);
+  ASSERT_TRUE(waitActionState(500ms));
+  ASSERT_EQ(action_state_->action_type, DO_NOTHING);
+  ASSERT_EQ(action_state_->polygon_name, "");
+
+  // Stop Collision Monitor node
+  cm_->stop();
+}
+
 TEST_F(Tester, testProcessNonActive)
 {
   rclcpp::Time curr_time = cm_->now();
