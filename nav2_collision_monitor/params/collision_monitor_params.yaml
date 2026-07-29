@@ -90,6 +90,7 @@ collision_monitor:
         theta_min: -1.0
         theta_max: 1.0
     observation_sources: ["scan"]
+    # exclusion_zones: ["dock", "robot_body"]  # node-level master list of zone blocks (defined below); each name must have a matching block
     scan:
       type: "scan"
       topic: "scan"
@@ -102,7 +103,7 @@ collision_monitor:
       max_height: 0.5
       use_global_height: false
       enabled: true
-      # exclusion_zones: ["dock", "robot_body"]  # names of zone blocks masking out this source's points
+      # exclusion_zones: ["dock", "robot_body"]  # subset of the node-level exclusion_zones masking out this source's points
     # dock:
     #   enabled: true
     #   type: "polygon"          # "polygon" or "circle"

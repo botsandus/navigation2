@@ -79,19 +79,13 @@ public:
     std::vector<Point> & data);
 
   /**
-   * @brief Activates the exclusion zone visualization publishers (if any)
+   * @brief Sets the exclusion zones (owned by the node) that mask out this
+   * source's points. Called once at configuration time, after the node has
+   * created the shared zone objects and resolved this source's references.
+   * @param exclusion_zones Zones referenced by this source
    */
-  void activate();
-
-  /**
-   * @brief Deactivates the exclusion zone visualization publishers (if any)
-   */
-  void deactivate();
-
-  /**
-   * @brief Publishes the source's exclusion zones for visualization
-   */
-  void publishExclusionZones() const;
+  void setExclusionZones(
+    const std::vector<std::shared_ptr<ExclusionZone>> & exclusion_zones);
 
   /**
    * @brief Obtains source enabled state
@@ -211,7 +205,9 @@ protected:
   bool base_shift_correction_;
   /// @brief Whether source is enabled
   bool enabled_;
-  /// @brief Exclusion zones masking out points from this source
+  /// @brief Exclusion zones masking out points from this source. These objects
+  /// are owned by the node and shared (by name) between the sources that
+  /// reference them; this source only holds references to apply them.
   std::vector<std::shared_ptr<ExclusionZone>> exclusion_zones_;
 };  // class Source
 

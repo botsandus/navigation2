@@ -16,6 +16,7 @@ collision_detector:
       polygon_pub_topic: "polygon_front"
       enabled: true
     observation_sources: ["scan"]
+    # exclusion_zones: ["dock", "robot_body"]  # node-level master list of zone blocks (defined below); each name must have a matching block
     scan:
       type: "scan"
       topic: "scan"
@@ -27,7 +28,7 @@ collision_detector:
       min_height: 0.1
       max_height: 0.5
       enabled: true
-      # exclusion_zones: ["dock", "robot_body"]  # names of zone blocks masking out this source's points
+      # exclusion_zones: ["dock", "robot_body"]  # subset of the node-level exclusion_zones masking out this source's points
     # dock:
     #   enabled: true
     #   type: "polygon"          # "polygon" or "circle"

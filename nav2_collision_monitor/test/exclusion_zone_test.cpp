@@ -166,10 +166,16 @@ public:
   {
   }
 
-  // Expose the protected zone configuration for testing.
-  bool setupExclusionZones()
+  // Configure the source, then inject the node-owned zones it references
+  // (mirrors what the node does after resolving the source's references).
+  bool setup(
+    const std::vector<std::shared_ptr<nav2_collision_monitor::ExclusionZone>> & zones = {})
   {
-    return configure();
+    if (!configure()) {
+      return false;
+    }
+    setExclusionZones(zones);
+    return true;
   }
 
   // Points appended by the next getData() call.
@@ -676,13 +682,14 @@ TEST_F(ExclusionZoneTester, SourceMasksOnlyNewlyAddedPoints)
 {
   declareZoneParams(ZONE_NAME, "polygon", true, ZONE_FRAME_ID);
   node_->declare_parameter(std::string(ZONE_NAME) + ".points", rclcpp::ParameterValue(UNIT_SQUARE));
-  node_->declare_parameter(
-    std::string(SOURCE_NAME) + ".exclusion_zones",
-    rclcpp::ParameterValue(std::vector<std::string>{ZONE_NAME}));
   broadcastTransform(ZONE_FRAME_ID, 0.0, 0.0);
 
+  // The node owns the zone; configure it then inject it into the source.
+  auto zone = makeZone();
+  ASSERT_TRUE(zone->configure());
+
   auto source = std::make_shared<FakeSource>(node_, SOURCE_NAME, tf_buffer_, BASE_FRAME_ID);
-  ASSERT_TRUE(source->setupExclusionZones());
+  ASSERT_TRUE(source->setup({zone}));
 
   // The source will append one point inside the zone and one outside.
   source->points_to_add = {{0.0, 0.0, 0.0, ""}, {5.0, 5.0, 0.0, ""}};
@@ -701,54 +708,13 @@ TEST_F(ExclusionZoneTester, SourceMasksOnlyNewlyAddedPoints)
 
 TEST_F(ExclusionZoneTester, SourceWithoutZonesLeavesDataUnchanged)
 {
-  node_->declare_parameter(
-    std::string(SOURCE_NAME) + ".exclusion_zones",
-    rclcpp::ParameterValue(std::vector<std::string>{}));
-
   auto source = std::make_shared<FakeSource>(node_, SOURCE_NAME, tf_buffer_, BASE_FRAME_ID);
-  ASSERT_TRUE(source->setupExclusionZones());
+  ASSERT_TRUE(source->setup());
 
   source->points_to_add = {{0.0, 0.0, 0.0, ""}, {5.0, 5.0, 0.0, ""}};
   std::vector<nav2_collision_monitor::Point> data;
   ASSERT_TRUE(source->getData(node_->now(), data));
   EXPECT_EQ(data.size(), 2u);
-}
-
-TEST_F(ExclusionZoneTester, SourceActivatePublishDeactivateForwardsToZones)
-{
-  declareZoneParams(ZONE_NAME, "polygon", true, ZONE_FRAME_ID);
-  node_->declare_parameter(std::string(ZONE_NAME) + ".points", rclcpp::ParameterValue(UNIT_SQUARE));
-  node_->declare_parameter(std::string(ZONE_NAME) + ".visualize", rclcpp::ParameterValue(true));
-  node_->declare_parameter(
-    std::string(SOURCE_NAME) + ".exclusion_zones",
-    rclcpp::ParameterValue(std::vector<std::string>{ZONE_NAME}));
-  broadcastTransform(ZONE_FRAME_ID, 0.0, 0.0);
-
-  geometry_msgs::msg::PolygonStamped::ConstSharedPtr received;
-  auto sub = node_->create_subscription<geometry_msgs::msg::PolygonStamped>(
-    std::string("~/") + ZONE_NAME,
-    [&](geometry_msgs::msg::PolygonStamped::ConstSharedPtr msg) {received = msg;},
-    nav2::qos::StandardTopicQoS());
-
-  auto source = std::make_shared<FakeSource>(node_, SOURCE_NAME, tf_buffer_, BASE_FRAME_ID);
-  ASSERT_TRUE(source->setupExclusionZones());
-
-  // The source must forward activate() / publishExclusionZones() to its zones,
-  // so the zone polygon is emitted (in the base frame) once activated.
-  source->activate();
-  rclcpp::Time start = node_->now();
-  while (rclcpp::ok() && !received &&
-    (node_->now() - start) < rclcpp::Duration::from_seconds(5.0))
-  {
-    source->publishExclusionZones();
-    executor_->spin_some();
-    std::this_thread::sleep_for(10ms);
-  }
-  source->deactivate();
-
-  ASSERT_NE(received, nullptr);
-  EXPECT_EQ(received->header.frame_id, std::string(BASE_FRAME_ID));
-  EXPECT_EQ(received->polygon.points.size(), 4u);
 }
 
 int main(int argc, char ** argv)

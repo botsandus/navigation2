@@ -62,24 +62,6 @@ bool Source::configure()
     throw std::runtime_error{"Failed to lock node"};
   }
 
-  // Configure the exclusion zones (if any) declared for this source
-  const std::vector<std::string> zone_names =
-    node->declare_or_get_parameter<std::vector<std::string>>(
-    source_name_ + ".exclusion_zones", std::vector<std::string>());
-
-  for (const std::string & zone_name : zone_names) {
-    auto zone = std::make_shared<ExclusionZone>(
-      node, zone_name, tf_buffer_, base_frame_id_, global_frame_id_,
-      transform_tolerance_, base_shift_correction_);
-    if (!zone->configure()) {
-      RCLCPP_ERROR(
-        logger_, "[%s]: Failed to configure exclusion zone '%s'",
-        source_name_.c_str(), zone_name.c_str());
-      return false;
-    }
-    exclusion_zones_.push_back(zone);
-  }
-
   // Add callback for dynamic parameters
   post_set_params_handler_ = node->add_post_set_parameters_callback(
     std::bind(
@@ -120,25 +102,10 @@ bool Source::getData(
   return true;
 }
 
-void Source::activate()
+void Source::setExclusionZones(
+  const std::vector<std::shared_ptr<ExclusionZone>> & exclusion_zones)
 {
-  for (const auto & zone : exclusion_zones_) {
-    zone->activate();
-  }
-}
-
-void Source::deactivate()
-{
-  for (const auto & zone : exclusion_zones_) {
-    zone->deactivate();
-  }
-}
-
-void Source::publishExclusionZones() const
-{
-  for (const auto & zone : exclusion_zones_) {
-    zone->publish();
-  }
+  exclusion_zones_ = exclusion_zones;
 }
 
 void Source::getCommonParameters(std::string & source_topic)

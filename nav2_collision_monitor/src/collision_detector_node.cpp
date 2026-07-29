@@ -35,6 +35,7 @@ CollisionDetector::~CollisionDetector()
 {
   polygons_.clear();
   sources_.clear();
+  exclusion_zones_.clear();
 }
 
 nav2::CallbackReturn
@@ -79,9 +80,9 @@ CollisionDetector::on_activate(const rclcpp_lifecycle::State & /*state*/)
     polygon->activate();
   }
 
-  // Activating sources
-  for (std::shared_ptr<Source> source : sources_) {
-    source->activate();
+  // Activating exclusion zone visualization publishers
+  for (const auto & [name, zone] : exclusion_zones_) {
+    zone->activate();
   }
 
   // Creating timer
@@ -113,9 +114,9 @@ CollisionDetector::on_deactivate(const rclcpp_lifecycle::State & /*state*/)
     polygon->deactivate();
   }
 
-  // Deactivating sources
-  for (std::shared_ptr<Source> source : sources_) {
-    source->deactivate();
+  // Deactivating exclusion zone visualization publishers
+  for (const auto & [name, zone] : exclusion_zones_) {
+    zone->deactivate();
   }
 
   // Destroying bond connection
@@ -135,6 +136,7 @@ CollisionDetector::on_cleanup(const rclcpp_lifecycle::State & /*state*/)
 
   polygons_.clear();
   sources_.clear();
+  exclusion_zones_.clear();
 
   tf_listener_.reset();
   tf_buffer_.reset();
@@ -166,6 +168,12 @@ bool CollisionDetector::getParameters()
     node->declare_or_get_parameter("source_timeout", 2.0));
   const bool base_shift_correction = node->declare_or_get_parameter("base_shift_correction", true);
   collision_points_marker_3d_ = node->declare_or_get_parameter("collision_points_marker_3d", false);
+
+  if (!configureExclusionZones(
+      base_frame_id_, odom_frame_id, transform_tolerance, base_shift_correction))
+  {
+    return false;
+  }
 
   if (!configureSources(
       base_frame_id_, odom_frame_id, transform_tolerance, source_timeout,
@@ -314,11 +322,77 @@ bool CollisionDetector::configureSources(
         return false;
       }
     }
+
+    // Resolve each source's exclusion-zone references against the node's pool
+    for (const auto & source : sources_) {
+      if (!setSourceExclusionZones(source, source->getSourceName())) {
+        return false;
+      }
+    }
   } catch (const std::exception & ex) {
     RCLCPP_ERROR(get_logger(), "Error while getting parameters: %s", ex.what());
     return false;
   }
 
+  return true;
+}
+
+bool CollisionDetector::configureExclusionZones(
+  const std::string & base_frame_id,
+  const std::string & global_frame_id,
+  const tf2::Duration & transform_tolerance,
+  const bool base_shift_correction)
+{
+  try {
+    auto node = shared_from_this();
+
+    const std::vector<std::string> zone_names =
+      node->declare_or_get_parameter<std::vector<std::string>>(
+      "exclusion_zones", std::vector<std::string>());
+    for (const std::string & zone_name : zone_names) {
+      auto zone = std::make_shared<ExclusionZone>(
+        node, zone_name, tf_buffer_, base_frame_id, global_frame_id,
+        transform_tolerance, base_shift_correction);
+      if (!zone->configure()) {
+        RCLCPP_ERROR(
+          get_logger(), "Failed to configure exclusion zone: %s", zone_name.c_str());
+        return false;
+      }
+      exclusion_zones_[zone_name] = zone;
+    }
+  } catch (const std::exception & ex) {
+    RCLCPP_ERROR(get_logger(), "Error while configuring exclusion zones: %s", ex.what());
+    return false;
+  }
+
+  return true;
+}
+
+bool CollisionDetector::setSourceExclusionZones(
+  const std::shared_ptr<Source> & source, const std::string & source_name)
+{
+  auto node = shared_from_this();
+
+  const std::vector<std::string> zone_names =
+    node->declare_or_get_parameter<std::vector<std::string>>(
+    source_name + ".exclusion_zones", std::vector<std::string>());
+
+  std::vector<std::shared_ptr<ExclusionZone>> zones;
+  zones.reserve(zone_names.size());
+  for (const std::string & zone_name : zone_names) {
+    const auto it = exclusion_zones_.find(zone_name);
+    if (it == exclusion_zones_.end()) {
+      RCLCPP_ERROR(
+        get_logger(),
+        "[%s]: Referenced exclusion zone '%s' is not defined in the node's "
+        "exclusion_zones parameter",
+        source_name.c_str(), zone_name.c_str());
+      return false;
+    }
+    zones.push_back(it->second);
+  }
+
+  source->setExclusionZones(zones);
   return true;
 }
 
@@ -462,8 +536,8 @@ void CollisionDetector::publishVisualizations() const
     }
   }
 
-  for (std::shared_ptr<Source> source : sources_) {
-    source->publishExclusionZones();
+  for (const auto & [name, zone] : exclusion_zones_) {
+    zone->publish();
   }
 }
 

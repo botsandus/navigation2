@@ -39,6 +39,7 @@
 #include "nav2_collision_monitor/circle.hpp"
 #include "nav2_collision_monitor/velocity_polygon.hpp"
 #include "nav2_collision_monitor/source.hpp"
+#include "nav2_collision_monitor/exclusion_zone.hpp"
 #include "nav2_collision_monitor/scan.hpp"
 #include "nav2_collision_monitor/pointcloud.hpp"
 #include "nav2_collision_monitor/range.hpp"
@@ -133,6 +134,29 @@ protected:
   bool configurePolygons(
     const std::string & base_frame_id,
     const tf2::Duration & transform_tolerance);
+  /**
+   * @brief Supporting routine creating and configuring all exclusion zones
+   * owned by the node. Sources reference these zones by name.
+   * @param base_frame_id Robot base frame ID
+   * @param global_frame_id Global (fixed) frame ID used to bridge zone lookups in time
+   * @param transform_tolerance Transform tolerance
+   * @param base_shift_correction Whether to correct the zone transform for base movement in time
+   * @return True if all exclusion zones were configured successfully, false otherwise
+   */
+  bool configureExclusionZones(
+    const std::string & base_frame_id,
+    const std::string & global_frame_id,
+    const tf2::Duration & transform_tolerance,
+    const bool base_shift_correction);
+  /**
+   * @brief Resolves a source's exclusion-zone name references against the
+   * node's zone pool and injects the resolved zones into the source.
+   * @param source Source to configure
+   * @param source_name Name of the source (parameter namespace)
+   * @return True if all referenced zones exist, false otherwise
+   */
+  bool setSourceExclusionZones(
+    const std::shared_ptr<Source> & source, const std::string & source_name);
   /**
    * @brief Supporting routine creating and configuring all data sources
    * @param base_frame_id Robot base frame ID
@@ -229,6 +253,10 @@ protected:
 
   /// @brief Data sources array
   std::vector<std::shared_ptr<Source>> sources_;
+
+  /// @brief Exclusion zones owned by the node, keyed by zone name. Sources
+  /// reference these shared objects by name to mask out their points.
+  std::unordered_map<std::string, std::shared_ptr<ExclusionZone>> exclusion_zones_;
 
   // Input/output speed controls
   /// @brief Input cmd_vel subscriber
