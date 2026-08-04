@@ -89,8 +89,13 @@ rclcpp::NodeOptions getChildNodeOptions(
   nav2::replaceOrAddArgument(
     new_arguments, "-p", "use_sim_time",
     "use_sim_time:=" + std::string(use_sim_time ? "true" : "false"));
-  return rclcpp::NodeOptions().use_intra_process_comms(use_intra_process_comms).arguments(
-    new_arguments);
+  // Forward the parent's parameter overrides: when composed, parameters given
+  // to the parent component arrive as overrides (never as global arguments),
+  // and without forwarding they cannot reach this internally created node.
+  return rclcpp::NodeOptions()
+         .use_intra_process_comms(use_intra_process_comms)
+         .parameter_overrides(parent_options.parameter_overrides())
+         .arguments(new_arguments);
 }
 
 Costmap2DROS::Costmap2DROS(
