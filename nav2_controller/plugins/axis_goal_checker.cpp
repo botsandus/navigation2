@@ -107,8 +107,7 @@ bool AxisGoalChecker::isGoalXYReached(
 
   // Check if we have at least 2 poses to determine path direction
   if (transformed_global_plan.poses.size() >= 2) {
-    // Use axis-aligned goal checking with path direction
-    // Find a pose before goal that is sufficiently far from goal
+    constexpr double min_direction_baseline = 1e-3;
     const geometry_msgs::msg::Pose * before_goal_pose_ptr = nullptr;
     double dx = 0.0;
     double dy = 0.0;
@@ -119,17 +118,17 @@ bool AxisGoalChecker::isGoalXYReached(
       dy = goal_pose.position.y - candidate_pose.position.y;
       double pose_distance = std::hypot(dx, dy);
 
-      if (pose_distance >= 1e-6) {
+      if (pose_distance >= min_direction_baseline) {
         before_goal_pose_ptr = &candidate_pose;
         break;
       }
     }
 
-    // If all poses are too close to goal, fall back to simple distance check
+    // If all poses are too close to the goal, fall back to simple distance check
     if (!before_goal_pose_ptr) {
       RCLCPP_DEBUG(
         logger_,
-        "All poses in path are too close to goal, falling back to simple distance check");
+        "All poses in path are too close to the goal, falling back to simple distance check");
       double distance_to_goal = std::hypot(
         goal_pose.position.x - query_pose.position.x,
         goal_pose.position.y - query_pose.position.y);
