@@ -101,9 +101,13 @@ bool AxisGoalChecker::isGoalXYReached(
 {
   std::lock_guard<std::mutex> lock_reinit(mutex_);
   // If the local plan length is longer than the tolerance, we skip the check
-  if (nav2_util::geometry_utils::calculate_path_length(transformed_global_plan) >
-    path_length_tolerance_)
-  {
+  const double path_length =
+    nav2_util::geometry_utils::calculate_path_length(transformed_global_plan);
+  if (path_length > path_length_tolerance_) {
+    RCLCPP_INFO(
+      logger_,
+      "[%s] Not reached: remaining path length %.3f m > path_length_tolerance %.3f m",
+      plugin_name_.c_str(), path_length, path_length_tolerance_);
     return false;
   }
 
@@ -128,13 +132,16 @@ bool AxisGoalChecker::isGoalXYReached(
 
     // If no pose is far enough back to estimate a direction, fall back to simple distance check
     if (!before_goal_pose_ptr) {
-      RCLCPP_DEBUG(
-        logger_,
-        "No plan pose far enough to estimate direction, falling back to simple distance check");
       double distance_to_goal = std::hypot(
         goal_pose.position.x - query_pose.position.x,
         goal_pose.position.y - query_pose.position.y);
       double tolerance = std::min(along_path_tolerance_, cross_track_tolerance_);
+      RCLCPP_INFO(
+        logger_,
+        "[%s] No plan pose >= %.3f m from goal to estimate direction, "
+        "falling back to simple distance check: distance_to_goal %.3f m vs tolerance %.3f m -> %s",
+        plugin_name_.c_str(), direction_estimation_distance_, distance_to_goal, tolerance,
+        distance_to_goal < tolerance ? "REACHED" : "not reached");
       return distance_to_goal < tolerance;
     }
 
@@ -147,6 +154,7 @@ bool AxisGoalChecker::isGoalXYReached(
     double distance_to_goal = std::hypot(robot_to_goal_dx, robot_to_goal_dy);
 
     if (distance_to_goal < 1e-6) {
+      RCLCPP_INFO(logger_, "[%s] REACHED: robot exactly at goal", plugin_name_.c_str());
       return true;  // Robot is at goal
     }
 
@@ -156,22 +164,33 @@ bool AxisGoalChecker::isGoalXYReached(
     double along_path_distance = distance_to_goal * cos(projection_angle);
     double cross_track_distance = distance_to_goal * sin(projection_angle);
 
-    if (is_overshoot_valid_) {
-      return along_path_distance < along_path_tolerance_ &&
-             fabs(cross_track_distance) < cross_track_tolerance_;
-    } else {
-      return fabs(along_path_distance) < along_path_tolerance_ &&
-             fabs(cross_track_distance) < cross_track_tolerance_;
-    }
+    const double effective_along = is_overshoot_valid_ ?
+      along_path_distance : fabs(along_path_distance);
+    const bool along_ok = effective_along < along_path_tolerance_;
+    const bool cross_ok = fabs(cross_track_distance) < cross_track_tolerance_;
+    RCLCPP_INFO(
+      logger_,
+      "[%s] distance_to_goal %.3f m, path_yaw %.3f rad, projection_angle %.3f rad | "
+      "along_path %.3f m (%stolerance %.3f, overshoot_valid=%d) -> %s | "
+      "cross_track %.3f m (tolerance %.3f) -> %s | %s",
+      plugin_name_.c_str(), distance_to_goal, end_of_path_yaw, projection_angle,
+      along_path_distance, is_overshoot_valid_ ? "signed, " : "abs, ", along_path_tolerance_,
+      is_overshoot_valid_, along_ok ? "OK" : "FAIL",
+      cross_track_distance, cross_track_tolerance_, cross_ok ? "OK" : "FAIL",
+      along_ok && cross_ok ? "REACHED" : "not reached");
+    return along_ok && cross_ok;
   } else {
     // Fallback: path has only 1 point, use simple distance check
-    RCLCPP_DEBUG(
-      logger_,
-      "Path has fewer than 2 poses, falling back to simple distance check");
     double distance_to_goal = std::hypot(
       goal_pose.position.x - query_pose.position.x,
       goal_pose.position.y - query_pose.position.y);
     double tolerance = std::min(along_path_tolerance_, cross_track_tolerance_);
+    RCLCPP_INFO(
+      logger_,
+      "[%s] Path has fewer than 2 poses, falling back to simple distance check: "
+      "distance_to_goal %.3f m vs tolerance %.3f m -> %s",
+      plugin_name_.c_str(), distance_to_goal, tolerance,
+      distance_to_goal < tolerance ? "REACHED" : "not reached");
     return distance_to_goal < tolerance;
   }
 }
