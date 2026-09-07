@@ -57,9 +57,11 @@ VectorObjectServer::on_configure(const rclcpp_lifecycle::State & /*state*/)
       global_frame_id_.c_str());
   }
 
-  map_pub_ = create_publisher<nav_msgs::msg::OccupancyGrid>(
-    map_topic_,
-    nav2::qos::LatchedPublisherQoS());
+  if (publish_map_) {
+    map_pub_ = create_publisher<nav_msgs::msg::OccupancyGrid>(
+      map_topic_,
+      nav2::qos::LatchedPublisherQoS());
+  }
 
   if (publish_shapes_) {
     shapes_pub_ = create_publisher<nav2_msgs::msg::VectorObjects>(
@@ -87,7 +89,9 @@ VectorObjectServer::on_activate(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Activating");
 
-  map_pub_->on_activate();
+  if (map_pub_) {
+    map_pub_->on_activate();
+  }
   if (shapes_pub_) {
     shapes_pub_->on_activate();
   }
@@ -113,7 +117,9 @@ VectorObjectServer::on_deactivate(const rclcpp_lifecycle::State & /*state*/)
   }
   process_map_ = false;
 
-  map_pub_->on_deactivate();
+  if (map_pub_) {
+    map_pub_->on_deactivate();
+  }
   if (shapes_pub_) {
     shapes_pub_->on_deactivate();
   }
@@ -169,7 +175,15 @@ bool VectorObjectServer::obtainParams()
       static_cast<int>(OverlayType::OVERLAY_SEQ)));
   update_frequency_ = nav2::declare_or_get_parameter(node, "update_frequency", 1.0);
   transform_tolerance_ = nav2::declare_or_get_parameter(node, "transform_tolerance", 0.1);
+  publish_map_ = nav2::declare_or_get_parameter(node, "publish_map", true);
   publish_shapes_ = nav2::declare_or_get_parameter(node, "publish_shapes", false);
+
+  if (!publish_map_ && !publish_shapes_) {
+    RCLCPP_WARN(
+      get_logger(),
+      "Both publish_map and publish_shapes are disabled: "
+      "the server will store shapes but publish nothing");
+  }
 
   // Shapes
   auto shape_names = nav2::declare_or_get_parameter(node, "shapes", std::vector<std::string>());
@@ -335,7 +349,7 @@ void VectorObjectServer::putVectorObjectsOnMap()
 
 void VectorObjectServer::publishMap()
 {
-  if (map_) {
+  if (map_ && map_pub_) {
     auto map = std::make_unique<nav_msgs::msg::OccupancyGrid>(*map_);
     map_pub_->publish(std::move(map));
   }
@@ -343,7 +357,7 @@ void VectorObjectServer::publishMap()
 
 void VectorObjectServer::processMap()
 {
-  if (!process_map_) {
+  if (!process_map_ || !publish_map_) {
     return;
   }
 
@@ -393,6 +407,12 @@ void VectorObjectServer::publishShapes()
 void VectorObjectServer::switchMapUpdate()
 {
   publishShapes();
+
+  // Shape-store-only mode: no grid rasterisation and no dynamic-frame
+  // republish timer — consumers (e.g. VectorObjectLayer) do their own TF
+  if (!publish_map_) {
+    return;
+  }
 
   for (auto shape : shapes_) {
     if (shape->getFrameID() != global_frame_id_ && !shape->getFrameID().empty()) {

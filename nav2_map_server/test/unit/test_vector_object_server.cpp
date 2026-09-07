@@ -32,6 +32,7 @@
 #include "nav2_msgs/srv/remove_shapes.hpp"
 #include "nav2_msgs/msg/polygon_object.hpp"
 #include "nav2_msgs/msg/circle_object.hpp"
+#include "nav2_msgs/msg/vector_objects.hpp"
 #include "nav2_ros_common/lifecycle_node.hpp"
 #include "nav2_util/occ_grid_utils.hpp"
 
@@ -1564,6 +1565,116 @@ TEST_F(Tester, testShapeOutsideMap) {
 
   // Verify that map did not corrupted after all false-manipulations
   verifyMap(true);
+}
+
+TEST_F(Tester, testPublishShapes)
+{
+  setVOServerParams();
+  vo_server_->declare_parameter("publish_shapes", rclcpp::ParameterValue(true));
+  vo_server_->set_parameter(rclcpp::Parameter("publish_shapes", true));
+
+  nav2_msgs::msg::VectorObjects::ConstSharedPtr shapes;
+  auto shapes_sub = vo_server_->create_subscription<nav2_msgs::msg::VectorObjects>(
+    std::string(vo_server_->get_name()) + "/shapes",
+    [&shapes](nav2_msgs::msg::VectorObjects::ConstSharedPtr msg) {shapes = msg;},
+    nav2::qos::LatchedSubscriptionQoS());
+
+  auto wait_shapes = [this, &shapes](const std::chrono::nanoseconds & timeout) -> bool {
+      rclcpp::Time start_time = vo_server_->now();
+      while (rclcpp::ok() && vo_server_->now() - start_time <= rclcpp::Duration(timeout)) {
+        if (shapes) {
+          return true;
+        }
+        executor_.spin_some();
+        std::this_thread::sleep_for(10ms);
+      }
+      return false;
+    };
+
+  vo_server_->start();
+
+  // Activation publishes the (initially empty) latched shape set
+  ASSERT_TRUE(wait_shapes(2s));
+  ASSERT_EQ(shapes->polygons.size(), 0u);
+  ASSERT_EQ(shapes->circles.size(), 0u);
+
+  // AddShapes must republish the shape set with the untransformed originals
+  auto add_shapes_msg = std::make_shared<nav2_msgs::srv::AddShapes::Request>();
+  auto po_msg = makePolygonObject(
+    std::vector<unsigned char>{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1});
+  auto co_msg = makeCircleObject(
+    std::vector<unsigned char>{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2});
+  add_shapes_msg->polygons.push_back(*po_msg);
+  add_shapes_msg->circles.push_back(*co_msg);
+  shapes.reset();
+  auto add_shapes_result =
+    sendRequest<nav2_msgs::srv::AddShapes>(add_shapes_client_, add_shapes_msg, 2s);
+  ASSERT_NE(add_shapes_result, nullptr);
+  ASSERT_TRUE(add_shapes_result->success);
+
+  ASSERT_TRUE(wait_shapes(2s));
+  ASSERT_EQ(shapes->polygons.size(), 1u);
+  auto p_check = std::make_shared<nav2_msgs::msg::PolygonObject>(shapes->polygons[0]);
+  comparePolygonObjects(p_check, po_msg);
+  ASSERT_EQ(shapes->circles.size(), 1u);
+  auto c_check = std::make_shared<nav2_msgs::msg::CircleObject>(shapes->circles[0]);
+  compareCircleObjects(c_check, co_msg);
+
+  // RemoveShapes must republish the now-empty shape set
+  auto remove_shapes_msg = std::make_shared<nav2_msgs::srv::RemoveShapes::Request>();
+  remove_shapes_msg->all_objects = true;
+  shapes.reset();
+  auto remove_shapes_result =
+    sendRequest<nav2_msgs::srv::RemoveShapes>(remove_shapes_client_, remove_shapes_msg, 2s);
+  ASSERT_NE(remove_shapes_result, nullptr);
+  ASSERT_TRUE(remove_shapes_result->success);
+
+  ASSERT_TRUE(wait_shapes(2s));
+  ASSERT_EQ(shapes->polygons.size(), 0u);
+  ASSERT_EQ(shapes->circles.size(), 0u);
+
+  vo_server_->stop();
+}
+
+TEST_F(Tester, testPublishMapDisabled)
+{
+  setVOServerParams();
+  vo_server_->declare_parameter("publish_map", rclcpp::ParameterValue(false));
+  vo_server_->set_parameter(rclcpp::Parameter("publish_map", false));
+  vo_server_->declare_parameter("publish_shapes", rclcpp::ParameterValue(true));
+  vo_server_->set_parameter(rclcpp::Parameter("publish_shapes", true));
+
+  nav2_msgs::msg::VectorObjects::ConstSharedPtr shapes;
+  auto shapes_sub = vo_server_->create_subscription<nav2_msgs::msg::VectorObjects>(
+    std::string(vo_server_->get_name()) + "/shapes",
+    [&shapes](nav2_msgs::msg::VectorObjects::ConstSharedPtr msg) {shapes = msg;},
+    nav2::qos::LatchedSubscriptionQoS());
+
+  vo_server_->start();
+
+  // Shape-store-only mode still serves CRUD and publishes shapes...
+  auto add_shapes_msg = std::make_shared<nav2_msgs::srv::AddShapes::Request>();
+  auto po_msg = makePolygonObject(
+    std::vector<unsigned char>{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1});
+  add_shapes_msg->polygons.push_back(*po_msg);
+  auto add_shapes_result =
+    sendRequest<nav2_msgs::srv::AddShapes>(add_shapes_client_, add_shapes_msg, 2s);
+  ASSERT_NE(add_shapes_result, nullptr);
+  ASSERT_TRUE(add_shapes_result->success);
+
+  rclcpp::Time start_time = vo_server_->now();
+  while (rclcpp::ok() && !shapes && vo_server_->now() - start_time <= rclcpp::Duration(2s)) {
+    executor_.spin_some();
+    std::this_thread::sleep_for(10ms);
+  }
+  ASSERT_NE(shapes, nullptr);
+  ASSERT_EQ(shapes->polygons.size(), 1u);
+
+  // ...but never publishes an OccupancyGrid (latched vo_map subscription
+  // would have delivered it during the spins above)
+  ASSERT_EQ(map_, nullptr);
+
+  vo_server_->stop();
 }
 
 int main(int argc, char ** argv)

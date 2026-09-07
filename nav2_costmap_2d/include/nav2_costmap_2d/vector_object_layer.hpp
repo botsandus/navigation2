@@ -117,12 +117,17 @@ private:
   nav2::Subscription<nav2_msgs::msg::VectorObjects>::SharedPtr shapes_sub_;
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr param_callback_handle_;
 
+  CombinationMethod combination_method_{CombinationMethod::Max};
+
   // Shape state (protected by data_mutex_)
   std::mutex data_mutex_;
   std::vector<nav2_msgs::msg::PolygonObject> polygons_;
   std::vector<nav2_msgs::msg::CircleObject> circles_;
   bool has_new_data_{false};
   bool buffer_valid_{false};
+  // Set when the layer is disabled at runtime, so the next updateBounds()
+  // reports the previous bbox once and stale cells are cleared from the master
+  bool pending_disable_clear_{false};
 
   // Previous reported bounding box (costmap frame) for stale-cell clearing.
   // Degenerate initial bounds so the first data does not include (0,0).

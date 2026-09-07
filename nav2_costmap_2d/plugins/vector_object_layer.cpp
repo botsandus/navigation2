@@ -22,7 +22,7 @@
 #include <vector>
 
 #include "nav2_costmap_2d/cost_values.hpp"
-#include "opencv2/imgproc.hpp"
+#include "nav2_util/polygon_fill_2d.hpp"
 #include "pluginlib/class_list_macros.hpp"
 #include "tf2/exceptions.hpp"
 
@@ -81,6 +81,10 @@ void VectorObjectLayer::onInitialize()
     getFullName("shapes_topic"), std::string{});
   const bool transient_local = node->declare_or_get_parameter(
     getFullName("shapes_topic_transient_local"), true);
+  combination_method_ = combination_method_from_int(
+    node->declare_or_get_parameter(
+      getFullName("combination_method"),
+      static_cast<int>(CombinationMethod::Max)));
 
   param_callback_handle_ = node->add_on_set_parameters_callback(
     std::bind(&VectorObjectLayer::dynamicParametersCallback, this, std::placeholders::_1));
@@ -98,6 +102,12 @@ void VectorObjectLayer::onInitialize()
       shapes_topic,
       std::bind(&VectorObjectLayer::shapesCallback, this, std::placeholders::_1),
       qos);
+  } else {
+    RCLCPP_WARN(
+      logger_,
+      "VectorObjectLayer(%s): no 'shapes_topic' configured — the layer stays "
+      "empty unless a subclass feeds it via setVectorObjects()",
+      name_.c_str());
   }
 
   // Non-shape cells must be NO_INFORMATION so that updateWithMax skips them,
@@ -139,12 +149,17 @@ rcl_interfaces::msg::SetParametersResult VectorObjectLayer::dynamicParametersCal
   for (const auto & param : parameters) {
     if (param.get_name() == getFullName("enabled")) {
       enabled_ = param.as_bool();
+      std::lock_guard<std::mutex> lock(data_mutex_);
       if (enabled_) {
-        std::lock_guard<std::mutex> lock(data_mutex_);
         has_new_data_ = true;
         buffer_valid_ = false;
+        pending_disable_clear_ = false;
+      } else {
+        pending_disable_clear_ = true;
       }
       current_ = false;
+    } else if (param.get_name() == getFullName("combination_method")) {
+      combination_method_ = combination_method_from_int(param.as_int());
     }
   }
 
@@ -231,25 +246,16 @@ bool VectorObjectLayer::lookupShapeTransforms(
 void VectorObjectLayer::rasterisePolygonFilled(
   const std::vector<double> & vx, const std::vector<double> & vy, unsigned char cost)
 {
-  // OpenCV rasterisation (interim — to be swapped for a shared nav2_util
-  // scanline before upstreaming). Overlapping shapes are painted in input
-  // order (last wins) rather than max-composed.
-  // Wrap the costmap buffer in a cv::Mat (no copy — shares memory).
-  cv::Mat grid(
-    static_cast<int>(getSizeInCellsY()), static_cast<int>(getSizeInCellsX()),
-    CV_8UC1, getCharMap());
-
-  std::vector<cv::Point> pts;
-  pts.reserve(vx.size());
-  for (std::size_t i = 0; i < vx.size(); ++i) {
-    pts.emplace_back(
-      static_cast<int>(std::lround(vx[i])),
-      static_cast<int>(std::lround(vy[i])));
-  }
-
-  const cv::Point * ppt[1] = {pts.data()};
-  int npt[1] = {static_cast<int>(pts.size())};
-  cv::fillPoly(grid, ppt, npt, 1, cv::Scalar(cost));
+  unsigned char * charmap = getCharMap();
+  const unsigned int size_x = getSizeInCellsX();
+  nav2_util::fillPolygon(
+    vx, vy, size_x, getSizeInCellsY(),
+    [charmap, size_x, cost](unsigned int y, unsigned int x_start, unsigned int x_end) {
+      unsigned char * row = charmap + static_cast<size_t>(y) * size_x;
+      for (unsigned int x = x_start; x <= x_end; ++x) {
+        row[x] = std::max(row[x] == NO_INFORMATION ? FREE_SPACE : row[x], cost);
+      }
+    });
 }
 
 void VectorObjectLayer::rasterisePolygonOutline(
@@ -257,33 +263,53 @@ void VectorObjectLayer::rasterisePolygonOutline(
 {
   // 1-cell-wide polygonal chain; to close an outline, the caller repeats
   // the first vertex.
-  cv::Mat grid(
-    static_cast<int>(getSizeInCellsY()), static_cast<int>(getSizeInCellsX()),
-    CV_8UC1, getCharMap());
-
-  std::vector<cv::Point> pts;
-  pts.reserve(vx.size());
-  for (std::size_t i = 0; i < vx.size(); ++i) {
-    pts.emplace_back(
-      static_cast<int>(std::lround(vx[i])),
-      static_cast<int>(std::lround(vy[i])));
+  unsigned char * charmap = getCharMap();
+  const unsigned int size_x = getSizeInCellsX();
+  const unsigned int size_y = getSizeInCellsY();
+  auto write_cell = [charmap, size_x, cost](unsigned int y, unsigned int x) {
+      unsigned char & cell = charmap[static_cast<size_t>(y) * size_x + x];
+      cell = std::max(cell == NO_INFORMATION ? FREE_SPACE : cell, cost);
+    };
+  for (std::size_t i = 0; i + 1 < vx.size(); ++i) {
+    nav2_util::forEachLineCell(vx[i], vy[i], vx[i + 1], vy[i + 1], size_x, size_y, write_cell);
   }
-
-  cv::polylines(grid, pts, /*isClosed=*/false, cv::Scalar(cost));
 }
 
 void VectorObjectLayer::rasteriseCircle(
   double cx, double cy, double radius_cells, bool fill, unsigned char cost)
 {
-  cv::Mat grid(
-    static_cast<int>(getSizeInCellsY()), static_cast<int>(getSizeInCellsX()),
-    CV_8UC1, getCharMap());
+  unsigned char * charmap = getCharMap();
+  const unsigned int size_x = getSizeInCellsX();
+  const unsigned int size_y = getSizeInCellsY();
 
-  const cv::Point center(
-    static_cast<int>(std::lround(cx)), static_cast<int>(std::lround(cy)));
-  cv::circle(
-    grid, center, static_cast<int>(std::lround(radius_cells)),
-    cv::Scalar(cost), fill ? cv::FILLED : 1);
+  if (fill) {
+    nav2_util::fillCircle(
+      cx, cy, radius_cells, size_x, size_y,
+      [charmap, size_x, cost](unsigned int y, unsigned int x_start, unsigned int x_end) {
+        unsigned char * row = charmap + static_cast<size_t>(y) * size_x;
+        for (unsigned int x = x_start; x <= x_end; ++x) {
+          row[x] = std::max(row[x] == NO_INFORMATION ? FREE_SPACE : row[x], cost);
+        }
+      });
+    return;
+  }
+
+  // Outline: draw the circle as a polygonal chain with ~1-cell-long segments
+  auto write_cell = [charmap, size_x, cost](unsigned int y, unsigned int x) {
+      unsigned char & cell = charmap[static_cast<size_t>(y) * size_x + x];
+      cell = std::max(cell == NO_INFORMATION ? FREE_SPACE : cell, cost);
+    };
+  const int segments = std::max(16, static_cast<int>(std::ceil(2.0 * M_PI * radius_cells)));
+  double px = cx + radius_cells;
+  double py = cy;
+  for (int s = 1; s <= segments; ++s) {
+    const double angle = 2.0 * M_PI * s / segments;
+    const double nx = cx + radius_cells * std::cos(angle);
+    const double ny = cy + radius_cells * std::sin(angle);
+    nav2_util::forEachLineCell(px, py, nx, ny, size_x, size_y, write_cell);
+    px = nx;
+    py = ny;
+  }
 }
 
 void VectorObjectLayer::rasteriseShapes(
@@ -377,6 +403,20 @@ void VectorObjectLayer::updateBounds(
   double * min_x, double * min_y, double * max_x, double * max_y)
 {
   if (!enabled_) {
+    std::lock_guard<std::mutex> lock(data_mutex_);
+    // Report the previous bbox once so cells written before disabling are
+    // cleared from the master (which only resets within the update region)
+    if (pending_disable_clear_) {
+      *min_x = std::min(*min_x, prev_min_x_);
+      *min_y = std::min(*min_y, prev_min_y_);
+      *max_x = std::max(*max_x, prev_max_x_);
+      *max_y = std::max(*max_y, prev_max_y_);
+      prev_min_x_ = std::numeric_limits<double>::max();
+      prev_min_y_ = std::numeric_limits<double>::max();
+      prev_max_x_ = std::numeric_limits<double>::lowest();
+      prev_max_y_ = std::numeric_limits<double>::lowest();
+      pending_disable_clear_ = false;
+    }
     return;
   }
 
@@ -446,7 +486,19 @@ void VectorObjectLayer::updateCosts(
     return;
   }
 
-  updateWithMax(master_grid, min_i, min_j, max_i, max_j);
+  switch (combination_method_) {
+    case CombinationMethod::Overwrite:
+      updateWithOverwrite(master_grid, min_i, min_j, max_i, max_j);
+      break;
+    case CombinationMethod::Max:
+      updateWithMax(master_grid, min_i, min_j, max_i, max_j);
+      break;
+    case CombinationMethod::MaxWithoutUnknownOverwrite:
+      updateWithMaxWithoutUnknownOverwrite(master_grid, min_i, min_j, max_i, max_j);
+      break;
+    default:  // Nothing
+      break;
+  }
   current_ = true;
 }
 

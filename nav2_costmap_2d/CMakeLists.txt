@@ -13,7 +13,6 @@ find_package(nav2_msgs REQUIRED)
 find_package(nav2_util REQUIRED)
 find_package(nav2_voxel_grid REQUIRED)
 find_package(nav_msgs REQUIRED)
-find_package(OpenCV REQUIRED COMPONENTS imgproc)
 find_package(pluginlib REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_lifecycle REQUIRED)
@@ -116,7 +115,6 @@ endif()
 
 target_link_libraries(layers PRIVATE
   pluginlib::pluginlib
-  opencv_imgproc
 )
 
 add_library(filters SHARED

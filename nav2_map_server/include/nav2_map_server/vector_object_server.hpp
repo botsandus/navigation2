@@ -232,6 +232,8 @@ protected:
   /// @brief Output map publisher
   nav2::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr map_pub_;
 
+  /// @brief Whether to rasterise shapes and publish the OccupancyGrid on map_topic
+  bool publish_map_{true};
   /// @brief Whether to publish the shape set on the '~/shapes' topic
   bool publish_shapes_{false};
   /// @brief Shape set publisher (latched)
