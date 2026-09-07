@@ -22,7 +22,7 @@
 #include <vector>
 
 #include "nav2_costmap_2d/cost_values.hpp"
-#include "nav2_util/raytrace_line_2d.hpp"
+#include "opencv2/imgproc.hpp"
 #include "pluginlib/class_list_macros.hpp"
 #include "tf2/exceptions.hpp"
 
@@ -33,27 +33,6 @@ namespace nav2_costmap_2d
 
 namespace
 {
-
-/// @brief Write a cost into a cell: overwrite NO_INFORMATION, otherwise keep the max.
-inline void writeCost(unsigned char & cell, unsigned char cost)
-{
-  if (cell == NO_INFORMATION || cost > cell) {
-    cell = cost;
-  }
-}
-
-/// @brief Functor for nav2_util::raytraceLine applying writeCost per cell.
-class WriteCostAction
-{
-public:
-  WriteCostAction(unsigned char * costmap, unsigned char cost)
-  : costmap_(costmap), cost_(cost) {}
-  inline void operator()(unsigned int offset) {writeCost(costmap_[offset], cost_);}
-
-private:
-  unsigned char * costmap_;
-  unsigned char cost_;
-};
 
 struct Transform2D
 {
@@ -217,7 +196,7 @@ bool VectorObjectLayer::lookupShapeTransforms(
   const std::string global_frame = layered_costmap_->getGlobalFrameID();
 
   auto resolve = [&](const std::string & frame,
-      geometry_msgs::msg::TransformStamped & tf_stamped) -> bool {
+    geometry_msgs::msg::TransformStamped & tf_stamped) -> bool {
       if (frame.empty() || frame == global_frame) {
         tf_stamped = identityTransform();
         return true;
@@ -252,139 +231,59 @@ bool VectorObjectLayer::lookupShapeTransforms(
 void VectorObjectLayer::rasterisePolygonFilled(
   const std::vector<double> & vx, const std::vector<double> & vy, unsigned char cost)
 {
-  // Scanline fill in continuous cell coordinates, matching the Vector Object
-  // server's rasterisation semantics (half-open Y interval, multiply-then-
-  // divide intersection, ceil-based span bounds).
-  const std::size_t n = vx.size();
-  const int map_w = static_cast<int>(getSizeInCellsX());
-  const int map_h = static_cast<int>(getSizeInCellsY());
-  const double map_w_d = static_cast<double>(map_w - 1);
-  const double map_h_d = static_cast<double>(map_h - 1);
-  unsigned char * charmap = getCharMap();
+  // OpenCV rasterisation (interim — to be swapped for a shared nav2_util
+  // scanline before upstreaming). Overlapping shapes are painted in input
+  // order (last wins) rather than max-composed.
+  // Wrap the costmap buffer in a cv::Mat (no copy — shares memory).
+  cv::Mat grid(
+    static_cast<int>(getSizeInCellsY()), static_cast<int>(getSizeInCellsX()),
+    CV_8UC1, getCharMap());
 
-  double y_min_d = std::ceil(*std::min_element(vy.begin(), vy.end()));
-  double y_max_d = std::floor(*std::max_element(vy.begin(), vy.end()));
-  y_min_d = std::clamp(y_min_d, 0.0, map_h_d);
-  y_max_d = std::clamp(y_max_d, 0.0, map_h_d);
-  const int y_min = static_cast<int>(y_min_d);
-  const int y_max = static_cast<int>(y_max_d);
-  if (y_min > y_max) {
-    return;  // no visible extent in Y
+  std::vector<cv::Point> pts;
+  pts.reserve(vx.size());
+  for (std::size_t i = 0; i < vx.size(); ++i) {
+    pts.emplace_back(
+      static_cast<int>(std::lround(vx[i])),
+      static_cast<int>(std::lround(vy[i])));
   }
 
-  struct EdgeInfo
-  {
-    double y_lo, y_hi, xi, yi, dx, dy;
-  };
-  std::vector<EdgeInfo> edges;
-  edges.reserve(n);
-  for (std::size_t i = 0; i < n; i++) {
-    const std::size_t j = (i + 1) % n;
-    const double y0 = vy[i], y1 = vy[j];
-    const double x0 = vx[i], x1 = vx[j];
-    if (y0 == y1) {
-      continue;  // horizontal edge never contributes an intersection
-    }
-    EdgeInfo e;
-    if (y0 < y1) {
-      e.y_lo = y0; e.y_hi = y1; e.xi = x0; e.yi = y0; e.dx = x1 - x0; e.dy = y1 - y0;
-    } else {
-      e.y_lo = y1; e.y_hi = y0; e.xi = x1; e.yi = y1; e.dx = x0 - x1; e.dy = y0 - y1;
-    }
-    edges.push_back(e);
-  }
-
-  std::vector<double> xs;
-  xs.reserve(edges.size());
-
-  for (int y = y_min; y <= y_max; y++) {
-    xs.clear();
-    for (const auto & e : edges) {
-      if (y <= e.y_lo || y > e.y_hi) {
-        continue;
-      }
-      xs.push_back(e.xi + (y - e.yi) * e.dx / e.dy);
-    }
-    std::sort(xs.begin(), xs.end());
-
-    for (std::size_t k = 0; k + 1 < xs.size(); k += 2) {
-      const double a = std::ceil(xs[k]);
-      const double b = std::ceil(xs[k + 1]) - 1.0;
-      if (b < 0.0 || a > map_w_d) {
-        continue;
-      }
-      const int x_start = static_cast<int>(std::max(a, 0.0));
-      const int x_end = static_cast<int>(std::min(b, map_w_d));
-      if (x_start > x_end) {
-        continue;
-      }
-      const unsigned int row_offset = static_cast<unsigned int>(y) * getSizeInCellsX();
-      for (int x = x_start; x <= x_end; x++) {
-        writeCost(charmap[row_offset + static_cast<unsigned int>(x)], cost);
-      }
-    }
-  }
+  const cv::Point * ppt[1] = {pts.data()};
+  int npt[1] = {static_cast<int>(pts.size())};
+  cv::fillPoly(grid, ppt, npt, 1, cv::Scalar(cost));
 }
 
 void VectorObjectLayer::rasterisePolygonOutline(
   const std::vector<double> & vx, const std::vector<double> & vy, unsigned char cost)
 {
-  // Draw the polygonal chain segment by segment (vertices clamped to the
-  // map). To close an outline, the caller repeats the first vertex.
-  const int map_w = static_cast<int>(getSizeInCellsX());
-  const int map_h = static_cast<int>(getSizeInCellsY());
-  unsigned char * charmap = getCharMap();
-  WriteCostAction action(charmap, cost);
+  // 1-cell-wide polygonal chain; to close an outline, the caller repeats
+  // the first vertex.
+  cv::Mat grid(
+    static_cast<int>(getSizeInCellsY()), static_cast<int>(getSizeInCellsX()),
+    CV_8UC1, getCharMap());
 
-  auto to_cell = [](double v, int max_cell) -> unsigned int {
-      return static_cast<unsigned int>(
-        std::clamp(std::lround(v), 0L, static_cast<int64_t>(max_cell)));
-    };
-
-  for (std::size_t i = 0; i + 1 < vx.size(); i++) {
-    nav2_util::raytraceLine(
-      action,
-      to_cell(vx[i], map_w - 1), to_cell(vy[i], map_h - 1),
-      to_cell(vx[i + 1], map_w - 1), to_cell(vy[i + 1], map_h - 1),
-      getSizeInCellsX());
+  std::vector<cv::Point> pts;
+  pts.reserve(vx.size());
+  for (std::size_t i = 0; i < vx.size(); ++i) {
+    pts.emplace_back(
+      static_cast<int>(std::lround(vx[i])),
+      static_cast<int>(std::lround(vy[i])));
   }
+
+  cv::polylines(grid, pts, /*isClosed=*/false, cv::Scalar(cost));
 }
 
 void VectorObjectLayer::rasteriseCircle(
   double cx, double cy, double radius_cells, bool fill, unsigned char cost)
 {
-  const int map_w = static_cast<int>(getSizeInCellsX());
-  const int map_h = static_cast<int>(getSizeInCellsY());
-  unsigned char * charmap = getCharMap();
+  cv::Mat grid(
+    static_cast<int>(getSizeInCellsY()), static_cast<int>(getSizeInCellsX()),
+    CV_8UC1, getCharMap());
 
-  if (fill) {
-    // Row-span fill in continuous cell coordinates
-    const int y0 = std::max(static_cast<int>(std::ceil(cy - radius_cells)), 0);
-    const int y1 = std::min(static_cast<int>(std::floor(cy + radius_cells)), map_h - 1);
-    for (int y = y0; y <= y1; y++) {
-      const double t = radius_cells * radius_cells - (y - cy) * (y - cy);
-      if (t < 0.0) {
-        continue;
-      }
-      const double dx = std::sqrt(t);
-      const int x0 = std::max(static_cast<int>(std::ceil(cx - dx)), 0);
-      const int x1 = std::min(static_cast<int>(std::floor(cx + dx)), map_w - 1);
-      const unsigned int row_offset = static_cast<unsigned int>(y) * getSizeInCellsX();
-      for (int x = x0; x <= x1; x++) {
-        writeCost(charmap[row_offset + static_cast<unsigned int>(x)], cost);
-      }
-    }
-  } else {
-    // Approximate the outline with a 36-segment closed chain
-    constexpr int kSegments = 36;
-    std::vector<double> vx(kSegments + 1), vy(kSegments + 1);
-    for (int s = 0; s <= kSegments; s++) {
-      const double angle = 2.0 * M_PI * s / kSegments;
-      vx[s] = cx + radius_cells * std::cos(angle);
-      vy[s] = cy + radius_cells * std::sin(angle);
-    }
-    rasterisePolygonOutline(vx, vy, cost);
-  }
+  const cv::Point center(
+    static_cast<int>(std::lround(cx)), static_cast<int>(std::lround(cy)));
+  cv::circle(
+    grid, center, static_cast<int>(std::lround(radius_cells)),
+    cv::Scalar(cost), fill ? cv::FILLED : 1);
 }
 
 void VectorObjectLayer::rasteriseShapes(
