@@ -61,6 +61,12 @@ VectorObjectServer::on_configure(const rclcpp_lifecycle::State & /*state*/)
     map_topic_,
     nav2::qos::LatchedPublisherQoS());
 
+  if (publish_shapes_) {
+    shapes_pub_ = create_publisher<nav2_msgs::msg::VectorObjects>(
+      "~/shapes",
+      nav2::qos::LatchedPublisherQoS());
+  }
+
   add_shapes_service_ = create_service<nav2_msgs::srv::AddShapes>(
     "~/add_shapes",
     std::bind(&VectorObjectServer::addShapesCallback, this, _1, _2, _3));
@@ -82,6 +88,9 @@ VectorObjectServer::on_activate(const rclcpp_lifecycle::State & /*state*/)
   RCLCPP_INFO(get_logger(), "Activating");
 
   map_pub_->on_activate();
+  if (shapes_pub_) {
+    shapes_pub_->on_activate();
+  }
 
   // Trigger map to be published
   process_map_ = true;
@@ -105,6 +114,9 @@ VectorObjectServer::on_deactivate(const rclcpp_lifecycle::State & /*state*/)
   process_map_ = false;
 
   map_pub_->on_deactivate();
+  if (shapes_pub_) {
+    shapes_pub_->on_deactivate();
+  }
 
   // Destroying bond connection
   destroyBond();
@@ -123,6 +135,7 @@ VectorObjectServer::on_cleanup(const rclcpp_lifecycle::State & /*state*/)
 
   map_pub_.reset();
   map_.reset();
+  shapes_pub_.reset();
 
   shapes_.clear();
 
@@ -156,6 +169,7 @@ bool VectorObjectServer::obtainParams()
       static_cast<int>(OverlayType::OVERLAY_SEQ)));
   update_frequency_ = nav2::declare_or_get_parameter(node, "update_frequency", 1.0);
   transform_tolerance_ = nav2::declare_or_get_parameter(node, "transform_tolerance", 0.1);
+  publish_shapes_ = nav2::declare_or_get_parameter(node, "publish_shapes", false);
 
   // Shapes
   auto shape_names = nav2::declare_or_get_parameter(node, "shapes", std::vector<std::string>());
@@ -354,8 +368,32 @@ void VectorObjectServer::processMap()
   publishMap();
 }
 
+void VectorObjectServer::publishShapes()
+{
+  if (!shapes_pub_ || !shapes_pub_->is_activated()) {
+    return;
+  }
+
+  auto msg = std::make_unique<nav2_msgs::msg::VectorObjects>();
+  for (auto shape : shapes_) {
+    switch (shape->getType()) {
+      case POLYGON:
+        msg->polygons.push_back(*(std::static_pointer_cast<Polygon>(shape)->getParams()));
+        break;
+      case CIRCLE:
+        msg->circles.push_back(*(std::static_pointer_cast<Circle>(shape)->getParams()));
+        break;
+      default:
+        RCLCPP_WARN(get_logger(), "Unknown shape type (UUID: %s)", shape->getUUID().c_str());
+    }
+  }
+  shapes_pub_->publish(std::move(msg));
+}
+
 void VectorObjectServer::switchMapUpdate()
 {
+  publishShapes();
+
   for (auto shape : shapes_) {
     if (shape->getFrameID() != global_frame_id_ && !shape->getFrameID().empty()) {
       if (!map_timer_) {

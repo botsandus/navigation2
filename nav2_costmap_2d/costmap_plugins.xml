@@ -27,6 +27,9 @@
     <class type="nav2_costmap_2d::PluginContainerLayer" base_class_type="nav2_costmap_2d::Layer">
       <description>Plugin to group different layers within the same costmap</description>
     </class>
+    <class type="nav2_costmap_2d::VectorObjectLayer" base_class_type="nav2_costmap_2d::Layer">
+      <description>Rasterises vector objects (polygons, circles) directly into the costmap, in-process.</description>
+    </class>
   </library>
 
   <library path="filters">

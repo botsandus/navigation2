@@ -27,6 +27,7 @@
 #include "nav2_msgs/srv/add_shapes.hpp"
 #include "nav2_msgs/srv/remove_shapes.hpp"
 #include "nav2_msgs/srv/get_shapes.hpp"
+#include "nav2_msgs/msg/vector_objects.hpp"
 #include "nav2_ros_common/lifecycle_node.hpp"
 
 #include "nav2_map_server/vector_object_shapes.hpp"
@@ -128,6 +129,14 @@ protected:
   void publishMap();
 
   /**
+   * @brief Publishes the current shape set as nav2_msgs/VectorObjects
+   * (untransformed originals with their own frame_ids), for consumers that
+   * rasterise shapes themselves (e.g. VectorObjectLayer). No-op unless the
+   * 'publish_shapes' parameter is enabled.
+   */
+  void publishShapes();
+
+  /**
    * @brief Calculates new map sizes, updates map, processes all vector objects on it
    * and publishes output map one time
    */
@@ -222,6 +231,11 @@ protected:
   std::string map_topic_;
   /// @brief Output map publisher
   nav2::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr map_pub_;
+
+  /// @brief Whether to publish the shape set on the '~/shapes' topic
+  bool publish_shapes_{false};
+  /// @brief Shape set publisher (latched)
+  nav2::Publisher<nav2_msgs::msg::VectorObjects>::SharedPtr shapes_pub_;
 };
 
 }  // namespace nav2_map_server

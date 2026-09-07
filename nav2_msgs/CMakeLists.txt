@@ -43,6 +43,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/GetCosts.srv"
   "msg/PolygonObject.msg"
   "msg/CircleObject.msg"
+  "msg/VectorObjects.msg"
   "msg/ExclusionZoneDescription.msg"
   "srv/GetCostmap.srv"
   "srv/IsPathValid.srv"
