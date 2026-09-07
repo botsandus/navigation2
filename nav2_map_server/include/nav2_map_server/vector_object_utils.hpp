@@ -16,15 +16,14 @@
 #define NAV2_MAP_SERVER__VECTOR_OBJECT_UTILS_HPP_
 
 #include <uuid/uuid.h>
+
+#include <cstdint>
 #include <stdexcept>
 #include <string>
 
-#include "rclcpp/rclcpp.hpp"
-#include "nav_msgs/msg/occupancy_grid.hpp"
-
-#include "nav2_ros_common/lifecycle_node.hpp"
-#include "nav2_ros_common/node_utils.hpp"
+#include "nav2_util/occ_grid_utils.hpp"
 #include "nav2_util/occ_grid_values.hpp"
+#include "nav_msgs/msg/occupancy_grid.hpp"
 
 namespace nav2_map_server
 {

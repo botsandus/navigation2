@@ -15,21 +15,21 @@
 #ifndef NAV2_MAP_SERVER__VECTOR_OBJECT_SHAPES_HPP_
 #define NAV2_MAP_SERVER__VECTOR_OBJECT_SHAPES_HPP_
 
+#include <cstdint>
 #include <memory>
+#include <stdexcept>
 #include <string>
 
-#include "rclcpp/rclcpp.hpp"
-#include "geometry_msgs/msg/polygon.hpp"
 #include "geometry_msgs/msg/point32.hpp"
-#include "nav_msgs/msg/occupancy_grid.hpp"
-
-#include "nav2_ros_common/tf2_factories.hpp"
-
-#include "nav2_msgs/msg/polygon_object.hpp"
-#include "nav2_msgs/msg/circle_object.hpp"
-#include "nav2_ros_common/lifecycle_node.hpp"
-
+#include "geometry_msgs/msg/polygon.hpp"
 #include "nav2_map_server/vector_object_utils.hpp"
+#include "nav2_msgs/msg/circle_object.hpp"
+#include "nav2_msgs/msg/polygon_object.hpp"
+#include "nav2_ros_common/lifecycle_node.hpp"
+#include "nav2_ros_common/tf2_factories.hpp"
+#include "nav2_util/occ_grid_values.hpp"
+#include "nav_msgs/msg/occupancy_grid.hpp"
+#include "rclcpp/rclcpp.hpp"
 
 namespace nav2_map_server
 {
@@ -155,6 +155,15 @@ public:
   virtual void putBorders(
     nav_msgs::msg::OccupancyGrid::SharedPtr map, const OverlayType overlay_type) = 0;
 
+  /**
+   * @brief Fills the shape interior on the map using an optimized scanline algorithm.
+   * Empty virtual method intended to be used in child implementations.
+   * @param map Output map pointer
+   * @param overlay_type Overlay type
+   */
+  virtual void putFilled(
+    nav_msgs::msg::OccupancyGrid::SharedPtr map, const OverlayType overlay_type) = 0;
+
 protected:
   /// @brief Type of shape
   ShapeType type_;
@@ -259,6 +268,14 @@ public:
    * @param overlay_type Overlay type
    */
   void putBorders(nav_msgs::msg::OccupancyGrid::SharedPtr map, const OverlayType overlay_type);
+
+  /**
+   * @brief Fills the polygon interior on the map using a scanline algorithm
+   * (equivalent to OpenCV's cv::fillPoly) without an external OpenCV dependency.
+   * @param map Output map pointer
+   * @param overlay_type Overlay type
+   */
+  void putFilled(nav_msgs::msg::OccupancyGrid::SharedPtr map, const OverlayType overlay_type);
 
 protected:
   /**
@@ -369,6 +386,15 @@ public:
    * @param overlay_type Overlay type
    */
   void putBorders(nav_msgs::msg::OccupancyGrid::SharedPtr map, const OverlayType overlay_type);
+
+  /**
+   * @brief Fills the circle interior on the map using a continuous coordinate scanline
+   * algorithm. Fills horizontal spans per scanline, preserving sub-cell precision
+   * and yielding O(r) work instead of O(r^2) bounding-box iteration.
+   * @param map Output map pointer
+   * @param overlay_type Overlay type
+   */
+  void putFilled(nav_msgs::msg::OccupancyGrid::SharedPtr map, const OverlayType overlay_type);
 
 protected:
   /**
