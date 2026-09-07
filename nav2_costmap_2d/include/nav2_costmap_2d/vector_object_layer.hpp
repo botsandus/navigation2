@@ -106,9 +106,11 @@ private:
     const std::vector<geometry_msgs::msg::TransformStamped> & circle_tfs,
     double & bbox_min_x, double & bbox_min_y, double & bbox_max_x, double & bbox_max_y);
 
-  void rasterisePolygonFilled(const std::vector<double> & vx, const std::vector<double> & vy,
+  void rasterisePolygonFilled(
+    const std::vector<double> & vx, const std::vector<double> & vy,
     unsigned char cost);
-  void rasterisePolygonOutline(const std::vector<double> & vx, const std::vector<double> & vy,
+  void rasterisePolygonOutline(
+    const std::vector<double> & vx, const std::vector<double> & vy,
     unsigned char cost);
   void rasteriseCircle(double cx, double cy, double radius_cells, bool fill, unsigned char cost);
 
