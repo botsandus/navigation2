@@ -17,6 +17,8 @@
 
 #include <memory>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "rclcpp/rclcpp.hpp"
 #include "geometry_msgs/msg/polygon.hpp"
@@ -147,6 +149,24 @@ public:
   virtual bool isPointInside(const double px, const double py) const = 0;
 
   /**
+   * @brief Gets X-intervals covered by the shape on the horizontal line y = py.
+   * Intervals may be slightly wider than the shape, but never narrower.
+   * Empty virtual method intended to be used in child implementations
+   * @param py Y-coordinate of the line
+   * @param spans Output [begin, end) intervals in world coordinates, sorted by X
+   */
+  virtual void getRowSpans(
+    const double py, std::vector<std::pair<double, double>> & spans) const = 0;
+
+  /**
+   * @brief Puts filled shape on map
+   * @param map Output map pointer
+   * @param overlay_type Overlay type
+   * @return False if shape boundaries can not be converted to map coordinates
+   */
+  bool putFill(nav_msgs::msg::OccupancyGrid::SharedPtr map, const OverlayType overlay_type);
+
+  /**
    * @brief Puts shape borders on map.
    * Empty virtual method intended to be used in child implementations
    * @param map Output map pointer
@@ -252,6 +272,13 @@ public:
    * @return True if given point inside the shape
    */
   bool isPointInside(const double px, const double py) const;
+
+  /**
+   * @brief Gets X-intervals covered by the polygon on the horizontal line y = py
+   * @param py Y-coordinate of the line
+   * @param spans Output [begin, end) intervals in world coordinates, sorted by X
+   */
+  void getRowSpans(const double py, std::vector<std::pair<double, double>> & spans) const;
 
   /**
    * @brief Puts shape borders on map.
@@ -362,6 +389,13 @@ public:
    * @return True if given point inside the shape
    */
   bool isPointInside(const double px, const double py) const;
+
+  /**
+   * @brief Gets X-interval covered by the circle on the horizontal line y = py
+   * @param py Y-coordinate of the line
+   * @param spans Output [begin, end) interval in world coordinates, empty if the line misses
+   */
+  void getRowSpans(const double py, std::vector<std::pair<double, double>> & spans) const;
 
   /**
    * @brief Puts shape borders on map.
