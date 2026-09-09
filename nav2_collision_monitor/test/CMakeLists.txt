@@ -1,4 +1,8 @@
 # Kinematics test
+nav2_add_gtest(triggering_cloud_test triggering_cloud_test.cpp)
+target_include_directories(triggering_cloud_test PRIVATE ../include)
+target_link_libraries(triggering_cloud_test sensor_msgs::sensor_msgs)
+
 nav2_add_gtest(kinematics_test kinematics_test.cpp)
 target_link_libraries(kinematics_test
   ${monitor_library_name}
