@@ -38,6 +38,7 @@
 #ifndef NAV2_COSTMAP_2D__STATIC_LAYER_HPP_
 #define NAV2_COSTMAP_2D__STATIC_LAYER_HPP_
 
+#include <array>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -48,6 +49,7 @@
 #include "nav2_costmap_2d/layered_costmap.hpp"
 #include "nav_msgs/msg/occupancy_grid.hpp"
 #include "nav2_costmap_2d/footprint.hpp"
+#include "std_msgs/msg/header.hpp"
 
 namespace nav2_costmap_2d
 {
@@ -135,6 +137,23 @@ protected:
   void processMap(const nav_msgs::msg::OccupancyGrid & new_map);
 
   /**
+   * @brief Whether this layer keeps its own grid geometry instead of sharing the master's.
+   * Rolling costmaps are always overlays; non-rolling ones when resize_master is false.
+   */
+  bool isOverlay() const;
+
+  /**
+   * @brief Report current and previous overlay extents in the costmap frame
+   */
+  void updateOverlayBounds(double * min_x, double * min_y, double * max_x, double * max_y);
+
+  /**
+   * @brief Sample the overlay at each master cell center in the window and merge the costs
+   */
+  void updateOverlayCosts(
+    nav2_costmap_2d::Costmap2D & master_grid, int min_i, int min_j, int max_i, int max_j);
+
+  /**
    * @brief  Callback to update the costmap's map from the map_server
    * @param new_map The map to put into the costmap. The origin of the new
    * map along with its size will determine what parts of the costmap's
@@ -146,6 +165,18 @@ protected:
    * with an update in a particular area of the map
    */
   void incomingUpdate(map_msgs::msg::OccupancyGridUpdate::ConstSharedPtr update);
+
+  /**
+   * @brief Callback for the source readiness barrier, if source_ready_topic is set
+   * @param barrier Maps stamped before this are known not to carry the source's latest
+   * state; a zero stamp means the source has nothing outstanding
+   */
+  void incomingSourceBarrier(std_msgs::msg::Header::ConstSharedPtr barrier);
+
+  /**
+   * @brief Whether the applied map is known to carry the source's latest state
+   */
+  bool isSourceReady() const;
 
   /**
    * @brief Interpret the value in the static map given on the topic to
@@ -197,6 +228,10 @@ protected:
   std::string map_frame_;  /// @brief frame that map is located in
 
   bool has_updated_data_{false};
+  bool resize_master_{true};
+  bool previous_overlay_bounds_valid_{false};
+  std::array<double, 4> previous_overlay_bounds_{};
+  tf2::Transform global_to_overlay_;
 
   unsigned int x_{0};
   unsigned int y_{0};
@@ -205,9 +240,11 @@ protected:
 
   nav2::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr map_sub_;
   nav2::Subscription<map_msgs::msg::OccupancyGridUpdate>::SharedPtr map_update_sub_;
+  nav2::Subscription<std_msgs::msg::Header>::SharedPtr source_ready_sub_;
 
   // Parameters
   std::string map_topic_;
+  std::string source_ready_topic_;
   bool map_subscribe_transient_local_;
   bool subscribe_to_updates_;
   bool track_unknown_space_;
@@ -218,6 +255,8 @@ protected:
   bool trinary_costmap_;
   bool map_received_{false};
   bool map_received_in_update_bounds_{false};
+  rclcpp::Time source_barrier_{0, 0, RCL_ROS_TIME};
+  rclcpp::Time applied_map_stamp_{0, 0, RCL_ROS_TIME};
   tf2::Duration transform_tolerance_;
   nav_msgs::msg::OccupancyGrid::ConstSharedPtr map_buffer_;
   // Dynamic parameters handler
