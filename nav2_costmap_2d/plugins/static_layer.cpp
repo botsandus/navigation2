@@ -104,6 +104,16 @@ StaticLayer::onInitialize()
       map_topic_ + "_updates",
       std::bind(&StaticLayer::incomingUpdate, this, std::placeholders::_1));
   }
+
+  if (!source_ready_topic_.empty()) {
+    RCLCPP_INFO(
+      logger_, "Gating currency on the source readiness topic (%s)",
+      source_ready_topic_.c_str());
+    source_ready_sub_ = node->create_subscription<std_msgs::msg::Header>(
+      source_ready_topic_,
+      std::bind(&StaticLayer::incomingSourceBarrier, this, std::placeholders::_1),
+      nav2::qos::LatchedSubscriptionQoS());
+  }
 }
 
 void
@@ -164,6 +174,11 @@ StaticLayer::getParameters()
   map_topic_ = node->declare_or_get_parameter(
     name_ + "." + "map_topic", std::string("map"));
   map_topic_ = joinWithParentNamespace(map_topic_);
+  source_ready_topic_ = node->declare_or_get_parameter(
+    name_ + "." + "source_ready_topic", std::string(""));
+  if (!source_ready_topic_.empty()) {
+    source_ready_topic_ = joinWithParentNamespace(source_ready_topic_);
+  }
   map_subscribe_transient_local_ = node->declare_or_get_parameter(
     name_ + "." + "map_subscribe_transient_local", true);
   node->get_parameter("track_unknown_space", track_unknown_space_);
@@ -181,6 +196,7 @@ StaticLayer::getParameters()
   lethal_threshold_ = std::max(std::min(temp_lethal_threshold, 100), 0);
   map_received_ = false;
   map_received_in_update_bounds_ = false;
+  applied_map_stamp_ = rclcpp::Time(0, 0, RCL_ROS_TIME);
 
   transform_tolerance_ = tf2::durationFromSec(temp_tf_tol);
 }
@@ -261,13 +277,14 @@ StaticLayer::processMap(const nav_msgs::msg::OccupancyGrid & new_map)
   }
 
   map_frame_ = new_map.header.frame_id;
+  applied_map_stamp_ = rclcpp::Time(new_map.header.stamp, RCL_ROS_TIME);
 
   x_ = y_ = 0;
   width_ = size_x_;
   height_ = size_y_;
   has_updated_data_ = true;
 
-  setCurrent(true);
+  setCurrent(isSourceReady());
 }
 
 void
@@ -325,6 +342,25 @@ StaticLayer::incomingMap(const nav_msgs::msg::OccupancyGrid::ConstSharedPtr & ne
   std::lock_guard<Costmap2D::mutex_t> guard(*getMutex());
   map_buffer_ = new_map;
   setCurrent(false);
+}
+
+void
+StaticLayer::incomingSourceBarrier(std_msgs::msg::Header::ConstSharedPtr barrier)
+{
+  std::lock_guard<Costmap2D::mutex_t> guard(*getMutex());
+  source_barrier_ = rclcpp::Time(barrier->stamp, RCL_ROS_TIME);
+  if (isSourceReady()) {
+    // Force a bounds/costs pass, otherwise a settled overlay never regains currency
+    has_updated_data_ = true;
+  } else {
+    setCurrent(false);
+  }
+}
+
+bool
+StaticLayer::isSourceReady() const
+{
+  return source_barrier_.nanoseconds() == 0 || applied_map_stamp_ >= source_barrier_;
 }
 
 void
@@ -539,7 +575,7 @@ StaticLayer::updateCosts(
     // restore the map region occupied by the polygon using cached data
     restoreMapRegionOccupiedByPolygon(map_region_to_restore);
   }
-  setCurrent(true);
+  setCurrent(isSourceReady());
 }
 
 void
@@ -596,6 +632,7 @@ rcl_interfaces::msg::SetParametersResult StaticLayer::validateParameterUpdatesCa
 
     if (param_name == name_ + "." + "map_subscribe_transient_local" ||
       param_name == name_ + "." + "map_topic" ||
+      param_name == name_ + "." + "source_ready_topic" ||
       param_name == name_ + "." + "subscribe_to_updates")
     {
       RCLCPP_WARN(

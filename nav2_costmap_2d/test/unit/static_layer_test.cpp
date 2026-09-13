@@ -23,12 +23,14 @@
 #include "nav2_costmap_2d/inflation_layer.hpp"
 #include "nav2_costmap_2d/static_layer.hpp"
 #include "nav2_ros_common/lifecycle_node.hpp"
+#include "std_msgs/msg/header.hpp"
 #include "tf2_ros/buffer.hpp"
 
 class TestStaticLayer : public nav2_costmap_2d::StaticLayer
 {
 public:
   using StaticLayer::incomingMap;
+  using StaticLayer::incomingSourceBarrier;
   using StaticLayer::incomingUpdate;
 };
 
@@ -381,6 +383,43 @@ TEST_F(StaticLayerOverlayTest, RejectsInitializationOnlyAndInconsistentParameter
     node_->set_parameter(rclcpp::Parameter("overlay.footprint_clearing_enabled", true)).successful);
   EXPECT_TRUE(
     node_->set_parameter(rclcpp::Parameter("overlay.restore_cleared_footprint", true)).successful);
+}
+
+TEST_F(StaticLayerOverlayTest, SourceBarrierHoldsCurrencyUntilANewerMapArrives)
+{
+  auto stamped = [this](int32_t seconds) {
+      auto map = makeMap();
+      map->header.stamp.sec = seconds;
+      return map;
+    };
+  overlay_->incomingMap(stamped(100));
+  layers_->updateMap(10.0, 10.0, 0.0);
+  ASSERT_TRUE(overlay_->isCurrent());
+
+  auto barrier = std::make_shared<std_msgs::msg::Header>();
+  barrier->stamp.sec = 200;
+  overlay_->incomingSourceBarrier(barrier);
+  EXPECT_FALSE(overlay_->isCurrent());
+  layers_->updateMap(10.0, 10.0, 0.0);
+  EXPECT_FALSE(overlay_->isCurrent());
+
+  // A grid that still predates the barrier does not satisfy it
+  overlay_->incomingMap(stamped(150));
+  layers_->updateMap(10.0, 10.0, 0.0);
+  EXPECT_FALSE(overlay_->isCurrent());
+
+  overlay_->incomingMap(stamped(250));
+  layers_->updateMap(10.0, 10.0, 0.0);
+  EXPECT_TRUE(overlay_->isCurrent());
+
+  // A cleared barrier means the source has nothing outstanding
+  auto later_barrier = std::make_shared<std_msgs::msg::Header>();
+  later_barrier->stamp.sec = 300;
+  overlay_->incomingSourceBarrier(later_barrier);
+  ASSERT_FALSE(overlay_->isCurrent());
+  overlay_->incomingSourceBarrier(std::make_shared<std_msgs::msg::Header>());
+  layers_->updateMap(10.0, 10.0, 0.0);
+  EXPECT_TRUE(overlay_->isCurrent());
 }
 
 int main(int argc, char ** argv)
