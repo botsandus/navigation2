@@ -25,6 +25,7 @@
 #include "nav2_ros_common/tf2_factories.hpp"
 
 #include "nav2_msgs/srv/add_shapes.hpp"
+#include "nav2_msgs/srv/replace_shapes.hpp"
 #include "nav2_msgs/srv/remove_shapes.hpp"
 #include "nav2_msgs/srv/get_shapes.hpp"
 #include "nav2_ros_common/lifecycle_node.hpp"
@@ -154,6 +155,11 @@ protected:
     const std::shared_ptr<nav2_msgs::srv::AddShapes::Request> request,
     std::shared_ptr<nav2_msgs::srv::AddShapes::Response> response);
 
+  void replaceShapesCallback(
+    const std::shared_ptr<rmw_request_id_t> request_header,
+    const std::shared_ptr<nav2_msgs::srv::ReplaceShapes::Request> request,
+    std::shared_ptr<nav2_msgs::srv::ReplaceShapes::Response> response);
+
   /**
    * @brief Callback for GetShapes service call.
    * Gets all shapes and returns them to the service response
@@ -214,6 +220,7 @@ protected:
 
   /// @brief AddShapes service
   nav2::ServiceServer<nav2_msgs::srv::AddShapes>::SharedPtr add_shapes_service_;
+  nav2::ServiceServer<nav2_msgs::srv::ReplaceShapes>::SharedPtr replace_shapes_service_;
   /// @brief GetShapes service
   nav2::ServiceServer<nav2_msgs::srv::GetShapes>::SharedPtr get_shapes_service_;
   /// @brief RemoveShapes service

@@ -19,6 +19,7 @@
 #include <functional>
 #include <limits>
 #include <stdexcept>
+#include <unordered_set>
 #include <utility>
 
 #include "rclcpp/create_timer.hpp"
@@ -62,6 +63,10 @@ VectorObjectServer::on_configure(const rclcpp_lifecycle::State & /*state*/)
   add_shapes_service_ = create_service<nav2_msgs::srv::AddShapes>(
     "~/add_shapes",
     std::bind(&VectorObjectServer::addShapesCallback, this, _1, _2, _3));
+
+  replace_shapes_service_ = create_service<nav2_msgs::srv::ReplaceShapes>(
+    "~/replace_shapes",
+    std::bind(&VectorObjectServer::replaceShapesCallback, this, _1, _2, _3));
 
   get_shapes_service_ = create_service<nav2_msgs::srv::GetShapes>(
     "~/get_shapes",
@@ -116,6 +121,7 @@ VectorObjectServer::on_cleanup(const rclcpp_lifecycle::State & /*state*/)
   RCLCPP_INFO(get_logger(), "Cleaning up");
 
   add_shapes_service_.reset();
+  replace_shapes_service_.reset();
   get_shapes_service_.reset();
   remove_shapes_service_.reset();
 
@@ -508,6 +514,54 @@ void VectorObjectServer::addShapesCallback(
   }
 
   switchMapUpdate();
+}
+
+void VectorObjectServer::replaceShapesCallback(
+  const std::shared_ptr<rmw_request_id_t>/*request_header*/,
+  const std::shared_ptr<nav2_msgs::srv::ReplaceShapes::Request> request,
+  std::shared_ptr<nav2_msgs::srv::ReplaceShapes::Response> response)
+{
+  response->success = false;
+  std::vector<std::shared_ptr<Shape>> replacement;
+  replacement.reserve(request->polygons.size() + request->circles.size());
+  std::unordered_set<std::string> uuids;
+  auto node = shared_from_this();
+  const auto stage_shape = [&](const auto & params, const auto & shape) {
+      if (enforce_global_frame_id_ && !params->header.frame_id.empty() &&
+        params->header.frame_id != global_frame_id_)
+      {
+        RCLCPP_ERROR(get_logger(), "Replacement shape frame must match global_frame_id");
+        return false;
+      }
+      if (!shape->setParams(params)) {
+        return false;
+      }
+      if (!uuids.insert(shape->getUUID()).second) {
+        RCLCPP_ERROR(get_logger(), "Duplicate UUID in replacement snapshot");
+        return false;
+      }
+      replacement.push_back(shape);
+      return true;
+    };
+  for (const auto & polygon : request->polygons) {
+    if (!stage_shape(
+        std::make_shared<nav2_msgs::msg::PolygonObject>(polygon),
+        std::make_shared<Polygon>(node)))
+    {
+      return;
+    }
+  }
+  for (const auto & circle : request->circles) {
+    if (!stage_shape(
+        std::make_shared<nav2_msgs::msg::CircleObject>(circle),
+        std::make_shared<Circle>(node)))
+    {
+      return;
+    }
+  }
+  shapes_.swap(replacement);
+  switchMapUpdate();
+  response->success = true;
 }
 
 void VectorObjectServer::getShapesCallback(

@@ -56,6 +56,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/SetInitialPose.srv"
   "srv/ReloadDockDatabase.srv"
   "srv/AddShapes.srv"
+  "srv/ReplaceShapes.srv"
   "srv/RemoveShapes.srv"
   "srv/GetShapes.srv"
   "srv/SetRouteGraph.srv"

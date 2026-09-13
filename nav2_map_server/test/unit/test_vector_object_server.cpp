@@ -100,6 +100,11 @@ public:
   {
     return static_cast<bool>(tf_listener_);
   }
+
+  bool hasMapTimer() const
+  {
+    return static_cast<bool>(map_timer_);
+  }
 };  // VOServerWrapper
 
 class Tester : public ::testing::Test
@@ -143,6 +148,7 @@ protected:
 
   // Service clients for calling AddShapes.srv, GetShapes.srv, RemoveShapes.srv
   nav2::ServiceClient<nav2_msgs::srv::AddShapes>::SharedPtr add_shapes_client_;
+  nav2::ServiceClient<nav2_msgs::srv::ReplaceShapes>::SharedPtr replace_shapes_client_;
   nav2::ServiceClient<nav2_msgs::srv::GetShapes>::SharedPtr get_shapes_client_;
   nav2::ServiceClient<nav2_msgs::srv::RemoveShapes>::SharedPtr remove_shapes_client_;
 
@@ -150,6 +156,7 @@ protected:
   rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr vo_map_sub_;
   // Output map published by VectorObjectServer
   nav_msgs::msg::OccupancyGrid::ConstSharedPtr map_;
+  size_t map_count_{0};
 
   // Vector Object server node
   std::shared_ptr<VOServerWrapper> vo_server_;
@@ -164,6 +171,9 @@ Tester::Tester()
   add_shapes_client_ = vo_server_->create_client<nav2_msgs::srv::AddShapes>(
     std::string(vo_server_->get_name()) + "/add_shapes");
 
+  replace_shapes_client_ = vo_server_->create_client<nav2_msgs::srv::ReplaceShapes>(
+    std::string(vo_server_->get_name()) + "/replace_shapes");
+
   get_shapes_client_ = vo_server_->create_client<nav2_msgs::srv::GetShapes>(
     std::string(vo_server_->get_name()) + "/get_shapes");
 
@@ -172,7 +182,7 @@ Tester::Tester()
 
   vo_map_sub_ = vo_server_->create_subscription<nav_msgs::msg::OccupancyGrid>(
     "vo_map", std::bind(&Tester::mapCallback, this, std::placeholders::_1),
-    nav2::qos::LatchedSubscriptionQoS());
+    nav2::qos::LatchedSubscriptionQoS(10));
 
   // Transform buffer and listener initialization
   tf_buffer_ = nav2::create_transform_buffer(vo_server_);
@@ -186,6 +196,7 @@ Tester::~Tester()
   vo_map_sub_.reset();
 
   add_shapes_client_.reset();
+  replace_shapes_client_.reset();
   get_shapes_client_.reset();
   remove_shapes_client_.reset();
 
@@ -425,6 +436,7 @@ typename T::Response::SharedPtr Tester::sendRequest(
 void Tester::mapCallback(nav_msgs::msg::OccupancyGrid::ConstSharedPtr map)
 {
   map_ = map;
+  ++map_count_;
 }
 
 bool Tester::waitMap(const std::chrono::nanoseconds & timeout)
@@ -514,6 +526,228 @@ void Tester::compareCircleObjects(
 }
 
 // ---------- ROS-parameters tests ----------
+TEST_F(Tester, testReplaceShapesRejectsWholeInvalidSnapshot)
+{
+  setVOServerParams();
+  setShapesParams(
+    "01010101-0101-0101-0101-010101010101",
+    "01010101-0101-0101-0101-010101010102");
+  vo_server_->start();
+  ASSERT_TRUE(waitMap(1s));
+  auto original_map = map_;
+  auto original = sendRequest<nav2_msgs::srv::GetShapes>(
+    get_shapes_client_, std::make_shared<nav2_msgs::srv::GetShapes::Request>(), 1s);
+  ASSERT_NE(original, nullptr);
+  auto request = std::make_shared<nav2_msgs::srv::ReplaceShapes::Request>();
+  request->polygons.push_back(*makePolygonObject(std::vector<unsigned char>(16, 3)));
+  auto circle = makeCircleObject(std::vector<unsigned char>(16, 4));
+  circle->radius = -1.0;
+  request->circles.push_back(*circle);
+  auto result = sendRequest<nav2_msgs::srv::ReplaceShapes>(replace_shapes_client_, request, 1s);
+  ASSERT_NE(result, nullptr);
+  EXPECT_FALSE(result->success);
+  auto actual = sendRequest<nav2_msgs::srv::GetShapes>(
+    get_shapes_client_, std::make_shared<nav2_msgs::srv::GetShapes::Request>(), 1s);
+  ASSERT_NE(actual, nullptr);
+  EXPECT_EQ(actual->polygons, original->polygons);
+  EXPECT_EQ(actual->circles, original->circles);
+  EXPECT_EQ(map_, original_map);
+  vo_server_->stop();
+}
+
+TEST_F(Tester, testReplaceShapesReplacesBothTypesAndClears)
+{
+  setVOServerParams();
+  setShapesParams(
+    "01010101-0101-0101-0101-010101010101",
+    "01010101-0101-0101-0101-010101010102");
+  vo_server_->start();
+  ASSERT_TRUE(waitMap(1s));
+  const auto initial_count = map_count_;
+  auto request = std::make_shared<nav2_msgs::srv::ReplaceShapes::Request>();
+  request->polygons.push_back(*makePolygonObject(std::vector<unsigned char>(16, 3)));
+  request->circles.push_back(*makeCircleObject(std::vector<unsigned char>(16, 4)));
+  auto result = sendRequest<nav2_msgs::srv::ReplaceShapes>(replace_shapes_client_, request, 1s);
+  ASSERT_NE(result, nullptr);
+  ASSERT_TRUE(result->success);
+  auto actual = sendRequest<nav2_msgs::srv::GetShapes>(
+    get_shapes_client_, std::make_shared<nav2_msgs::srv::GetShapes::Request>(), 1s);
+  ASSERT_NE(actual, nullptr);
+  EXPECT_EQ(actual->polygons, request->polygons);
+  EXPECT_EQ(actual->circles, request->circles);
+  EXPECT_EQ(map_count_, initial_count + 1);
+  verifyMap(true);
+
+  request->polygons.clear();
+  request->circles.front().uuid.uuid.fill(3);
+  request->circles.front().center.x = 10.0;
+  map_.reset();
+  result = sendRequest<nav2_msgs::srv::ReplaceShapes>(replace_shapes_client_, request, 1s);
+  ASSERT_NE(result, nullptr);
+  ASSERT_TRUE(result->success);
+  ASSERT_TRUE(waitMap(1s));
+  actual = sendRequest<nav2_msgs::srv::GetShapes>(
+    get_shapes_client_, std::make_shared<nav2_msgs::srv::GetShapes::Request>(), 1s);
+  ASSERT_NE(actual, nullptr);
+  EXPECT_TRUE(actual->polygons.empty());
+  EXPECT_EQ(actual->circles, request->circles);
+  EXPECT_NEAR(map_->info.origin.position.x, 9.0, EPSILON);
+  EXPECT_EQ(map_count_, initial_count + 2);
+
+  request->circles.clear();
+  map_.reset();
+  result = sendRequest<nav2_msgs::srv::ReplaceShapes>(replace_shapes_client_, request, 1s);
+  ASSERT_NE(result, nullptr);
+  ASSERT_TRUE(result->success);
+  ASSERT_TRUE(waitMap(1s));
+  actual = sendRequest<nav2_msgs::srv::GetShapes>(
+    get_shapes_client_, std::make_shared<nav2_msgs::srv::GetShapes::Request>(), 1s);
+  ASSERT_NE(actual, nullptr);
+  EXPECT_TRUE(actual->polygons.empty());
+  EXPECT_TRUE(actual->circles.empty());
+  EXPECT_EQ(map_->data, std::vector<int8_t>{nav2_util::OCC_GRID_UNKNOWN});
+  EXPECT_EQ(map_count_, initial_count + 3);
+  vo_server_->stop();
+}
+
+TEST_F(Tester, testReplaceShapesRejectsDuplicateUUIDs)
+{
+  setVOServerParams();
+  setShapesParams(
+    "01010101-0101-0101-0101-010101010101",
+    "01010101-0101-0101-0101-010101010102");
+  vo_server_->start();
+  auto original = sendRequest<nav2_msgs::srv::GetShapes>(
+    get_shapes_client_, std::make_shared<nav2_msgs::srv::GetShapes::Request>(), 1s);
+  ASSERT_NE(original, nullptr);
+  const auto initial_count = map_count_;
+  const auto polygon = *makePolygonObject(std::vector<unsigned char>(16, 3));
+  const auto circle = *makeCircleObject(std::vector<unsigned char>(16, 3));
+  std::vector<nav2_msgs::srv::ReplaceShapes::Request> snapshots(3);
+  snapshots[0].polygons = {polygon, polygon};
+  snapshots[1].circles = {circle, circle};
+  snapshots[2].polygons = {polygon};
+  snapshots[2].circles = {circle};
+  for (const auto & snapshot : snapshots) {
+    auto result = sendRequest<nav2_msgs::srv::ReplaceShapes>(
+      replace_shapes_client_,
+      std::make_shared<nav2_msgs::srv::ReplaceShapes::Request>(snapshot), 1s);
+    ASSERT_NE(result, nullptr);
+    EXPECT_FALSE(result->success);
+    auto actual = sendRequest<nav2_msgs::srv::GetShapes>(
+      get_shapes_client_, std::make_shared<nav2_msgs::srv::GetShapes::Request>(), 1s);
+    ASSERT_NE(actual, nullptr);
+    EXPECT_EQ(actual->polygons, original->polygons);
+    EXPECT_EQ(actual->circles, original->circles);
+    EXPECT_EQ(map_count_, initial_count);
+  }
+  vo_server_->stop();
+}
+
+TEST_F(Tester, testReplaceShapesGeneratesMissingUUIDs)
+{
+  setVOServerParams();
+  vo_server_->start();
+  auto request = std::make_shared<nav2_msgs::srv::ReplaceShapes::Request>();
+  request->polygons = {*makePolygonObject({}), *makePolygonObject({})};
+  request->circles = {*makeCircleObject({}), *makeCircleObject({})};
+  auto result = sendRequest<nav2_msgs::srv::ReplaceShapes>(replace_shapes_client_, request, 1s);
+  ASSERT_NE(result, nullptr);
+  ASSERT_TRUE(result->success);
+  auto actual = sendRequest<nav2_msgs::srv::GetShapes>(
+    get_shapes_client_, std::make_shared<nav2_msgs::srv::GetShapes::Request>(), 1s);
+  ASSERT_NE(actual, nullptr);
+  ASSERT_EQ(actual->polygons.size(), 2u);
+  ASSERT_EQ(actual->circles.size(), 2u);
+  std::vector<unique_identifier_msgs::msg::UUID> uuids;
+  for (const auto & polygon : actual->polygons) {
+    uuids.push_back(polygon.uuid);
+  }
+  for (const auto & circle : actual->circles) {
+    uuids.push_back(circle.uuid);
+  }
+  for (size_t index = 0; index < uuids.size(); ++index) {
+    EXPECT_NE(uuids[index], unique_identifier_msgs::msg::UUID{});
+    for (size_t other = index + 1; other < uuids.size(); ++other) {
+      EXPECT_NE(uuids[index], uuids[other]);
+    }
+  }
+  vo_server_->stop();
+}
+
+TEST_F(Tester, testReplaceShapesEnforcesFramesAndValidatesPolygons)
+{
+  setVOServerParams();
+  vo_server_->set_parameter(rclcpp::Parameter("enforce_global_frame_id", true));
+  setShapesParams(
+    "01010101-0101-0101-0101-010101010101",
+    "01010101-0101-0101-0101-010101010102");
+  vo_server_->start();
+  auto original = sendRequest<nav2_msgs::srv::GetShapes>(
+    get_shapes_client_, std::make_shared<nav2_msgs::srv::GetShapes::Request>(), 1s);
+  ASSERT_NE(original, nullptr);
+  const auto initial_count = map_count_;
+  std::vector<nav2_msgs::srv::ReplaceShapes::Request> snapshots(3);
+  for (auto & snapshot : snapshots) {
+    snapshot.polygons = {*makePolygonObject(std::vector<unsigned char>(16, 3))};
+    snapshot.circles = {*makeCircleObject(std::vector<unsigned char>(16, 4))};
+  }
+  snapshots[0].polygons.front().header.frame_id = SHAPE_FRAME_ID;
+  snapshots[1].circles.front().header.frame_id = SHAPE_FRAME_ID;
+  snapshots[2].polygons.front().points.clear();
+  for (const auto & snapshot : snapshots) {
+    auto result = sendRequest<nav2_msgs::srv::ReplaceShapes>(
+      replace_shapes_client_,
+      std::make_shared<nav2_msgs::srv::ReplaceShapes::Request>(snapshot), 1s);
+    ASSERT_NE(result, nullptr);
+    EXPECT_FALSE(result->success);
+    auto actual = sendRequest<nav2_msgs::srv::GetShapes>(
+      get_shapes_client_, std::make_shared<nav2_msgs::srv::GetShapes::Request>(), 1s);
+    ASSERT_NE(actual, nullptr);
+    EXPECT_EQ(actual->polygons, original->polygons);
+    EXPECT_EQ(actual->circles, original->circles);
+    EXPECT_EQ(map_count_, initial_count);
+  }
+  auto request = std::make_shared<nav2_msgs::srv::ReplaceShapes::Request>();
+  request->polygons = original->polygons;
+  request->circles = original->circles;
+  request->polygons.front().header.frame_id.clear();
+  auto result = sendRequest<nav2_msgs::srv::ReplaceShapes>(replace_shapes_client_, request, 1s);
+  ASSERT_NE(result, nullptr);
+  EXPECT_TRUE(result->success);
+  vo_server_->stop();
+}
+
+TEST_F(Tester, testReplaceShapesSwitchesDynamicAndStaticUpdates)
+{
+  setVOServerParams();
+  vo_server_->start();
+  ASSERT_TRUE(waitMap(1s));
+  auto original_map = map_;
+  auto request = std::make_shared<nav2_msgs::srv::ReplaceShapes::Request>();
+  request->polygons = {*makePolygonObject(std::vector<unsigned char>(16, 3))};
+  request->polygons.front().header.frame_id = SHAPE_FRAME_ID;
+  auto result = sendRequest<nav2_msgs::srv::ReplaceShapes>(replace_shapes_client_, request, 1s);
+  ASSERT_NE(result, nullptr);
+  EXPECT_TRUE(result->success);
+  EXPECT_TRUE(vo_server_->hasMapTimer());
+  EXPECT_EQ(map_, original_map);
+  auto actual = sendRequest<nav2_msgs::srv::GetShapes>(
+    get_shapes_client_, std::make_shared<nav2_msgs::srv::GetShapes::Request>(), 1s);
+  ASSERT_NE(actual, nullptr);
+  EXPECT_EQ(actual->polygons, request->polygons);
+
+  request->polygons.front().header.frame_id = GLOBAL_FRAME_ID;
+  map_.reset();
+  result = sendRequest<nav2_msgs::srv::ReplaceShapes>(replace_shapes_client_, request, 1s);
+  ASSERT_NE(result, nullptr);
+  EXPECT_TRUE(result->success);
+  EXPECT_FALSE(vo_server_->hasMapTimer());
+  ASSERT_TRUE(waitMap(1s));
+  verifyMap(false);
+  vo_server_->stop();
+}
+
 TEST_F(Tester, testObtainParams)
 {
   setVOServerParams();
