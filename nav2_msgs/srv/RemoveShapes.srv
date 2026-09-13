@@ -4,3 +4,5 @@ bool all_objects
 unique_identifier_msgs/UUID[] uuids
 ---
 bool success
+# Stamp of the map published as a result of this request
+builtin_interfaces/Time map_stamp

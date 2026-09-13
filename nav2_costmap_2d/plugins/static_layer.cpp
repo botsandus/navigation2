@@ -104,6 +104,16 @@ StaticLayer::onInitialize()
       map_topic_ + "_updates",
       std::bind(&StaticLayer::incomingUpdate, this, std::placeholders::_1));
   }
+
+  if (!expected_map_stamp_topic_.empty()) {
+    RCLCPP_INFO(
+      logger_, "Subscribing to expected map stamp topic (%s)",
+      expected_map_stamp_topic_.c_str());
+    expected_map_stamp_sub_ = node->create_subscription<std_msgs::msg::Header>(
+      expected_map_stamp_topic_,
+      std::bind(&StaticLayer::incomingExpectedMapStamp, this, std::placeholders::_1),
+      nav2::qos::LatchedSubscriptionQoS(1));
+  }
 }
 
 void
@@ -164,6 +174,11 @@ StaticLayer::getParameters()
   map_topic_ = node->declare_or_get_parameter(
     name_ + "." + "map_topic", std::string("map"));
   map_topic_ = joinWithParentNamespace(map_topic_);
+  expected_map_stamp_topic_ = node->declare_or_get_parameter(
+    name_ + "." + "expected_map_stamp_topic", std::string(""));
+  if (!expected_map_stamp_topic_.empty()) {
+    expected_map_stamp_topic_ = joinWithParentNamespace(expected_map_stamp_topic_);
+  }
   map_subscribe_transient_local_ = node->declare_or_get_parameter(
     name_ + "." + "map_subscribe_transient_local", true);
   node->get_parameter("track_unknown_space", track_unknown_space_);
@@ -261,13 +276,41 @@ StaticLayer::processMap(const nav_msgs::msg::OccupancyGrid & new_map)
   }
 
   map_frame_ = new_map.header.frame_id;
+  applied_map_stamp_ = new_map.header.stamp;
 
   x_ = y_ = 0;
   width_ = size_x_;
   height_ = size_y_;
   has_updated_data_ = true;
+}
 
-  setCurrent(true);
+void
+StaticLayer::setCurrentIfMapExpected()
+{
+  if (expected_map_stamp_topic_.empty()) {
+    setCurrent(true);
+    return;
+  }
+  const bool announced = expected_map_stamp_received_ &&
+    (expected_map_stamp_.sec != 0 || expected_map_stamp_.nanosec != 0);
+  const bool applied_is_older = applied_map_stamp_.sec < expected_map_stamp_.sec ||
+    (applied_map_stamp_.sec == expected_map_stamp_.sec &&
+    applied_map_stamp_.nanosec < expected_map_stamp_.nanosec);
+  setCurrent(announced && !applied_is_older);
+}
+
+void
+StaticLayer::incomingExpectedMapStamp(const std_msgs::msg::Header::ConstSharedPtr & ready)
+{
+  std::lock_guard<Costmap2D::mutex_t> guard(*getMutex());
+  expected_map_stamp_received_ = true;
+  expected_map_stamp_ = ready->stamp;
+  if (!map_received_in_update_bounds_) {
+    setCurrent(false);
+    return;
+  }
+  // updateCosts() may not run again if no bounds are dirty, so decide here
+  setCurrentIfMapExpected();
 }
 
 void
@@ -539,7 +582,7 @@ StaticLayer::updateCosts(
     // restore the map region occupied by the polygon using cached data
     restoreMapRegionOccupiedByPolygon(map_region_to_restore);
   }
-  setCurrent(true);
+  setCurrentIfMapExpected();
 }
 
 void

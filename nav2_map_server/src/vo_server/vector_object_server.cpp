@@ -323,6 +323,8 @@ void VectorObjectServer::publishMap()
 {
   if (map_) {
     auto map = std::make_unique<nav_msgs::msg::OccupancyGrid>(*map_);
+    last_map_stamp_ = now();
+    map->header.stamp = last_map_stamp_;
     map_pub_->publish(std::move(map));
   }
 }
@@ -508,6 +510,7 @@ void VectorObjectServer::addShapesCallback(
   }
 
   switchMapUpdate();
+  response->map_stamp = last_map_stamp_;
 }
 
 void VectorObjectServer::getShapesCallback(
@@ -517,6 +520,7 @@ void VectorObjectServer::getShapesCallback(
 {
   std::shared_ptr<Polygon> polygon;
   std::shared_ptr<Circle> circle;
+  response->map_stamp = last_map_stamp_;
 
   for (auto shape : shapes_) {
     switch (shape->getType()) {
@@ -566,6 +570,7 @@ void VectorObjectServer::removeShapesCallback(
   }
 
   switchMapUpdate();
+  response->map_stamp = last_map_stamp_;
 }
 
 }  // namespace nav2_map_server

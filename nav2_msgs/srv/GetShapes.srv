@@ -3,3 +3,5 @@
 ---
 CircleObject[] circles
 PolygonObject[] polygons
+# Stamp of the latest published map reflecting these shapes
+builtin_interfaces/Time map_stamp

@@ -4,3 +4,5 @@ CircleObject[] circles
 PolygonObject[] polygons
 ---
 bool success
+# Stamp of the map published as a result of this request
+builtin_interfaces/Time map_stamp

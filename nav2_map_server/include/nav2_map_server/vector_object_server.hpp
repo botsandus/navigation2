@@ -196,6 +196,8 @@ protected:
 
   /// @brief Output map with vector objects on it
   nav_msgs::msg::OccupancyGrid::SharedPtr map_;
+  /// @brief Stamp given to the most recently published map
+  builtin_interfaces::msg::Time last_map_stamp_;
   /// @brief Whether to process and publish map
   double process_map_;
 

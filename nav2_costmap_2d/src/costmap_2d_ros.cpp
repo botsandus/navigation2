@@ -638,7 +638,16 @@ Costmap2DROS::waitUntilCurrent(const rclcpp::Duration & timeout)
   auto waiting_start = now();
   while (!isCurrent()) {
     if (now() - waiting_start > timeout) {
-      throw std::runtime_error("Costmap timed out waiting for update");
+      std::string stale_layers;
+      for (const auto & layers : {layered_costmap_->getPlugins(), layered_costmap_->getFilters()}) {
+        for (const auto & layer : *layers) {
+          if (!layer->isCurrent()) {
+            stale_layers += (stale_layers.empty() ? "" : ", ") + layer->getName();
+          }
+        }
+      }
+      throw std::runtime_error(
+              "Costmap timed out waiting for update; layers not current: " + stale_layers);
     }
     r.sleep();
   }

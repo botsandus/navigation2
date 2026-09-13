@@ -23,6 +23,7 @@
 #include "nav2_costmap_2d/inflation_layer.hpp"
 #include "nav2_costmap_2d/static_layer.hpp"
 #include "nav2_ros_common/lifecycle_node.hpp"
+#include "rclcpp/executors/single_threaded_executor.hpp"
 #include "tf2_ros/buffer.hpp"
 
 class TestStaticLayer : public nav2_costmap_2d::StaticLayer
@@ -30,6 +31,14 @@ class TestStaticLayer : public nav2_costmap_2d::StaticLayer
 public:
   using StaticLayer::incomingMap;
   using StaticLayer::incomingUpdate;
+  using StaticLayer::incomingExpectedMapStamp;
+
+  void expectMapStamp(int32_t map_stamp_sec)
+  {
+    auto msg = std::make_shared<std_msgs::msg::Header>();
+    msg->stamp.sec = map_stamp_sec;
+    incomingExpectedMapStamp(msg);
+  }
 };
 
 class StaticLayerOverlayTest : public ::testing::Test
@@ -61,10 +70,11 @@ protected:
     node_->shutdown();
   }
 
-  nav_msgs::msg::OccupancyGrid::SharedPtr makeMap(double origin_x = 5.0)
+  nav_msgs::msg::OccupancyGrid::SharedPtr makeMap(double origin_x = 5.0, int32_t stamp_sec = 1)
   {
     auto map = std::make_shared<nav_msgs::msg::OccupancyGrid>();
     map->header.frame_id = "map";
+    map->header.stamp.sec = stamp_sec;
     map->info.width = 2;
     map->info.height = 2;
     map->info.resolution = 2.0;
@@ -73,6 +83,16 @@ protected:
     map->info.origin.orientation.w = 1.0;
     map->data = {100, -1, -1, -1};
     return map;
+  }
+
+  std::shared_ptr<TestStaticLayer> addGatedLayer(const std::string & name)
+  {
+    node_->declare_parameter(name + ".resize_master", false);
+    node_->declare_parameter(name + ".expected_map_stamp_topic", "/overlay_source/ready");
+    auto layer = std::make_shared<TestStaticLayer>();
+    layers_->addPlugin(layer);
+    layer->initialize(layers_.get(), name, tf_.get(), node_, nullptr);
+    return layer;
   }
 
   nav2::LifecycleNode::SharedPtr node_;
@@ -279,6 +299,102 @@ TEST_F(StaticLayerOverlayTest, RollingDefaultLayerKeepsLethalUnderUnknownMapCell
   base->updateCosts(*master, 0, 0, 10, 10);
   EXPECT_EQ(master->getCost(5, 5), nav2_costmap_2d::LETHAL_OBSTACLE);
   EXPECT_EQ(master->getCost(0, 0), nav2_costmap_2d::LETHAL_OBSTACLE);
+}
+
+TEST_F(StaticLayerOverlayTest, ZeroExpectedStampHoldsNotCurrentUntilAnnouncedMapApplied)
+{
+  auto gated = addGatedLayer("gated");
+  gated->incomingMap(makeMap(5.0, 1));
+  gated->expectMapStamp(1);
+  layers_->updateMap(10.0, 10.0, 0.0);
+  ASSERT_TRUE(gated->isCurrent());
+
+  gated->expectMapStamp(0);
+  EXPECT_FALSE(gated->isCurrent());
+  layers_->updateMap(10.0, 10.0, 0.0);
+  EXPECT_FALSE(gated->isCurrent());
+
+  // Announcement arrives before the map it refers to
+  gated->expectMapStamp(2);
+  layers_->updateMap(10.0, 10.0, 0.0);
+  EXPECT_FALSE(gated->isCurrent());
+
+  gated->incomingMap(makeMap(10.0, 2));
+  layers_->updateMap(10.0, 10.0, 0.0);
+  EXPECT_TRUE(gated->isCurrent());
+  EXPECT_EQ(layers_->getCostmap()->getCost(10, 5), nav2_costmap_2d::LETHAL_OBSTACLE);
+}
+
+TEST_F(StaticLayerOverlayTest, MapBeforeExpectedStampBecomesCurrentOnAnnouncement)
+{
+  auto gated = addGatedLayer("gated");
+  gated->incomingMap(makeMap(5.0, 1));
+  gated->expectMapStamp(1);
+  layers_->updateMap(10.0, 10.0, 0.0);
+  gated->expectMapStamp(0);
+  gated->incomingMap(makeMap(10.0, 2));
+  layers_->updateMap(10.0, 10.0, 0.0);
+  EXPECT_FALSE(gated->isCurrent());
+
+  // No further update cycle is needed once the source confirms
+  gated->expectMapStamp(2);
+  EXPECT_TRUE(gated->isCurrent());
+}
+
+TEST_F(StaticLayerOverlayTest, ExpectedStampWithoutAnyMapStaysNotCurrent)
+{
+  auto gated = addGatedLayer("gated");
+  gated->expectMapStamp(1);
+  layers_->updateMap(10.0, 10.0, 0.0);
+  EXPECT_FALSE(gated->isCurrent());
+
+  gated->incomingMap(makeMap(5.0, 1));
+  layers_->updateMap(10.0, 10.0, 0.0);
+  EXPECT_TRUE(gated->isCurrent());
+}
+
+TEST_F(StaticLayerOverlayTest, NewerAppliedMapSatisfiesOlderAnnouncement)
+{
+  auto gated = addGatedLayer("gated");
+  gated->incomingMap(makeMap(5.0, 3));
+  layers_->updateMap(10.0, 10.0, 0.0);
+  EXPECT_FALSE(gated->isCurrent());
+  gated->expectMapStamp(2);
+  EXPECT_TRUE(gated->isCurrent());
+}
+
+TEST_F(StaticLayerOverlayTest, ExpectedMapStampTopicIsSubscribedWhenConfigured)
+{
+  overlay_->deactivate();
+  auto gated = addGatedLayer("gated");
+
+  rclcpp::executors::SingleThreadedExecutor executor;
+  executor.add_node(node_->get_node_base_interface());
+  auto spin_until = [&](auto && predicate) {
+      const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+      while (!predicate() && std::chrono::steady_clock::now() < deadline) {
+        executor.spin_some(std::chrono::milliseconds(10));
+        layers_->updateMap(10.0, 10.0, 0.0);
+      }
+    };
+
+  // Deliver the map over the real subscription this time
+  auto map_publisher = node_->create_publisher<nav_msgs::msg::OccupancyGrid>(
+    "map", nav2::qos::LatchedPublisherQoS());
+  map_publisher->on_activate();
+  map_publisher->publish(*makeMap(5.0, 1));
+  auto ready_publisher = node_->create_publisher<std_msgs::msg::Header>(
+    "/overlay_source/ready", nav2::qos::LatchedPublisherQoS());
+  ready_publisher->on_activate();
+  std_msgs::msg::Header ready;
+  ready.stamp.sec = 1;
+  ready_publisher->publish(ready);
+  spin_until([&]() {return gated->isCurrent();});
+  ASSERT_TRUE(gated->isCurrent());
+
+  ready_publisher->publish(std_msgs::msg::Header());
+  spin_until([&]() {return !gated->isCurrent();});
+  EXPECT_FALSE(gated->isCurrent());
 }
 
 TEST_F(StaticLayerOverlayTest, FootprintClearingWorksInOverlayFrame)

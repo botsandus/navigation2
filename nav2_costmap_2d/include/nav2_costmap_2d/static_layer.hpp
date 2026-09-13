@@ -48,6 +48,7 @@
 #include "nav2_costmap_2d/costmap_layer.hpp"
 #include "nav2_costmap_2d/layered_costmap.hpp"
 #include "nav_msgs/msg/occupancy_grid.hpp"
+#include "std_msgs/msg/header.hpp"
 #include "nav2_costmap_2d/footprint.hpp"
 
 namespace nav2_costmap_2d
@@ -166,6 +167,18 @@ protected:
   void incomingUpdate(map_msgs::msg::OccupancyGridUpdate::ConstSharedPtr update);
 
   /**
+   * @brief Callback for the optional expected_map_stamp_topic. The message carries the header of the
+   * map the source considers complete; the layer is current once it has applied a map stamped at
+   * or after that time. A zero stamp means the source has nothing verified yet.
+   */
+  void incomingExpectedMapStamp(const std_msgs::msg::Header::ConstSharedPtr & ready);
+
+  /**
+   * @brief Mark the layer current unless the applied map predates what the source announced
+   */
+  void setCurrentIfMapExpected();
+
+  /**
    * @brief Interpret the value in the static map given on the topic to
    * convert into costs for the costmap to utilize
    */
@@ -227,9 +240,14 @@ protected:
 
   nav2::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr map_sub_;
   nav2::Subscription<map_msgs::msg::OccupancyGridUpdate>::SharedPtr map_update_sub_;
+  nav2::Subscription<std_msgs::msg::Header>::SharedPtr expected_map_stamp_sub_;
+  bool expected_map_stamp_received_{false};
+  builtin_interfaces::msg::Time expected_map_stamp_;
+  builtin_interfaces::msg::Time applied_map_stamp_;
 
   // Parameters
   std::string map_topic_;
+  std::string expected_map_stamp_topic_;
   bool map_subscribe_transient_local_;
   bool subscribe_to_updates_;
   bool track_unknown_space_;
