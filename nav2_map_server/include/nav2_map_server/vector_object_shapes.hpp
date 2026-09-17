@@ -173,7 +173,7 @@ public:
    * @param map Output map pointer
    * @param overlay_type Overlay type
    */
-  virtual void putBorders(
+  virtual bool putBorders(
     nav_msgs::msg::OccupancyGrid::SharedPtr map, const OverlayType overlay_type) = 0;
 
 protected:
@@ -298,7 +298,7 @@ public:
    * @param map Output map pointer
    * @param overlay_type Overlay type
    */
-  void putBorders(nav_msgs::msg::OccupancyGrid::SharedPtr map, const OverlayType overlay_type);
+  bool putBorders(nav_msgs::msg::OccupancyGrid::SharedPtr map, const OverlayType overlay_type);
 
 protected:
   /**
@@ -415,7 +415,7 @@ public:
    * @param map Output map pointer
    * @param overlay_type Overlay type
    */
-  void putBorders(nav_msgs::msg::OccupancyGrid::SharedPtr map, const OverlayType overlay_type);
+  bool putBorders(nav_msgs::msg::OccupancyGrid::SharedPtr map, const OverlayType overlay_type);
 
 protected:
   /**

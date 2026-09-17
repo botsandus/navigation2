@@ -370,7 +370,7 @@ void Polygon::getRowSpans(
   }
 }
 
-void Polygon::putBorders(
+bool Polygon::putBorders(
   nav_msgs::msg::OccupancyGrid::SharedPtr map, const OverlayType overlay_type)
 {
   unsigned int mx0, my0, mx1, my1;
@@ -385,7 +385,7 @@ void Polygon::putBorders(
       node->get_logger(),
       "[UUID: %s] Can not convert (%f, %f) point to map",
       getUUID().c_str(), polygon_->points[0].x, polygon_->points[0].y);
-    return;
+    return false;
   }
 
   MapAction ma(map, params_->value, overlay_type);
@@ -397,10 +397,11 @@ void Polygon::putBorders(
         node->get_logger(),
         "[UUID: %s] Can not convert (%f, %f) point to map",
         getUUID().c_str(), polygon_->points[i].x, polygon_->points[i].y);
-      return;
+      return false;
     }
     nav2_util::raytraceLine(ma, mx0, my0, mx1, my1, map->info.width);
   }
+  return true;
 }
 
 bool Polygon::checkConsistency()
@@ -590,12 +591,12 @@ void Circle::getRowSpans(
   spans.emplace_back(center_->x - half_chord - padding, center_->x + half_chord + padding);
 }
 
-void Circle::putBorders(
+bool Circle::putBorders(
   nav_msgs::msg::OccupancyGrid::SharedPtr map, const OverlayType overlay_type)
 {
   unsigned int mcx, mcy;
   if (!centerToMap(map, mcx, mcy)) {
-    return;
+    return false;
   }
 
   // Implementation of the circle generation algorithm, based on the following work:
@@ -637,6 +638,7 @@ void Circle::putBorders(
     putPoint(mcx - x + 1, mcy - y + 1, map, overlay_type);
     putPoint(mcx + x, mcy - y + 1, map, overlay_type);
   }
+  return true;
 }
 
 bool Circle::checkConsistency()
