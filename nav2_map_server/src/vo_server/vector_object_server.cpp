@@ -239,13 +239,20 @@ bool VectorObjectServer::transformVectorObjects()
 void VectorObjectServer::getMapBoundaries(
   double & min_x, double & min_y, double & max_x, double & max_y) const
 {
+  nav2_map_server::getMapBoundaries(shapes_, min_x, min_y, max_x, max_y);
+}
+
+void getMapBoundaries(
+  const std::vector<std::shared_ptr<Shape>> & shapes,
+  double & min_x, double & min_y, double & max_x, double & max_y)
+{
   min_x = std::numeric_limits<double>::max();
   min_y = std::numeric_limits<double>::max();
   max_x = std::numeric_limits<double>::lowest();
   max_y = std::numeric_limits<double>::lowest();
 
   double min_p_x, min_p_y, max_p_x, max_p_y;
-  for (auto shape : shapes_) {
+  for (auto shape : shapes) {
     shape->getBoundaries(min_p_x, min_p_y, max_p_x, max_p_y);
     min_x = std::min(min_x, min_p_x);
     min_y = std::min(min_y, min_p_y);
@@ -266,9 +273,18 @@ void VectorObjectServer::getMapBoundaries(
 void VectorObjectServer::updateMap(
   const double & min_x, const double & min_y, const double & max_x, const double & max_y)
 {
+  nav2_map_server::updateMap(
+    map_, min_x, min_y, max_x, max_y, resolution_, default_value_, global_frame_id_);
+}
+
+void updateMap(
+  nav_msgs::msg::OccupancyGrid::SharedPtr & map,
+  double min_x, double min_y, double max_x, double max_y,
+  double resolution, int8_t default_value, const std::string & frame_id)
+{
   // Calculate size of update map
-  int size_x = static_cast<int>((max_x - min_x) / resolution_) + 1;
-  int size_y = static_cast<int>((max_y - min_y) / resolution_) + 1;
+  int size_x = static_cast<int>((max_x - min_x) / resolution) + 1;
+  int size_y = static_cast<int>((max_y - min_y) / resolution) + 1;
 
   if (size_x < 0) {
     throw std::runtime_error("Incorrect map x-size");
@@ -278,27 +294,27 @@ void VectorObjectServer::updateMap(
     throw std::runtime_error("Incorrect map y-size");
   }
 
-  if (!map_) {
-    map_ = std::make_shared<nav_msgs::msg::OccupancyGrid>();
+  if (!map) {
+    map = std::make_shared<nav_msgs::msg::OccupancyGrid>();
   }
 
   if (
-    map_->info.width != static_cast<unsigned int>(size_x) ||
-    map_->info.height != static_cast<unsigned int>(size_y))
+    map->info.width != static_cast<unsigned int>(size_x) ||
+    map->info.height != static_cast<unsigned int>(size_y))
   {
     // Map size was changed
-    map_->data = std::vector<int8_t>(size_x * size_y, default_value_);
-    map_->info.width = size_x;
-    map_->info.height = size_y;
+    map->data = std::vector<int8_t>(size_x * size_y, default_value);
+    map->info.width = size_x;
+    map->info.height = size_y;
   } else if (size_x > 0 && size_y > 0) {
     // Map size was not changed
-    memset(map_->data.data(), default_value_, size_x * size_y * sizeof(int8_t));
+    memset(map->data.data(), default_value, size_x * size_y * sizeof(int8_t));
   }
 
-  map_->header.frame_id = global_frame_id_;
-  map_->info.resolution = resolution_;
-  map_->info.origin.position.x = min_x;
-  map_->info.origin.position.y = min_y;
+  map->header.frame_id = frame_id;
+  map->info.resolution = resolution;
+  map->info.origin.position.x = min_x;
+  map->info.origin.position.y = min_y;
 }
 
 void VectorObjectServer::putVectorObjectsOnMap()

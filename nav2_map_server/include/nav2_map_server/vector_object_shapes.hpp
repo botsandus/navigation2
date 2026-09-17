@@ -45,6 +45,17 @@ enum ShapeType
   CIRCLE = 2
 };
 
+class Shape;
+
+void getMapBoundaries(
+  const std::vector<std::shared_ptr<Shape>> & shapes,
+  double & min_x, double & min_y, double & max_x, double & max_y);
+
+void updateMap(
+  nav_msgs::msg::OccupancyGrid::SharedPtr & map,
+  double min_x, double min_y, double max_x, double max_y,
+  double resolution, int8_t default_value, const std::string & frame_id);
+
 /// @brief Basic class, other vector objects to be inherited from
 class Shape
 {
