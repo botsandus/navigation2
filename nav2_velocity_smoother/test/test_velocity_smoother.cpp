@@ -50,6 +50,53 @@ public:
   }
 };
 
+TEST(VelocitySmootherTest, stampedTimeoutRampKeepsCurrentTimestamp)
+{
+  auto smoother = std::make_shared<VelSmootherShim>();
+  rclcpp::executors::SingleThreadedExecutor executor;
+  executor.add_node(smoother->get_node_base_interface());
+  smoother->declare_parameter("enable_stamped_cmd_vel", rclcpp::ParameterValue(true));
+  smoother->declare_parameter("velocity_timeout", rclcpp::ParameterValue(0.4));
+  smoother->declare_parameter(
+    "max_decel", rclcpp::ParameterValue(std::vector<double>{-0.5, 0.0, -1.2}));
+  rclcpp_lifecycle::State state;
+  ASSERT_EQ(smoother->configure(state), nav2::CallbackReturn::SUCCESS);
+  smoother->activate(state);
+
+  std::vector<geometry_msgs::msg::TwistStamped> messages;
+  int64_t greatest_future_ns = 0;
+  auto subscription = nav2_util::TwistSubscriber(
+    smoother, "cmd_vel_smoothed",
+    [](geometry_msgs::msg::Twist::ConstSharedPtr) {},
+    [&](geometry_msgs::msg::TwistStamped::ConstSharedPtr msg) {
+      const auto future_ns =
+        (rclcpp::Time(msg->header.stamp) - smoother->now()).nanoseconds();
+      greatest_future_ns = std::max(greatest_future_ns, future_ns);
+      messages.push_back(*msg);
+    });
+
+  auto cmd = std::make_shared<geometry_msgs::msg::TwistStamped>();
+  cmd->header.stamp = smoother->now();
+  cmd->header.frame_id = "base_link";
+  cmd->twist.linear.x = 0.5;
+  smoother->sendCommandMsg(cmd);
+  const auto start = smoother->now();
+  while (smoother->now() - start < 1.7s) {
+    executor.spin_some();
+  }
+
+  ASSERT_GT(messages.size(), 12u);
+  EXPECT_EQ(messages.back().twist.linear.x, 0.0);
+  // Downstream drivers reject future-dated commands, including the final zero
+  // needed to rearm after a stop. Exercise multiple ticks after input timeout.
+  EXPECT_LE(greatest_future_ns, 50000000);
+  for (const auto & msg : messages) {
+    EXPECT_EQ(msg.header.frame_id, "base_link");
+  }
+  smoother->deactivate(state);
+  smoother->cleanup(state);
+}
+
 TEST(VelocitySmootherTest, openLoopTestTimer6dof)
 {
   auto smoother =

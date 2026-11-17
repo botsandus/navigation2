@@ -350,8 +350,9 @@ void VelocitySmoother::smootherTimer()
       stopped_ = true;
       return;
     }
-    command_ = geometry_msgs::msg::TwistStamped();
-    command_.header.stamp = now();
+    // Retain the input timestamp paired with last_command_time_. Replacing it
+    // with now() makes subsequent ramp-down outputs future-dated.
+    command_.twist = geometry_msgs::msg::Twist();
   }
 
   stopped_ = false;
