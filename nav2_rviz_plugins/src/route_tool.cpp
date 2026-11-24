@@ -15,18 +15,16 @@
 #include "nav2_rviz_plugins/route_tool.hpp"
 
 #include <sys/types.h>
+#include <QDesktopServices>
+#include <QFileDialog>
+#include <QMetaObject>
+#include <QUrl>
 
 #include <algorithm>
 #include <cmath>
 #include <functional>
 
 #include "rviz_common/display_context.hpp"
-
-#include <QDesktopServices>
-#include <QFileDialog>
-#include <QMetaObject>
-#include <QUrl>
-
 #include "tf2/LinearMath/Quaternion.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 
@@ -311,6 +309,7 @@ void RouteTool::on_save_button_clicked(void)
   auto logger = node_->get_logger();
   set_route_graph_client_->async_send_request(
     request,
+    // nosemgrep: detect-rclcpp-client
     [logger, filename](rclcpp::Client<nav2_msgs::srv::SetRouteGraph>::SharedFuture future) {
       auto response = future.get();
       if (response->success) {
