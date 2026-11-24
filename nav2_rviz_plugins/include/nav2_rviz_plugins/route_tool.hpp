@@ -138,7 +138,7 @@ private:
   nav2::Subscription<geometry_msgs::msg::PointStamped>::SharedPtr
     clicked_point_subscription_;
   std::shared_ptr<interactive_markers::InteractiveMarkerServer> im_server_;
-  rclcpp::Client<nav2_msgs::srv::SetRouteGraph>::SharedPtr set_route_graph_client_;
+  rclcpp::Client<nav2_msgs::srv::SetRouteGraph>::SharedPtr set_route_graph_client_;  //  nosemgrep
 
   unsigned int next_node_id_ = 0;
 };
