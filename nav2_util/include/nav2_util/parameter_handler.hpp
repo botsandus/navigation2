@@ -70,6 +70,24 @@ public:
       std::bind(&ParameterHandler::updateParametersCallback, this, std::placeholders::_1));
     on_set_params_handler_ = node->add_on_set_parameters_callback(
       std::bind(&ParameterHandler::validateParameterUpdatesCallback, this, std::placeholders::_1));
+
+    // Resync params_ with the parameter store: catches set_parameters calls made
+    // while we were inactive (no on-set callback registered), which would otherwise
+    // leave the cached params_ struct stale until the parameter is set again.
+    // Skip parameters that are declared but uninitialized (PARAMETER_NOT_SET) —
+    // a bulk get_parameters on those throws ParameterUninitializedException.
+    std::vector<rclcpp::Parameter> initialized;
+    for (const auto & name : node->list_parameters({}, 0).names) {
+      rclcpp::Parameter p;
+      if (node->get_parameter(name, p) &&
+        p.get_type() != rclcpp::ParameterType::PARAMETER_NOT_SET)
+      {
+        initialized.push_back(p);
+      }
+    }
+    if (!initialized.empty()) {
+      updateParametersCallback(initialized);
+    }
   }
 
   /**
